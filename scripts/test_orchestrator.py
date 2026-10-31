@@ -100,6 +100,69 @@ class SafetyTests(unittest.TestCase):
             with patch.object(o, "ROOT", original), self.assertRaisesRegex(o.Stop, "Konflikt"):
                 o.review_run(run, apply=True)
 
+    def test_review_ignores_internal_dependency_symlinks_but_checks_project_delta(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = Path(tmp) / "original", Path(tmp) / "run"
+            workspace = run / "workspace"
+            (root / "docs").mkdir(parents=True)
+            (workspace / "docs").mkdir(parents=True)
+            source, candidate = root / "docs/a.txt", workspace / "docs/a.txt"
+            source.write_text("before")
+            candidate.write_text("after")
+            (workspace / "node_modules/.bin").mkdir(parents=True)
+            (workspace / "node_modules/pkg").mkdir()
+            (workspace / "node_modules/pkg/tool").write_text("tool")
+            (workspace / "node_modules/.bin/tool").symlink_to("../pkg/tool")
+            base = {"docs/a.txt": __import__("hashlib").sha256(b"before").hexdigest()}
+            (run / "report.json").write_text(json.dumps({"status": "ready_for_manual_review",
+                "allowed": ["docs/a.txt"], "files": ["docs/a.txt"], "base_hashes": base}))
+            with patch.object(o, "ROOT", root):
+                o.review_run(run)
+                (workspace / "unexpected.txt").write_text("surprise")
+                with self.assertRaisesRegex(o.Stop, "unerwartet verändert"):
+                    o.review_run(run)
+
+    def test_review_rejects_old_incomplete_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = Path(tmp) / "original", Path(tmp) / "run"
+            root.mkdir()
+            (run / "workspace").mkdir(parents=True)
+            for report in (
+                {"status": "ready_for_manual_review", "files": ["a.txt"], "base_hashes": {"a.txt": "0" * 64}},
+                {"status": "ready_for_manual_review", "allowed": ["a.txt"], "files": ["a.txt"]},
+            ):
+                (run / "report.json").write_text(json.dumps(report))
+                with patch.object(o, "ROOT", root), self.assertRaises(o.Stop):
+                    o.review_run(run)
+
+    def test_review_rejects_changed_original_before_display_or_apply(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = Path(tmp) / "original", Path(tmp) / "run"
+            (root / "a.txt").parent.mkdir(parents=True)
+            (run / "workspace").mkdir(parents=True)
+            (root / "a.txt").write_text("changed")
+            (run / "workspace/a.txt").write_text("worker")
+            base = {"a.txt": __import__("hashlib").sha256(b"before").hexdigest()}
+            (run / "report.json").write_text(json.dumps({"status": "ready_for_manual_review",
+                "allowed": ["a.txt"], "files": ["a.txt"], "base_hashes": base}))
+            with patch.object(o, "ROOT", root), self.assertRaisesRegex(o.Stop, "Konflikt"):
+                o.review_run(run)
+
+    def test_apply_still_rejects_symlink_in_approved_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = Path(tmp) / "original", Path(tmp) / "run"
+            root.mkdir()
+            outside = Path(tmp) / "outside"
+            outside.write_text("before")
+            (root / "a.txt").symlink_to(outside)
+            (run / "workspace").mkdir(parents=True)
+            (run / "workspace/a.txt").write_text("after")
+            base = {"a.txt": __import__("hashlib").sha256(b"before").hexdigest()}
+            (run / "report.json").write_text(json.dumps({"status": "ready_for_manual_review",
+                "allowed": ["a.txt"], "files": ["a.txt"], "base_hashes": base}))
+            with patch.object(o, "ROOT", root), self.assertRaisesRegex(o.Stop, "Symlink im Übernahmepfad"):
+                o.review_run(run, apply=True, input_fn=lambda _: "APPLY")
+
     def test_review_rejects_unapproved_file_and_requires_exact_confirmation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root, run = Path(tmp) / "original", Path(tmp) / "run"

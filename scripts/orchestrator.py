@@ -71,13 +71,19 @@ def run_process(command, cwd, timeout, log, prompt=None):
             process.wait()
 
 
+SNAPSHOT_IGNORED_DIRS = {"node_modules", ".venv", "dist", "artifacts", "__pycache__", ".pytest_cache"}
+SNAPSHOT_IGNORED_FILES = {".DS_Store"}
+SNAPSHOT_IGNORED_SUFFIXES = (".tsbuildinfo", ".pyc")
+
+
 def snapshot(root, checking=False):
+    """Hash project files, consistently excluding copied dependencies and generated output."""
     result = {}
     for folder, dirs, files in os.walk(root, followlinks=False):
-        if checking:
-            dirs[:] = [d for d in dirs if d not in {"node_modules", ".venv", "dist", "__pycache__", ".pytest_cache"}]
-            files = [f for f in files if not f.endswith((".tsbuildinfo", ".pyc"))]
+        dirs[:] = [d for d in dirs if d not in SNAPSHOT_IGNORED_DIRS]
         for name in list(dirs) + files:
+            if name in SNAPSHOT_IGNORED_FILES or name.endswith(SNAPSHOT_IGNORED_SUFFIXES):
+                continue
             path = Path(folder) / name
             relative = path.relative_to(root).as_posix()
             if path.is_symlink():
@@ -176,22 +182,49 @@ def review_run(run, apply=False, selected=None, input_fn=None):
         report = json.loads(report_path.read_text())
     except (OSError, ValueError) as exc:
         raise Stop("Laufbericht fehlt oder ist ungültig.") from exc
-    if report.get("status") != "ready_for_manual_review":
+    if not isinstance(report, dict) or report.get("status") != "ready_for_manual_review":
         raise Stop("Lauf ist nicht zur Übernahme freigegeben.")
     workspace = run / "workspace"
     try:
-        allow = {safe_path(p) for p in report.get("allowed", [])}
-        changed = {safe_path(p) for p in report.get("files", [])}
+        raw_allow, raw_changed = report.get("allowed"), report.get("files")
+        base = report.get("base_hashes")
+        if (not isinstance(raw_allow, list) or not raw_allow
+                or not isinstance(raw_changed, list) or not raw_changed
+                or not isinstance(base, dict) or not base):
+            raise Stop("Alter oder unvollständiger Laufbericht: Basis-Hashes oder erlaubte Pfade fehlen.")
+        allow = {safe_path(p) for p in raw_allow}
+        changed = {safe_path(p) for p in raw_changed}
         selected = None if selected is None else {safe_path(p) for p in selected}
     except (Stop, TypeError) as exc:
+        if isinstance(exc, Stop) and str(exc).startswith("Alter oder"):
+            raise
         raise Stop("Ungültige Pfadangaben im Laufbericht.") from exc
-    base = report.get("base_hashes", {})
+    if (len(allow) != len(raw_allow) or len(changed) != len(raw_changed)
+            or not changed <= allow
+            or any(not isinstance(p, str) for p in base)
+            or any(not isinstance(p, str) or not re.fullmatch(r"[0-9a-f]{64}", h)
+                   for p, h in base.items())):
+        raise Stop("Laufbericht enthält unvollständige oder inkonsistente Basisdaten.")
+    try:
+        invalid_base_path = any(safe_path(p) != p for p in base)
+    except (Stop, TypeError):
+        invalid_base_path = True
+    if invalid_base_path:
+        raise Stop("Ungültiger Basispfad im Laufbericht.")
     current = snapshot(workspace)
     if set(changes(base, current)) != changed:
         raise Stop("Projektkopie wurde nach dem Lauf unerwartet verändert.")
     paths = sorted(changed if selected is None else set(selected))
     if not paths or any(p not in allow or p not in changed for p in paths):
         raise Stop("Review/Apply enthält nicht freigegebene oder unveränderte Dateien.")
+    for path in paths:
+        original = ROOT / path
+        if any(part.is_symlink() for part in (ROOT.joinpath(*Path(path).parts[:i])
+                                                for i in range(1, len(Path(path).parts) + 1))):
+            raise Stop("Symlink im Übernahmepfad: " + path)
+        actual = hashlib.sha256(original.read_bytes()).hexdigest() if original.is_file() else None
+        if actual != base.get(path):
+            raise Stop("Konflikt: Originaldatei seit dem Lauf verändert: " + path)
     for path in paths:
         print("".join(difflib.unified_diff(
             ((ROOT / path).read_text(errors="replace") if base.get(path) and (ROOT / path).is_file() else "").splitlines(True),
@@ -204,9 +237,6 @@ def review_run(run, apply=False, selected=None, input_fn=None):
         if any(part.is_symlink() for part in (ROOT.joinpath(*Path(path).parts[:i])
                                                 for i in range(1, len(Path(path).parts) + 1))):
             raise Stop("Symlink im Übernahmepfad: " + path)
-        actual = hashlib.sha256(original.read_bytes()).hexdigest() if original.is_file() else None
-        if actual != base.get(path):
-            raise Stop("Konflikt: Originaldatei seit dem Lauf verändert: " + path)
     if input_fn is None and not sys.stdin.isatty():
         raise Stop("Übernahme erfordert eine interaktive Bestätigung.")
     confirm = input_fn or input

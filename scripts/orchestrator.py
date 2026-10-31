@@ -86,6 +86,24 @@ def snapshot(root, checking=False):
     return result
 
 
+def copy_node_modules(source, target):
+    """Copy installed packages while preserving only links contained in the tree."""
+    source_root = source.resolve()
+    for folder, dirs, files in os.walk(source, followlinks=False):
+        for name in list(dirs) + files:
+            path = Path(folder) / name
+            if not path.is_symlink():
+                continue
+            link = os.readlink(path)
+            if Path(link).is_absolute():
+                raise Stop("Absoluter Symlink in node_modules: " + path.relative_to(source).as_posix())
+            try:
+                (path.parent / link).resolve().relative_to(source_root)
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise Stop("Symlinkziel außerhalb von node_modules: " + path.relative_to(source).as_posix()) from exc
+    shutil.copytree(source, target, symlinks=True)
+
+
 def changes(before, after):
     return sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))
 
@@ -240,7 +258,10 @@ def execute_locked(args, model, allowed, rules, storage):
                 continue
             if not (ROOT / dependency).is_dir():
                 raise Stop("Installierte Abhängigkeiten fehlen: " + dependency)
-            shutil.copytree(ROOT / dependency, workspace / dependency, symlinks=False)
+            if dependency == "node_modules":
+                copy_node_modules(ROOT / dependency, workspace / dependency)
+            else:
+                shutil.copytree(ROOT / dependency, workspace / dependency, symlinks=False)
         for index, command in enumerate(check_plan(delta)):
             item = {"command": command, "status": "running"}
             report["checks"].append(item)

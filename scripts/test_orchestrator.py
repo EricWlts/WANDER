@@ -3,6 +3,7 @@ import argparse
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -70,6 +71,37 @@ class SafetyTests(unittest.TestCase):
             (root / "link").symlink_to("/tmp")
             with self.assertRaises(o.Stop):
                 o.snapshot(root)
+
+    def test_node_modules_preserves_internal_relative_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            target = root / "copy"
+            (source / ".bin").mkdir(parents=True)
+            (source / "typescript" / "bin").mkdir(parents=True)
+            (source / "typescript" / "bin" / "tsc").write_text("#!/usr/bin/env node\n")
+            (source / ".bin" / "tsc").symlink_to("../typescript/bin/tsc")
+
+            o.copy_node_modules(source, target)
+
+            copied_link = target / ".bin" / "tsc"
+            self.assertTrue(copied_link.is_symlink())
+            self.assertEqual(os.readlink(copied_link), "../typescript/bin/tsc")
+            self.assertEqual(copied_link.resolve().read_text(), "#!/usr/bin/env node\n")
+
+    def test_node_modules_rejects_symlinks_outside_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            target = root / "copy"
+            outside = root / "outside"
+            source.mkdir()
+            outside.write_text("outside")
+            (source / "escape").symlink_to("../outside")
+
+            with self.assertRaises(o.Stop):
+                o.copy_node_modules(source, target)
+            self.assertFalse(target.exists())
 
     def test_lock_prevents_second_runner(self):
         with tempfile.TemporaryDirectory() as tmp:

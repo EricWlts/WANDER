@@ -50,6 +50,7 @@ import { useMotionOff } from "./Motion";
 import { MotionControl } from "./MotionControl";
 import { PhotoViewer } from "./StoryExperience";
 import { t, useLocale } from "./I18n";
+import { isRecoveryJourney } from "./recoveryModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 
 function PreviewFrame({
@@ -243,13 +244,14 @@ export function ModularEditor() {
   const [recovery, setRecovery] = useState<Journey | null>(null);
   useEffect(() => {
     if (!journey) return;
+    setRecovery(null);
     try {
       const value =
         localStorage.getItem(`wander-recovery-${journey.id}`) ||
         sessionStorage.getItem(`wander-recovery-${journey.id}`);
       if (value) {
-        const j = JSON.parse(value);
-        if (j.id === journey.id) setRecovery(j);
+        const j: unknown = JSON.parse(value);
+        if (isRecoveryJourney(j, journey.id)) setRecovery(j);
       }
     } catch {
       /* Invalid recovery is ignored. */

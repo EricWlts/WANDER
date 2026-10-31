@@ -546,6 +546,10 @@ export function PhotoViewer({
               x: e.touches[0].clientX,
               y: e.touches[0].clientY,
             };
+          else touch.current = null;
+        }}
+        onTouchCancel={() => {
+          touch.current = null;
         }}
         onTouchEnd={(e) => {
           const start = touch.current;

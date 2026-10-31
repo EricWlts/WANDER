@@ -1,0 +1,250 @@
+import { tr } from "./I18n";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
+import { ArrowUpRight, X } from "lucide-react";
+import type { Photo, RevealConfig } from "./types";
+import { t, getLocale } from "./I18n";
+import { imageMotion, useReveal } from "./Reveal";
+export function Compass({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={`compass ${className}`}
+      viewBox="0 0 60 60"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M30 0v60M0 30h60M9 9l42 42M9 51L51 9"
+        stroke="currentColor"
+        strokeWidth=".8"
+      />
+      <path
+        d="M30 11l4 15 15 4-15 4-4 15-4-15-15-4 15-4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+export function Picture({
+  photo,
+  className = "",
+  eager = false,
+  sizes = "100vw",
+  onClick,
+  actionLabel,
+  animate = false,
+  motion = imageMotion,
+}: {
+  photo: Photo | null;
+  className?: string;
+  eager?: boolean;
+  sizes?: string;
+  onClick?: () => void;
+  actionLabel?: string;
+  animate?: boolean;
+  motion?: RevealConfig;
+}) {
+  const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
+  const [loaded, setLoaded] = useState(false);
+  const reveal = useReveal(ref, motion, animate, loaded || !photo);
+  const img = photo ? (
+    <img
+      src={photo.url}
+      srcSet={photo.srcset}
+      sizes={sizes}
+      alt={photo.alt || ""}
+      style={
+        {
+          objectFit: photo.edits?.fit || "cover",
+          objectPosition: `${photo.edits?.x ?? 50}% ${photo.edits?.y ?? 50}%`,
+          transform:
+            "scale(calc(var(--image-crop-zoom, 1) * var(--active-hover, 1)))",
+          "--image-crop-zoom":
+            photo.edits?.fit === "contain" ? 1 : photo.edits?.zoom || 1,
+          transformOrigin: `${photo.edits?.x ?? 50}% ${photo.edits?.y ?? 50}%`,
+        } as CSSProperties
+      }
+      width={photo.width}
+      height={photo.height}
+      loading={eager ? "eager" : "lazy"}
+      fetchPriority={eager ? "high" : "auto"}
+      decoding="async"
+      onLoad={async (event) => {
+        const image = event.currentTarget;
+        await image.decode().catch(() => {});
+        setLoaded(true);
+      }}
+      onError={() => setLoaded(true)}
+    />
+  ) : (
+    <div className="photo-placeholder">
+      <Compass />
+      <span>{tr("A story waiting for its first photograph.")}</span>
+    </div>
+  );
+  const ratio = photo ? photo.edits?.ratio || "original" : undefined;
+  const frameStyle = ratio
+    ? ({
+        aspectRatio:
+          ratio === "original"
+            ? `${photo!.width} / ${photo!.height}`
+            : ratio === "free"
+              ? photo?.edits?.free_ratio || 1.5
+              : ratio.replace(":", " / "),
+        "--image-hover-scale":
+          photo?.edits?.hover_zoom === undefined
+            ? undefined
+            : 1 + photo.edits.hover_zoom / 100,
+      } as CSSProperties)
+    : undefined;
+  return onClick ? (
+    <button
+      ref={ref}
+      {...reveal}
+      className={`picture picture-button ${className}`}
+      style={{ ...reveal.style, ...frameStyle }}
+      onClick={onClick}
+      aria-label={
+        actionLabel ||
+        t("View photograph full size", "Foto in voller Größe ansehen")
+      }
+    >
+      {img}
+      <span className="image-expand">
+        <ArrowUpRight size={19} />
+      </span>
+    </button>
+  ) : (
+    <div
+      ref={ref}
+      {...reveal}
+      style={{ ...reveal.style, ...frameStyle }}
+      className={`picture ${className}`}
+    >
+      {img}
+    </div>
+  );
+}
+let modalLocks = 0;
+let previousOverflow = "";
+export function Modal({
+  children,
+  onClose,
+  title,
+  className = "",
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  title: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current!;
+    const active = document.activeElement;
+    const focused = (
+      active instanceof HTMLIFrameElement
+        ? active.contentDocument?.activeElement
+        : active
+    ) as HTMLElement | null;
+    const x = window.scrollX,
+      y = window.scrollY;
+    dialog.showModal();
+    if (modalLocks++ === 0) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      dialog.close();
+      if (--modalLocks === 0) {
+        document.body.style.overflow = previousOverflow;
+        window.scrollTo({ left: x, top: y, behavior: "instant" });
+      }
+      focused?.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={`modal ${className}`}
+      aria-label={title}
+      onCancel={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="modal-inner">
+        <button
+          className="icon-button modal-close"
+          aria-label={tr("Close dialog")}
+          onClick={onClose}
+        >
+          <X />
+        </button>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+export function dateLabel(
+  value: string,
+  options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  },
+) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString(
+    getLocale() === "de" ? "de-DE" : "en-GB",
+    options,
+  );
+}
+export function dateRange(start: string, end: string) {
+  return start === end
+    ? dateLabel(start)
+    : `${dateLabel(start, { day: "2-digit", month: "short" })} — ${dateLabel(end)}`;
+}
+export function dayCount(start: string, end: string) {
+  return Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+}
+export function Field({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+}) {
+  const id = useId();
+  const control = isValidElement<{
+    id?: string;
+    "aria-labelledby"?: string;
+    "aria-describedby"?: string;
+  }>(children)
+    ? cloneElement(children, {
+        id: children.props.id || id,
+        "aria-labelledby": `${id}-label`,
+        "aria-describedby": hint ? `${id}-hint` : undefined,
+      })
+    : children;
+  return (
+    <label className="field">
+      <span id={`${id}-label`}>{label}</span>
+      {control}
+      {hint && <small id={`${id}-hint`}>{hint}</small>}
+    </label>
+  );
+}

@@ -1,0 +1,214 @@
+import { tr } from "./I18n";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { ArrowUpRight, Menu, X } from "lucide-react";
+import { LanguageSwitch, useLocale } from "./I18n";
+import { api, json } from "./api";
+import { Compass } from "./components";
+import { Home, Archive, About } from "./Public";
+import { Studio, JourneyEditor, GuidedEditor, NewJourney } from "./Studio";
+import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
+interface AppContextType {
+  authenticated: boolean;
+  ready: boolean;
+  login: (password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  notify: (message: string) => void;
+}
+const AppContext = createContext<AppContextType>(null!);
+export const useApp = () => useContext(AppContext);
+export default function App() {
+  useLocale();
+  const [authenticated, setAuthenticated] = useState(false),
+    [ready, setReady] = useState(false),
+    [error, setError] = useState(""),
+    [toast, setToast] = useState("");
+  const location = useLocation();
+  useEffect(() => {
+    api<{ authenticated: boolean }>("/auth")
+      .then((data) => setAuthenticated(data.authenticated))
+      .catch((e) => setError(e.message))
+      .finally(() => setReady(true));
+  }, []);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 4500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+  useEffect(() => {
+    if (location.hash)
+      requestAnimationFrame(() =>
+        document.getElementById(location.hash.slice(1))?.scrollIntoView(),
+      );
+    else window.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname, location.hash]);
+  const value: AppContextType = {
+    authenticated,
+    ready,
+    login: async (password) => {
+      const data = await api<{ authenticated: boolean }>(
+        "/auth/login",
+        json("POST", { password }),
+      );
+      setAuthenticated(data.authenticated);
+    },
+    logout: async () => {
+      await api("/auth/logout", json("POST", {}));
+      setAuthenticated(false);
+    },
+    notify: setToast,
+  };
+  return (
+    <AppContext.Provider value={value}>
+      <a className="skip-link" href="#main">
+        {tr("Skip to content")}
+      </a>
+      <Header />
+      {error && (
+        <div className="connection-error" role="alert">
+          {error}{" "}
+          <button onClick={() => window.location.reload()}>
+            {tr("Try again")}
+          </button>
+        </div>
+      )}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/archive" element={<Archive />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/journeys/:slug" element={<JourneyStory />} />
+        <Route path="/studio" element={<Studio />} />
+        <Route path="/inspiration" element={<Inspiration />} />
+        <Route path="/inspiration/:templateId" element={<ExampleStory />} />
+        <Route path="/studio/new" element={<NewJourney />} />
+        <Route path="/studio/:slug/edit" element={<JourneyEditor />} />
+        <Route path="/studio/:slug" element={<JourneyEditor />} />
+        <Route path="/studio/:slug/setup" element={<GuidedEditor />} />
+        <Route
+          path="*"
+          element={
+            <PageState
+              title={tr("A little off the beaten path.")}
+              text={tr(
+                "This page doesn't exist. There's still a whole journey to explore.",
+              )}
+            />
+          }
+        />
+      </Routes>
+      <Footer />
+      {toast && (
+        <div className="toast" role="status">
+          <Compass />
+          {toast}
+          <button
+            aria-label={tr("Dismiss notification")}
+            onClick={() => setToast("")}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+    </AppContext.Provider>
+  );
+}
+function Header() {
+  const [menu, setMenu] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    setMenu(false);
+  }, [location.pathname]);
+  return (
+    <header className="site-header">
+      <div className="brand-lockup">
+        <Link to="/" className="wordmark" aria-label={tr("WANDER home")}>
+          WANDER<span className="wordmark-star">✳</span>
+        </Link>
+        <span className="header-caption">{tr("Places that stay.")}</span>
+      </div>
+      <nav
+        aria-label={tr("Main navigation")}
+        className={menu ? "nav-open" : ""}
+      >
+        <NavLink to="/" end>
+          {tr("Journal")}
+          <sup>01</sup>
+        </NavLink>
+        <NavLink to="/archive">{tr("The archive")}</NavLink>
+        <NavLink to="/inspiration">{tr("The editions")}</NavLink>
+        <NavLink to="/about">{tr("About")}</NavLink>
+        <Link to="/studio" className="studio-link">
+          {tr("My studio")}
+          <ArrowUpRight size={14} />
+        </Link>
+      </nav>
+      <LanguageSwitch />
+      <button
+        className="menu-toggle icon-button"
+        aria-label={menu ? tr("Close navigation") : tr("Open navigation")}
+        aria-expanded={menu}
+        onClick={() => setMenu(!menu)}
+      >
+        {menu ? <X /> : <Menu />}
+      </button>
+    </header>
+  );
+}
+function Footer() {
+  return (
+    <footer className="site-footer">
+      <div className="footer-top">
+        <span>
+          {tr("EVERY JOURNEY DESERVES")}
+          <br />
+          {tr("TO BE REMEMBERED.")}
+        </span>
+        <Compass />
+        <Link to="/archive" className="text-link">
+          {tr("Keep exploring")}
+          <ArrowUpRight size={17} />
+        </Link>
+      </div>
+      <Link to="/" className="footer-wordmark" aria-label={tr("WANDER home")}>
+        WANDER
+      </Link>
+      <div className="footer-bottom">
+        <span>
+          © {new Date().getFullYear()}
+          {tr("WANDER. A personal travel journal.")}
+        </span>
+        <span>{tr("Made for the moments that stay.")}</span>
+        <Link to="/about#credits">{tr("Photography & credits ↗")}</Link>
+      </div>
+    </footer>
+  );
+}
+export function PageState({
+  title,
+  text,
+  children,
+}: {
+  title: string;
+  text?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <main id="main" className="page-state">
+      <Compass />
+      <h1>{title}</h1>
+      {text && <p>{text}</p>}
+      {children || (
+        <Link className="text-link" to="/">
+          {tr("Back to the journal")}
+          <ArrowUpRight size={18} />
+        </Link>
+      )}
+    </main>
+  );
+}

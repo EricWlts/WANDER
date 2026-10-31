@@ -24,6 +24,10 @@ class RoutingTests(unittest.TestCase):
         for task in ("T1 Ladefehler", "T2 Escape", "T3 ARIA", "T5 Save-Test", "Unbekannte lokale Änderung"):
             self.assertEqual(o.route(task), o.LUNA)
 
+    def test_documentation_tasks_low_but_risk_terms_still_sol(self):
+        for task in ("Dokumentation aktualisieren", "README: Installation beschreiben", "README korrigiert"):
+            self.assertEqual(o.route(task), ("gpt-6-luna", "low"))
+
     def test_sol_and_risk_precedence(self):
         for task in ("T7", "Recovery prüfen", "Autosave ändern", "README erklärt published_data",
                      "Backend ändern backend/app.py", "Tests für CSRF", "Datenbankmigration"):
@@ -64,6 +68,51 @@ class SafetyTests(unittest.TestCase):
                 path.write_text(content)
                 with self.subTest(content=content), self.assertRaises(o.Stop):
                     o.validate_answer(path)
+
+    def test_usage_parser_reports_unknown_or_structured_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "worker.log"
+            self.assertEqual(o.usage_from_log(log)["input_tokens"], "unknown")
+            log.write_text('{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19,"input_tokens_details":{"cached_tokens":3}}}\n')
+            self.assertEqual(o.usage_from_log(log), {"input_tokens": 12, "output_tokens": 7,
+                "total_tokens": 19, "cached_input_tokens": 3, "reasoning_output_tokens": "unknown"})
+
+    def test_review_apply_and_conflicts_use_only_approved_temporary_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = root / "original"
+            run = root / "run"
+            (original / "docs").mkdir(parents=True)
+            (run / "workspace" / "docs").mkdir(parents=True)
+            source, candidate = original / "docs" / "guide.md", run / "workspace" / "docs" / "guide.md"
+            source.write_text("before\n")
+            candidate.write_text("after\n")
+            base = {"docs/guide.md": __import__("hashlib").sha256(b"before\n").hexdigest()}
+            (run / "report.json").write_text(json.dumps({"status": "ready_for_manual_review",
+                "allowed": ["docs/guide.md"], "files": ["docs/guide.md"], "base_hashes": base}))
+            with patch.object(o, "ROOT", original), contextlib.redirect_stdout(io.StringIO()) as output:
+                o.review_run(run)
+            self.assertIn("-before", output.getvalue())
+            with patch.object(o, "ROOT", original):
+                o.review_run(run, apply=True, input_fn=lambda _: "APPLY")
+            self.assertEqual(source.read_text(), "after\n")
+            source.write_text("changed elsewhere\n")
+            with patch.object(o, "ROOT", original), self.assertRaisesRegex(o.Stop, "Konflikt"):
+                o.review_run(run, apply=True)
+
+    def test_review_rejects_unapproved_file_and_requires_exact_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, run = Path(tmp) / "original", Path(tmp) / "run"
+            root.mkdir()
+            (run / "workspace").mkdir(parents=True)
+            (run / "workspace" / "a.txt").write_text("new")
+            (run / "report.json").write_text(json.dumps({"status": "ready_for_manual_review",
+                "allowed": ["a.txt"], "files": ["a.txt"], "base_hashes": {}}))
+            with patch.object(o, "ROOT", root), self.assertRaises(o.Stop):
+                o.review_run(run, selected=["other.txt"])
+            with patch.object(o, "ROOT", root), self.assertRaises(o.Stop):
+                o.review_run(run, apply=True, input_fn=lambda _: "no")
+            self.assertFalse((root / "a.txt").exists())
 
     def test_symlinks_stop(self):
         with tempfile.TemporaryDirectory() as tmp:

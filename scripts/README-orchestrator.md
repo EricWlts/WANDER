@@ -33,7 +33,8 @@ AGENTS.md, ARCHITECTURE.md und TASKS.md müssen vorhanden und in Git erfasst sei
   Recovery, Autosave, Merge, gekoppelte Zustände, Composition, Veröffentlichung,
   Auth/CSRF, Datenbank/Migration und Backendpfade → `gpt-6.1-sol / medium`.
   T4/T6, Tippfehler, README/Dokumentation oder ausdrücklich lokale Testergänzungen
-  → `gpt-6-luna / low`. Übrige Aufgaben → `gpt-6-luna / medium`.
+  → `gpt-6-luna / low`. Einfache README- und Dokumentationsaufgaben erhalten ebenfalls
+  `gpt-6-luna / low`. Übrige Aufgaben → `gpt-6-luna / medium`.
   Risikoregeln haben Vorrang. Diese Heuristik ist keine semantische Sicherheitsanalyse;
   Aufgabe und Dry-Run-Plan manuell prüfen.
 - Sol erfordert vor jedem Aufruf interaktiv die Eingabe `SOL`, auch bei direktem
@@ -66,10 +67,34 @@ AGENTS.md, ARCHITECTURE.md und TASKS.md müssen vorhanden und in Git erfasst sei
   Generierte Build-/Cachedateien werden bei der anschließenden Integritätsprüfung
   ausgenommen. Tests können temporäre Betriebssystemdateien erzeugen.
 - Das JSON-Protokoll `report.json` enthält Modell, Reasoning, Prüfungen, Dateiliste,
-  Ergebnis und ggf. Abbruchgrund. Vollständige Prozessausgaben stehen in separaten Logs.
-  Keine Änderungen werden zurückkopiert. Kopie und Original manuell vergleichen,
-  diff prüfen und erst danach gewünschte Änderungen selbst übernehmen.
+  Ergebnis, Basis-Hashes und Token-Nutzungsdaten pro Workeraufruf. Nicht gelieferte
+  Nutzungswerte stehen als `unknown`; es werden keine Kosten geschätzt. Vollständige
+  Prozessausgaben stehen in separaten Logs. Es gibt keine automatischen Commits oder Pushes.
   Browser-/UI-Prüfungen bleiben manuell; grüne Logiktests und Builds ersetzen sie nicht.
+
+## Review und Übernahme
+
+Nach einem erfolgreichen Lauf zeigt Review den Diff zwischen Original und isolierter
+Kopie. Die Lauf-ID steht im Pfad des Ergebnisprotokolls:
+
+```sh
+python3 -B scripts/orchestrator.py --review 20261031-120000-ab12cd34
+```
+
+Optional begrenzt `--file` Review auf eine im Lauf freigegebene und geänderte Datei;
+die Option kann wiederholt werden. Übernahme zeigt denselben Diff und verlangt danach
+die exakte Eingabe `APPLY`:
+
+```sh
+python3 -B scripts/orchestrator.py --apply 20261031-120000-ab12cd34
+python3 -B scripts/orchestrator.py --apply 20261031-120000-ab12cd34 --file docs/guide.md
+```
+
+Vor der Bestätigung prüft der Befehl, dass die Projektkopie unverändert ist und jede
+Originaldatei noch dem beim Lauf gespeicherten Basis-Hash entspricht. Konflikte,
+unerwartete Änderungen, nicht erlaubte Dateien und nicht interaktive Aufrufe stoppen.
+Neue Dateien werden angelegt, im Lauf gelöschte Dateien entfernt. Review/Apply führen
+keine Git-Aktion aus.
 
 ## Offline prüfen
 

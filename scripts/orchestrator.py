@@ -1,5 +1,6 @@
 """Serial, review-only Codex runner. Python standard library; POSIX only."""
 import argparse
+import difflib
 import fcntl
 import hashlib
 import json
@@ -110,7 +111,7 @@ def changes(before, after):
 
 
 def worker_command(workspace, model, schema, answer):
-    return ["codex", "--no-daemon", "exec", "--ignore-user-config", "--ephemeral",
+    return ["codex", "--no-daemon", "exec", "--json", "--ignore-user-config", "--ephemeral",
             "--sandbox", "workspace-write", "--model", model[0],
             "-c", 'model_reasoning_effort="' + model[1] + '"',
             "-c", 'approval_policy="never"', "-c", "features.multi_agent=false",
@@ -136,6 +137,88 @@ def validate_answer(answer):
             or not isinstance(value["summary"], str) or not value["summary"].strip()):
         raise Stop("Unklares Worker-Ergebnis.")
     return value
+
+
+def usage_from_log(path):
+    """Read Codex JSONL token usage events; unavailable fields stay explicitly unknown."""
+    usage = {"input_tokens": "unknown", "output_tokens": "unknown", "total_tokens": "unknown",
+             "cached_input_tokens": "unknown", "reasoning_output_tokens": "unknown"}
+    try:
+        for line in path.read_text(errors="replace").splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get("type") not in {"turn.completed", "response.completed"}:
+                continue
+            info = event.get("usage") or event.get("response", {}).get("usage") or {}
+            mapping = {"input_tokens": "input_tokens", "output_tokens": "output_tokens",
+                       "total_tokens": "total_tokens", "cached_input_tokens": "cached_input_tokens",
+                       "reasoning_output_tokens": "reasoning_output_tokens"}
+            for target, source in mapping.items():
+                value = info.get(source)
+                if isinstance(value, int) and value >= 0:
+                    usage[target] = value
+            details = info.get("input_tokens_details", {})
+            if usage["cached_input_tokens"] == "unknown" and isinstance(details.get("cached_tokens"), int):
+                usage["cached_input_tokens"] = details["cached_tokens"]
+            details = info.get("output_tokens_details", {})
+            if usage["reasoning_output_tokens"] == "unknown" and isinstance(details.get("reasoning_tokens"), int):
+                usage["reasoning_output_tokens"] = details["reasoning_tokens"]
+    except OSError:
+        pass
+    return usage
+
+
+def review_run(run, apply=False, selected=None, input_fn=None):
+    report_path = run / "report.json"
+    try:
+        report = json.loads(report_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise Stop("Laufbericht fehlt oder ist ungültig.") from exc
+    if report.get("status") != "ready_for_manual_review":
+        raise Stop("Lauf ist nicht zur Übernahme freigegeben.")
+    workspace = run / "workspace"
+    try:
+        allow = {safe_path(p) for p in report.get("allowed", [])}
+        changed = {safe_path(p) for p in report.get("files", [])}
+        selected = None if selected is None else {safe_path(p) for p in selected}
+    except (Stop, TypeError) as exc:
+        raise Stop("Ungültige Pfadangaben im Laufbericht.") from exc
+    base = report.get("base_hashes", {})
+    current = snapshot(workspace)
+    if set(changes(base, current)) != changed:
+        raise Stop("Projektkopie wurde nach dem Lauf unerwartet verändert.")
+    paths = sorted(changed if selected is None else set(selected))
+    if not paths or any(p not in allow or p not in changed for p in paths):
+        raise Stop("Review/Apply enthält nicht freigegebene oder unveränderte Dateien.")
+    for path in paths:
+        print("".join(difflib.unified_diff(
+            ((ROOT / path).read_text(errors="replace") if base.get(path) and (ROOT / path).is_file() else "").splitlines(True),
+            ((workspace / path).read_text(errors="replace") if (workspace / path).is_file() else "").splitlines(True),
+            fromfile="original/" + path, tofile="copy/" + path)), end="")
+    if not apply:
+        return
+    for path in paths:
+        original = ROOT / path
+        if any(part.is_symlink() for part in (ROOT.joinpath(*Path(path).parts[:i])
+                                                for i in range(1, len(Path(path).parts) + 1))):
+            raise Stop("Symlink im Übernahmepfad: " + path)
+        actual = hashlib.sha256(original.read_bytes()).hexdigest() if original.is_file() else None
+        if actual != base.get(path):
+            raise Stop("Konflikt: Originaldatei seit dem Lauf verändert: " + path)
+    if input_fn is None and not sys.stdin.isatty():
+        raise Stop("Übernahme erfordert eine interaktive Bestätigung.")
+    confirm = input_fn or input
+    if confirm("Zur Übernahme aller angezeigten Änderungen APPLY eingeben: ") != "APPLY":
+        raise Stop("Übernahme nicht bestätigt.")
+    for path in paths:
+        source, target = workspace / path, ROOT / path
+        if source.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        elif target.exists():
+            target.unlink()
 
 
 def check_plan(paths):
@@ -170,7 +253,7 @@ def execute_locked(args, model, allowed, rules, storage):
     run.mkdir()
     workspace = run / "workspace"
     workspace.mkdir()
-    report = {"status": "stopped", "calls": [], "checks": [], "files": [],
+    report = {"status": "stopped", "calls": [], "checks": [], "files": [], "allowed": allowed,
               "review": "Nur Projektkopie; manuelles Review und manuelle Übernahme erforderlich."}
     try:
         # Never include untracked data, secrets, live DBs or user Codex configuration.
@@ -199,6 +282,7 @@ def execute_locked(args, model, allowed, rules, storage):
         if run_process(["git", "init", "--quiet", str(workspace)], ROOT, 30, run / "init.log"):
             raise Stop("Isoliertes Git-Verzeichnis konnte nicht angelegt werden.")
         baseline = snapshot(workspace)
+        report["base_hashes"] = baseline
         schema = run / "schema.json"
         schema.write_text(json.dumps(SCHEMA))
         repair_used = False
@@ -217,11 +301,15 @@ def execute_locked(args, model, allowed, rules, storage):
                       "dieser Kopie bearbeiten. Nur folgende Dateien dürfen geändert werden: "
                       + json.dumps(allowed) + "\nProjektregeln:\n" + rules
                       + "\nAufgabe:\n" + args.task + "\n" + followup)
-            report["calls"].append({"model": model[0], "reasoning": model[1]})
+            report["calls"].append({"model": model[0], "reasoning": model[1], "usage": {
+                "input_tokens": "unknown", "output_tokens": "unknown", "total_tokens": "unknown",
+                "cached_input_tokens": "unknown", "reasoning_output_tokens": "unknown"}})
+            worker_log = run / (str(attempt) + "-worker.log")
             try:
                 code = run_process(worker_command(workspace, model, schema, answer), workspace,
-                                   args.timeout, run / (str(attempt) + "-worker.log"), prompt)
+                                   args.timeout, worker_log, prompt)
             finally:
+                report["calls"][-1]["usage"] = usage_from_log(worker_log)
                 # Preserve the change list even when a worker times out or is interrupted.
                 delta = changes(baseline, snapshot(workspace))
                 report["files"] = delta
@@ -292,12 +380,24 @@ def execute_locked(args, model, allowed, rules, storage):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("task", help="Eine konkrete Aufgabe oder TASKS.md-ID mit Beschreibung")
-    parser.add_argument("--allow", action="append", required=True, help="Erlaubte Datei relativ zum Projekt; wiederholbar")
+    parser.add_argument("task", nargs="?", help="Eine konkrete Aufgabe oder TASKS.md-ID mit Beschreibung")
+    parser.add_argument("--allow", action="append", default=[], help="Erlaubte Datei relativ zum Projekt; wiederholbar")
     parser.add_argument("--timeout", type=int, default=600, help="Sekunden je Worker/Prüfung (1–3600)")
     parser.add_argument("--dry-run", action="store_true", help="Nur Plan ausgeben; keine Aufrufe oder Schreibzugriffe")
+    parser.add_argument("--review", metavar="LAUF", help="Diff eines Laufs anzeigen (Pfad oder Lauf-ID)")
+    parser.add_argument("--apply", metavar="LAUF", help="Diff prüfen und nach Bestätigung übernehmen")
+    parser.add_argument("--file", action="append", default=[], help="Bei Review/Apply einzelne freigegebene Datei auswählen")
     args = parser.parse_args(argv)
     try:
+        if args.review or args.apply:
+            run_arg = args.review or args.apply
+            run = Path(run_arg)
+            if not run.is_absolute():
+                run = ROOT / "artifacts" / "orchestrator" / run
+            review_run(run, apply=bool(args.apply), selected=args.file or None)
+            return 0
+        if not args.task or not args.allow:
+            raise Stop("Aufgabe und mindestens ein --allow sind erforderlich.")
         if not args.task.strip() or not 1 <= args.timeout <= 3600:
             raise Stop("Aufgabe oder Timeout ungültig.")
         allowed = sorted({safe_path(p) for p in args.allow})

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { api } from "./api";
 import { PageState, useApp } from "./App";
+import { shouldShowEmptyLibrary } from "./studioLibraryModel";
 import { Compass, dateRange, Field, Picture } from "./components";
 import type { Journey } from "./types";
 import { ModularEditor } from "./ModularEditor";
@@ -109,11 +110,14 @@ function StudioLibrary() {
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [deleting, setDeleting] = useState<Journey | null>(null);
-  const load = () =>
-    api<Journey[]>("/journeys")
+  const load = () => {
+    setError("");
+    setLoading(true);
+    return api<Journey[]>("/journeys")
       .then(setJourneys)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  };
   useEffect(() => {
     void load();
   }, []);
@@ -142,9 +146,12 @@ function StudioLibrary() {
         </div>
       </div>
       {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+        <div role="alert">
+          <p className="form-error">{error}</p>
+          <button className="text-link" onClick={() => void load()}>
+            {tr("Try again")}
+          </button>
+        </div>
       )}
       <div className="studio-library-label">
         <span>
@@ -194,7 +201,7 @@ function StudioLibrary() {
           </article>
         ))
       )}
-      {!loading && !journeys.length && (
+      {shouldShowEmptyLibrary(loading, error, journeys.length) && (
         <div className="empty-state">
           <Compass />
           <h2>{tr("The first page is yours.")}</h2>

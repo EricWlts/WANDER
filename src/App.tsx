@@ -2,6 +2,7 @@ import { tr } from "./I18n";
 import {
   createContext,
   useContext,
+  useRef,
   useEffect,
   useState,
   type ReactNode,
@@ -14,6 +15,7 @@ import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
 import { Studio, JourneyEditor, GuidedEditor, NewJourney } from "./Studio";
 import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
+import { closeNavigationOnEscape } from "./mobileNavigation";
 interface AppContextType {
   authenticated: boolean;
   ready: boolean;
@@ -120,10 +122,18 @@ export default function App() {
 }
 function Header() {
   const [menu, setMenu] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   useEffect(() => {
     setMenu(false);
   }, [location.pathname]);
+  useEffect(() => {
+    if (!menu) return;
+    const onKeyDown = (event: KeyboardEvent) =>
+      closeNavigationOnEscape(event, () => setMenu(false), toggleRef.current);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menu]);
   return (
     <header className="site-header">
       <div className="brand-lockup">
@@ -150,6 +160,7 @@ function Header() {
       </nav>
       <LanguageSwitch />
       <button
+        ref={toggleRef}
         className="menu-toggle icon-button"
         aria-label={menu ? tr("Close navigation") : tr("Open navigation")}
         aria-expanded={menu}

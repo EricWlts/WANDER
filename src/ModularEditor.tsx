@@ -186,7 +186,9 @@ export function ModularEditor() {
           setJourney(j);
         }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (alive) setError(e.message);
+      });
     return () => {
       alive = false;
     };

@@ -53,6 +53,87 @@ test("legacy image assignments receive stable keys without mutating stored data"
   assert.deepEqual(old.layout, { photo_ids: [33, 11] });
   assert.equal(modulePhotos(old, journey)[0].id, 33);
 });
+test("explicitly empty placements suppress legacy image assignments without mutation", () => {
+  const old = {
+    ...journey,
+    photos: [...journey.photos],
+  } as Journey;
+  const module = {
+    id: 1,
+    kind: "wall",
+    layout: { photo_ids: [11, 22], placements: [] },
+  } as Chapter;
+  const before = structuredClone({ old, module });
+
+  assert.deepEqual(placementsFor(module, old), []);
+  assert.deepEqual(modulePhotos(module, old), []);
+  assert.deepEqual({ old, module }, before);
+});
+test("module placements skip missing photo sources without mutating inputs", () => {
+  const record = { ...journey, photos: [...journey.photos] } as Journey;
+  const module = {
+    ...wall,
+    layout: {
+      placements: [
+        { id: "missing", photo_id: 404 },
+        { id: "present", photo_id: 22 },
+      ],
+    },
+  } as Chapter;
+  const before = structuredClone({ record, module });
+
+  assert.deepEqual(
+    modulePhotos(module, record).map(({ id, placement_id }) => ({
+      id,
+      placement_id,
+    })),
+    [{ id: 22, placement_id: "present" }],
+  );
+  assert.deepEqual({ record, module }, before);
+});
+test("placement edits override module edits, which override source edits", () => {
+  const source = {
+    ...journey.photos[0],
+    edits: { ratio: "4:3", x: 10, zoom: 1.1 },
+  };
+  const record = { ...journey, photos: [source] } as Journey;
+  const module = {
+    id: 1,
+    kind: "image",
+    layout: {
+      photo_edits: { [source.id]: { x: 20, y: 30, zoom: 1.2 } },
+      placements: [
+        {
+          id: "edited",
+          photo_id: source.id,
+          edits: { x: 40, fit: "contain" },
+        },
+      ],
+    },
+  } as Chapter;
+  const before = structuredClone({ record, module });
+
+  assert.deepEqual(modulePhotos(module, record)[0].edits, {
+    ratio: "4:3",
+    x: 40,
+    y: 30,
+    zoom: 1.2,
+    fit: "contain",
+  });
+  assert.deepEqual({ record, module }, before);
+});
+test("explicitly empty filmstrip placements suppress legacy filmstrip IDs", () => {
+  const record = {
+    ...journey,
+    filmstrip_ids: [11, 22],
+    photos: [...journey.photos],
+    layout: { filmstrip_placements: [] },
+  } as Journey;
+  const before = structuredClone(record);
+
+  assert.deepEqual(rootPhotos(record, "filmstrip"), []);
+  assert.deepEqual(record, before);
+});
 test("edits made during a save survive its response, including new module ID remapping", () => {
   const pending = {
     ...journey,
@@ -84,12 +165,71 @@ test("edits made during a save survive its response, including new module ID rem
     ],
     has_unpublished_changes: true,
   };
+  const before = structuredClone({ current, pending, saved });
   const merged = mergeSavedJourney(current, pending, saved);
   assert.equal(merged.title, "Typed while saving");
   assert.equal(merged.chapters[1].story, "More words");
   assert.equal(merged.chapters[1].layout?.parent_id, 7);
   assert.equal(merged.chapters[2].id, -3);
   assert.equal(merged.chapters[2].layout?.parent_id, 7);
+  assert.equal(merged.has_unpublished_changes, true);
+  assert.deepEqual({ current, pending, saved }, before);
+});
+test("a module deleted while saving remains deleted", () => {
+  const pending = {
+    ...journey,
+    chapters: [
+      { id: 1, kind: "text", story: "First" },
+      { id: 2, kind: "quote", quote: "Deleted during save" },
+      { id: 3, kind: "text", story: "Last" },
+    ],
+  } as Journey;
+  const current = { ...pending, chapters: [pending.chapters[0], pending.chapters[2]] };
+  const saved = {
+    ...pending,
+    chapters: pending.chapters.map((chapter, index) => ({
+      ...chapter,
+      id: index + 11,
+    })),
+    has_unpublished_changes: true,
+  };
+  const before = structuredClone({ current, pending, saved });
+
+  const merged = mergeSavedJourney(current, pending, saved);
+
+  assert.deepEqual(merged.chapters.map(({ id }) => id), [11, 13]);
+  assert.deepEqual({ current, pending, saved }, before);
+});
+test("local module order survives while IDs and parent references follow submitted save order", () => {
+  const pending = {
+    ...journey,
+    chapters: [
+      { id: -1, kind: "day", title: "Parent", layout: {} },
+      { id: -2, kind: "text", story: "Child", layout: { parent_id: -1 } },
+      { id: 5, kind: "quote", quote: "Standalone", layout: {} },
+    ],
+  } as Journey;
+  const current = {
+    ...pending,
+    chapters: [pending.chapters[2], pending.chapters[1], pending.chapters[0]],
+  };
+  const saved = {
+    ...pending,
+    chapters: [
+      { ...pending.chapters[0], id: 70 },
+      { ...pending.chapters[1], id: 80 },
+      { ...pending.chapters[2], id: 50 },
+    ],
+    has_unpublished_changes: false,
+  };
+  const before = structuredClone({ current, pending, saved });
+
+  const merged = mergeSavedJourney(current, pending, saved);
+
+  assert.deepEqual(merged.chapters.map(({ id }) => id), [50, 80, 70]);
+  assert.equal(merged.chapters[1].layout?.parent_id, 70);
+  assert.equal(merged.has_unpublished_changes, false);
+  assert.deepEqual({ current, pending, saved }, before);
 });
 test("continuous reveal fades symmetrically on both sides of the central reading area", () => {
   assert.equal(centerRevealOpacity(350, 450, 0, 800), 1);

@@ -13,6 +13,7 @@ import { ArrowUpRight, X } from "lucide-react";
 import type { Photo, RevealConfig } from "./types";
 import { t, getLocale } from "./I18n";
 import { imageMotion, useReveal } from "./Reveal";
+import { mergeIdRefs } from "./ariaIdRefs";
 export function Compass({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -236,8 +237,15 @@ export function Field({
   }>(children)
     ? cloneElement(children, {
         id: children.props.id || id,
-        "aria-labelledby": `${id}-label`,
-        "aria-describedby": hint ? `${id}-hint` : undefined,
+        "aria-labelledby": mergeIdRefs(
+          children.props["aria-labelledby"],
+          `${id}-label`,
+        ),
+        "aria-describedby":
+          mergeIdRefs(
+            children.props["aria-describedby"],
+            hint ? `${id}-hint` : undefined,
+          ) || undefined,
       })
     : children;
   return (

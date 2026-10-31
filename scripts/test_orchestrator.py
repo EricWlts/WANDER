@@ -154,7 +154,7 @@ class SafetyTests(unittest.TestCase):
 
 
 class LifecycleTests(unittest.TestCase):
-    def simulate(self, statuses, unexpected=False, check_failure=False):
+    def simulate(self, statuses, unexpected=False, check_failure=False, ds_store_during_check=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for name in o.RULES:
@@ -179,6 +179,8 @@ class LifecycleTests(unittest.TestCase):
                         (cwd / "surprise.txt").write_text("bad")
                     answer = Path(command[command.index("--output-last-message") + 1])
                     answer.write_text(json.dumps({"status": next(answers), "summary": "Offline test"}))
+                elif ds_store_during_check:
+                    (cwd / ".DS_Store").write_text("Finder metadata")
                 return 1 if check_failure and command[0] == "npm" else 0
 
             args = argparse.Namespace(task="test", timeout=10)
@@ -212,6 +214,17 @@ class LifecycleTests(unittest.TestCase):
         result, report, calls, _ = self.simulate(["complete"], unexpected=True)
         self.assertEqual((result, calls), (1, 1))
         self.assertEqual(report["checks"], [])
+
+    def test_ds_store_created_by_check_is_ignored_and_not_copied_to_original(self):
+        result, report, calls, _ = self.simulate(["complete"], ds_store_during_check=True)
+        self.assertEqual((result, calls), (0, 1))
+        self.assertEqual(report["status"], "ready_for_manual_review")
+        self.assertEqual(report["files"], ["target.txt"])
+
+    def test_unallowed_file_change_still_stops(self):
+        result, report, calls, _ = self.simulate(["complete"], unexpected=True)
+        self.assertEqual((result, calls), (1, 1))
+        self.assertIn("Unerwartete Dateiänderungen: surprise.txt", report["error"])
 
     def test_failed_check_stops_without_repair(self):
         result, report, calls, _ = self.simulate(["complete"], check_failure=True)

@@ -105,7 +105,8 @@ def copy_node_modules(source, target):
 
 
 def changes(before, after):
-    return sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))
+    return sorted(p for p in before.keys() | after.keys()
+                  if Path(p).name != ".DS_Store" and before.get(p) != after.get(p))
 
 
 def worker_command(workspace, model, schema, answer):

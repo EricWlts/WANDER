@@ -71,7 +71,7 @@ def run_process(command, cwd, timeout, log, prompt=None):
             process.wait()
 
 
-SNAPSHOT_IGNORED_DIRS = {"node_modules", ".venv", "dist", "artifacts", "__pycache__", ".pytest_cache"}
+SNAPSHOT_IGNORED_DIRS = {".git", "node_modules", ".venv", "dist", "artifacts", "__pycache__", ".pytest_cache"}
 SNAPSHOT_IGNORED_FILES = {".DS_Store"}
 SNAPSHOT_IGNORED_SUFFIXES = (".tsbuildinfo", ".pyc")
 
@@ -109,6 +109,22 @@ def copy_node_modules(source, target):
             except (OSError, RuntimeError, ValueError) as exc:
                 raise Stop("Symlinkziel außerhalb von node_modules: " + path.relative_to(source).as_posix()) from exc
     shutil.copytree(source, target, symlinks=True)
+
+
+def validate_backend_venv(venv):
+    """Require a usable copied environment without installing or reaching into source."""
+    python = venv / "bin" / "python"
+    if not python.is_file() or not os.access(python, os.X_OK):
+        raise Stop("Backend-Tests gestoppt: Die isolierte .venv enthält keinen ausführbaren bin/python-Interpreter.")
+    for args in (("--version",), ("-m", "pytest", "--version")):
+        try:
+            result = subprocess.run([str(python), *args], cwd=venv.parent,
+                                    capture_output=True, timeout=15, check=False)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise Stop("Backend-Tests gestoppt: Die kopierte .venv ist nicht ausführbar; Umgebung lokal neu erstellen.") from exc
+        if result.returncode:
+            raise Stop("Backend-Tests gestoppt: Die kopierte .venv ist unvollständig (Python oder pytest fehlt); "
+                       "bitte .venv im Originalprojekt kontrolliert neu erstellen. Es wurden keine Pakete installiert.")
 
 
 def changes(before, after):
@@ -381,6 +397,7 @@ def execute_locked(args, model, allowed, rules, storage):
                 copy_node_modules(ROOT / dependency, workspace / dependency)
             else:
                 shutil.copytree(ROOT / dependency, workspace / dependency, symlinks=False)
+                validate_backend_venv(workspace / dependency)
         for index, command in enumerate(check_plan(delta)):
             item = {"command": command, "status": "running"}
             report["checks"].append(item)

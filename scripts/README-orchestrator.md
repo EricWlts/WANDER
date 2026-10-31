@@ -60,10 +60,16 @@ AGENTS.md, ARCHITECTURE.md und TASKS.md müssen vorhanden und in Git erfasst sei
   Der Worker bekommt nur diese Kopie. Pfadfilter und Hashprüfungen stoppen bei
   unerwarteten Änderungen; sie ersetzen keine Betriebssystem-Sandbox gegen bösartige
   Prozesse. Die globale Codex-Anmeldung/CLI-Laufzeit kann eigene Verwaltungsdaten führen.
+- Projekt-Snapshots und Basis-Hashes lassen `.git` vollständig aus; tatsächliche
+  Projektdateien unterliegen weiter den strengen Pfad-, Symlink- und Hashprüfungen.
 - Nach erfolgreichem Workerabschluss werden vorhandene `node_modules` und bei Bedarf
-  `.venv` in die Kopie kopiert (zusätzlicher Speicherbedarf). Keine Symlinks zum
-  Original und keine Paketinstallation. Dort laufen immer `npm run test:frontend`
-  und `npm run build`; bei Backend- oder Paketmanifeständerungen zusätzlich `npm test`.
+  `.venv` in die Kopie kopiert (zusätzlicher Speicherbedarf). Symlinks in `.venv`
+  werden beim Kopieren dereferenziert; es werden keine Symlinks zum Original angelegt
+  und keine Pakete installiert. Vor `npm test` prüft der Orchestrator den kopierten
+  Python-Interpreter und pytest. Ist die Umgebung nicht lauffähig oder unvollständig,
+  stoppt er mit einer verständlichen Meldung; `.venv` muss dann im Originalprojekt
+  kontrolliert neu erstellt werden. Dort laufen immer `npm run test:frontend` und
+  `npm run build`; bei Backend- oder Paketmanifeständerungen zusätzlich `npm test`.
   Generierte Build-/Cachedateien werden bei der anschließenden Integritätsprüfung
   ausgenommen. Tests können temporäre Betriebssystemdateien erzeugen.
 - Das JSON-Protokoll `report.json` enthält Modell, Reasoning, Prüfungen, Dateiliste,

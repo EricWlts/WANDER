@@ -184,6 +184,35 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaises(o.Stop):
                 o.snapshot(root)
 
+    def test_snapshot_excludes_git_tree_and_metadata_but_checks_project_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git/objects/deep").mkdir(parents=True)
+            (root / ".git/objects/deep/object").write_text("git metadata")
+            (root / "src").mkdir()
+            (root / "src/app.py").write_text("project")
+            (root / "src/link").symlink_to("app.py")
+            with self.assertRaisesRegex(o.Stop, "Symlink im Prüfbereich: src/link"):
+                o.snapshot(root)
+            (root / "src/link").unlink()
+            self.assertEqual(set(o.snapshot(root)), {"src/app.py"})
+
+    def test_backend_venv_requires_python_and_pytest_without_installing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            venv = Path(tmp) / ".venv"
+            (venv / "bin").mkdir(parents=True)
+            python = venv / "bin/python"
+            python.write_text("placeholder")
+            with patch.object(o.os, "access", return_value=True), patch.object(o.subprocess, "run") as run:
+                run.return_value.returncode = 0
+                o.validate_backend_venv(venv)
+                self.assertEqual(run.call_count, 2)
+                self.assertTrue(all("pip" not in str(call.args) for call in run.call_args_list))
+                run.reset_mock()
+                run.return_value.returncode = 1
+                with self.assertRaisesRegex(o.Stop, "keine Pakete installiert"):
+                    o.validate_backend_venv(venv)
+
     def test_node_modules_preserves_internal_relative_symlinks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

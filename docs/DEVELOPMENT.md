@@ -6,7 +6,9 @@
 2. Wunsch in eigenen Worten beschreiben, etwa: „Der Abstand unter dem Titel ist auf dem Handy zu groß. Bitte verkleinern und zuerst eine Vorschau zeigen.“ Codex hält Ziel und Abnahmefälle in `TASKS.md` fest und bearbeitet nur diesen Auftrag.
 3. Codex erstellt oder verwendet einen isolierten nativen Worktree, implementiert und prüft den Entwurf. Es nennt Modellwahl/Eskalation kurz, öffnet die lokale Vorschau und zeigt relevante Änderungen im nativen Review. Bei UI-Arbeit Desktop und Mobil, DE/EN sowie betroffene Interaktionen kontrollieren.
 4. Feedback im selben Chat geben: „Noch etwas weniger Abstand; Desktop bitte so lassen.“ Codex bearbeitet denselben Entwurf und prüft die betroffenen Stellen erneut.
-5. Erst **„Diesen Stand übernehmen“** erlaubt die lokale Integration des zuletzt gezeigten, unveränderten Entwurfs. Vorher bleiben Änderungen im Worktree. Ein Commit, Push oder Deployment benötigt einen entsprechenden ausdrücklichen Auftrag. „Verwerfen“ betrifft nur den zugehörigen Entwurf.
+5. **G-Gates bleiben verbindlich:** Bei einer grundlegenden Produkt- oder Designentscheidung zeigt Codex den konkreten Stand samt Nachweisen und wartet auf die ausdrückliche Gate-Entscheidung. Ein grüner Build oder allgemeine Zustimmung überspringt das Gate nicht.
+6. Für eine ausdrücklich beauftragte Routineimplementierung ohne ausstehendes G-Gate autorisiert der Auftrag die lokale Integration und einen gezielten lokalen Commit, sobald die vorgeschriebenen Prüfungen bestanden sind. Codex prüft zuvor, dass Draft und Zielcheckout unverändert und konfliktfrei sind, übernimmt nur den Auftragsdiff und erhält fremde/ungesicherte Arbeiten. Bei Konflikten oder fehlgeschlagenen Prüfungen stoppt es und berichtet. Eine ausdrücklich gewünschte Vorschau-/Feedbackphase ohne Übernahme hält den Draft isoliert.
+7. Push und Deployment benötigen immer eine separate ausdrückliche Erlaubnis. „Verwerfen“ betrifft nur den zugehörigen Entwurf.
 
 Für diese Einrichtung werden nur Konfigurations- und Anweisungsdateien im bestehenden Checkout geändert. Die Isolation gilt für künftige Anwendungsänderungen. Die Freigaberegel ist eine Agentenanweisung, keine technisch erzwungene Merge-Sperre. Subagenten teilen grundsätzlich die Berechtigungen des Elternchats.
 
@@ -35,7 +37,7 @@ Für substanzielle Logikänderungen nach Abschluss des Workers einen unabhängig
 - `npm start` startet die vorhandene lokale App mit Frontend und Backend; es ist kein isolierter Abnahmemodus. Der Starthelfer `scripts/dev.py` ist kein Modell-Orchestrator, wird aber nicht zur isolierten Datenprüfung verwendet.
 - Frontendänderungen: `npm run test:frontend` und `npm run build`. Backend-/Persistenzänderungen: zusätzlich `npm test` (oder zusammen `npm run test:all`). Keine Lint- oder DOM-Testumgebung vorhanden. Browserprüfung separat belegen, fehlende Abdeckung offen lassen. Nur direkt verursachte Fehler beheben.
 
-Worktrees starten vom gewählten Commit, nicht von ungesicherten Änderungen im ursprünglichen Checkout. Codex prüft vorher den Git-Status und benennt fehlende Voraussetzungen. Keine automatische Sicherungs- oder Sammel-Commits. Nach Freigabe nur den geprüften Auftragsdiff lokal integrieren, auf zwischenzeitliche Änderungen prüfen und bei Konflikten stoppen.
+Worktrees starten vom gewählten Commit, nicht von ungesicherten Änderungen im ursprünglichen Checkout. Codex prüft vorher den Git-Status und benennt fehlende Voraussetzungen. Keine automatische Sicherungs- oder Sammel-Commits. Bei ausdrücklich beauftragten Routineaufgaben nach bestandenen Prüfungen nur den geprüften Auftragsdiff lokal integrieren und gezielt committen; vorher zwischenzeitliche Änderungen prüfen und bei Konflikten stoppen. Ausdrücklich vorgesehene G-Gates bleiben abzuwarten. Push und Deployment bleiben separat freigabepflichtig.
 
 ## Geprüfte Installation und Grenzen
 

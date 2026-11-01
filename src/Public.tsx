@@ -1,19 +1,11 @@
 import { tr } from "./I18n";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  ArrowDown,
-  ArrowDownLeft,
-  ArrowUpRight,
-  List,
-  Grid2X2,
-} from "lucide-react";
+import { ArrowUpRight, List, Grid2X2 } from "lucide-react";
 import { api } from "./api";
-import { Reveal, journeyReveal } from "./Reveal";
-import { Compass, dateLabel, dateRange, dayCount, Picture } from "./components";
+import { Reveal } from "./Reveal";
+import { Compass, dateLabel, dateRange, Picture } from "./components";
 import type { Journey } from "./types";
-import { Parallax } from "./Motion";
-import { HomeDays } from "./StoryExperience";
 
 function useJourneys() {
   const [journeys, setJourneys] = useState<Journey[]>([]),
@@ -30,238 +22,137 @@ function useJourneys() {
 export function Home() {
   const { journeys, loading, error } = useJourneys();
   const journey = journeys[0];
+  const otherJourneys = journeys.slice(1, 4);
   return (
     <main id="main">
       <section className="home-intro page-width">
         <div className="intro-composition">
           <h1>
             <Reveal as="span">
-              {tr("Somewhere,")}
-              <br />
-              <em>{tr("worth remembering.")}</em>
+              {tr("Journeys in photographs and stories")}
             </Reveal>
           </h1>
           <div className="intro-aside">
-            <Compass />
             <p>
-              <Reveal as="span">
-                {tr("Not just the places we go.")}
-                <br />
-                {tr("But the way they make us feel.")}
-              </Reveal>
+              {tr(
+                "A personal travel journal for photographs, notes and the moments worth keeping.",
+              )}
             </p>
-            <a href="#latest" className="scroll-link">
-              {tr("SCROLL TO WANDER")} <ArrowDown size={15} />
-            </a>
+            <div className="home-paths">
+              <Link to="/archive" className="text-link home-reader-link">
+                {tr("Explore the archive")} <ArrowUpRight size={18} />
+              </Link>
+              <Link to="/studio" className="home-studio-link">
+                {tr("Open the studio")} <ArrowUpRight size={14} />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
       <section
-        className="home-cover page-width"
+        className="home-feature page-width"
+        id="latest"
         aria-label={tr("Latest journey")}
       >
         {loading ? (
-          <div className="loading-photo" aria-label={tr("Loading journeys")} />
+          <div
+            className="home-feature-loading"
+            aria-label={tr("Loading journeys")}
+          />
         ) : error ? (
-          <div className="inline-error" role="alert">
+          <div className="home-feature-error inline-error" role="alert">
             {error}
             <button onClick={() => location.reload()}>{tr("Try again")}</button>
           </div>
         ) : journey ? (
-          <Link to={`/journeys/${journey.slug}`} className="cover-link">
-            <Parallax enabled={journey.layout?.parallax ?? true}>
+          <article className="home-feature-story">
+            <Link
+              to={`/journeys/${journey.slug}`}
+              className="home-feature-image-link"
+              aria-label={`${tr("Read the journey")}: ${journey.title}`}
+            >
               <Picture
                 photo={journey.cover}
                 eager
-                className="home-cover-image"
+                className="home-feature-image"
+                sizes="(max-width: 760px) 100vw, 58vw"
               />
-            </Parallax>
-            <div className="cover-shade" />
-            <div className="cover-top">
-              <span>
-                {tr("FIELD NOTES — VOL.")}
-                {String(journey.id).padStart(3, "0")}
+              <span className="home-feature-image-label">
+                {tr("THE LATEST JOURNEY")}
               </span>
-              <span>
-                {journey.country.toUpperCase()} ·{" "}
+              <span className="home-feature-image-arrow" aria-hidden="true">
+                <ArrowUpRight />
+              </span>
+            </Link>
+            <div className="home-feature-copy">
+              <span className="eyebrow">
+                {journey.country} /{" "}
                 {dateLabel(journey.start_date, {
                   month: "long",
                   year: "numeric",
-                }).toUpperCase()}
+                })}
               </span>
+              <h2>{journey.title}</h2>
+              {journey.subtitle && (
+                <p className="home-feature-subtitle">{journey.subtitle}</p>
+              )}
+              {journey.description && (
+                <p className="home-feature-description">
+                  {journey.description}
+                </p>
+              )}
+              <Link className="text-link" to={`/journeys/${journey.slug}`}>
+                {tr("Read the journey")} <ArrowUpRight size={18} />
+              </Link>
             </div>
-            <div className="cover-title">
-              <div className="eyebrow">
-                {tr("THE LATEST JOURNEY")}{" "}
-                <span>01 / {String(journeys.length).padStart(2, "0")}</span>
-              </div>
-              <h2>
-                <Reveal
-                  as="span"
-                  config={journeyReveal(journey.reveal_settings, "title")}
-                >
-                  {journey.title}
-                </Reveal>
-              </h2>
-              <p>
-                <Reveal
-                  as="span"
-                  config={journeyReveal(journey.reveal_settings, "title")}
-                >
-                  {journey.subtitle}
-                </Reveal>
-              </p>
-            </div>
-            <span className="cover-arrow" aria-hidden="true">
-              <ArrowUpRight />
-            </span>
-            <span className="cover-side">
-              {tr("SOME MOMENTS STAY WITH YOU.")}
-            </span>
-          </Link>
+          </article>
         ) : (
-          <div className="empty-cover">
+          <div className="home-feature-empty">
             <Compass />
-            <h2>
-              <Reveal as="span">{tr("Every story starts somewhere.")}</Reveal>
-            </h2>
-            <Link to="/studio" className="text-link">
-              {tr("Begin your first journey")}
-              <ArrowUpRight size={18} />
-            </Link>
+            <div>
+              <span className="eyebrow">{tr("THE JOURNAL")}</span>
+              <h2>{tr("A place for journeys in photographs and stories.")}</h2>
+              <p>{tr("No journeys have been published yet.")}</p>
+              <Link className="text-link" to="/archive">
+                {tr("Explore the archive")} <ArrowUpRight size={18} />
+              </Link>
+            </div>
           </div>
         )}
-        <div className="cover-caption">
-          <span>{tr("A DIGITAL KEEPSAKE. A WINDOW BACK.")}</span>
-          <span>
-            EST. 2026 <span className="caption-star">✳</span>
-            {tr("ALWAYS WANDERING")}
-          </span>
-        </div>
       </section>
-      <section className="manifesto page-width" id="latest">
-        <div className="section-index">
-          <span>{tr("01 — THE JOURNAL")}</span>
-          <span>{tr("COLLECTING MOMENTS, NOT MILES.")}</span>
-        </div>
-        <div className="manifesto-content">
-          <ArrowDownLeft strokeWidth={1} className="manifesto-arrow" />
-          <h2>
-            <Reveal as="span">
-              {tr("Life moves.")}
-              <br />
-              <em>{tr("Some things should stay.")}</em>
-            </Reveal>
-          </h2>
-          <div>
-            <p>
-              <Reveal as="span">
-                {tr(
-                  "A fleeting light. An unfamiliar path. The kind of quiet you wish you could take home.",
-                )}
-              </Reveal>
-            </p>
-            <p>
-              <Reveal as="span">
-                {tr(
-                  "This is a place for those things. Photographs, field notes, and little pieces of a life well wandered.",
-                )}
-              </Reveal>
-            </p>
-            <Link to="/about" className="text-link">
-              {tr("A note about WANDER")}
-              <ArrowUpRight size={16} />
+      {otherJourneys.length > 0 && (
+        <section
+          className="home-more page-width"
+          aria-labelledby="home-more-title"
+        >
+          <div className="home-more-heading">
+            <h2 id="home-more-title">{tr("More from the journal")}</h2>
+            <Link to="/archive" className="text-link">
+              {tr("View all journeys")} <ArrowUpRight size={16} />
             </Link>
           </div>
-        </div>
-      </section>
-      {journey && (
-        <section className="selected-story page-width">
-          <Link
-            to={`/journeys/${journey.slug}`}
-            className="selected-image-link"
-          >
-            <Picture
-              animate
-              photo={journey.cover}
-              sizes="(max-width: 760px) 100vw, 56vw"
-            />
-            <span className="selected-tag">{tr("FROM THE JOURNAL")}</span>
-          </Link>
-          <div className="selected-copy">
-            <span className="eyebrow">
-              {journey.country} /{" "}
-              {dateLabel(journey.start_date, { year: "numeric" })}
-            </span>
-            <h2>
-              <Reveal as="span">
-                {journey.title}
-                <em>{journey.subtitle}</em>
-              </Reveal>
-            </h2>
-            <p>
-              <Reveal as="span">{journey.description}</Reveal>
-            </p>
-            <div className="journey-facts">
-              <span>
-                {String(
-                  dayCount(journey.start_date, journey.end_date),
-                ).padStart(2, "0")}{" "}
-                {tr("DAYS")}
-              </span>
-              <span>
-                {String(journey.photo_count).padStart(2, "0")}
-                {tr("PHOTOGRAPHS")}
-              </span>
-            </div>
-            <Link className="text-link" to={`/journeys/${journey.slug}`}>
-              {tr("Step inside the story")}
-              <ArrowUpRight size={18} />
-            </Link>
-            {journey.demo && (
-              <span className="demo-caption">
-                {tr("An imagined journey · Illustrative photography")}
-              </span>
-            )}
+          <div className="home-more-grid">
+            {otherJourneys.map((item) => (
+              <Link
+                key={item.id}
+                to={`/journeys/${item.slug}`}
+                className="home-more-entry"
+              >
+                <Picture
+                  photo={item.cover}
+                  sizes="(max-width: 760px) 100vw, 30vw"
+                />
+                <span className="eyebrow">
+                  {item.country} /{" "}
+                  {dateLabel(item.start_date, { year: "numeric" })}
+                </span>
+                <h3>{item.title}</h3>
+                {item.subtitle && <p>{item.subtitle}</p>}
+              </Link>
+            ))}
           </div>
         </section>
       )}
-      {journey && <HomeDays slug={journey.slug} />}
-      <section className="home-interlude">
-        <Compass />
-        <p>
-          <Reveal as="span">
-            {tr("Go slowly.")}
-            <br />
-            {tr("Look closely.")}
-            <br />
-            <em>{tr("Remember how it felt.")}</em>
-          </Reveal>
-        </p>
-        <span className="eyebrow">
-          {tr("THE BEAUTY IS IN THE IN-BETWEEN.")}
-        </span>
-      </section>
-      <section className="archive-invite page-width">
-        <div>
-          <span className="eyebrow">
-            {tr("THERE IS ALWAYS ANOTHER CHAPTER.")}
-          </span>
-          <h2>
-            <Reveal as="span">
-              {tr("The places become")}
-              <br />
-              <em>{tr("part of us.")}</em>
-            </Reveal>
-          </h2>
-        </div>
-        <Link to="/archive" className="large-link">
-          {tr("Explore the archive")}{" "}
-          <span className="round-arrow">
-            <ArrowUpRight />
-          </span>
-        </Link>
-      </section>
     </main>
   );
 }
@@ -338,7 +229,7 @@ export function Archive() {
             <Link
               key={j.id}
               to={`/journeys/${j.slug}`}
-              className="archive-entry"
+              className={`archive-entry${view === "editorial" && i === 0 ? " archive-entry--lead" : ""}`}
             >
               <div className="entry-number">
                 {String(i + 1).padStart(2, "0")}
@@ -370,21 +261,33 @@ export function Archive() {
         <div className="empty-state">
           <Compass />
           <h2>
-            <Reveal as="span">{tr("Room for your first adventure.")}</Reveal>
+            <Reveal as="span">
+              {tr("No journeys have been published yet.")}
+            </Reveal>
           </h2>
-          <Link className="text-link" to="/studio">
-            {tr("Create a journey")}
+          <p>
+            {tr(
+              "The archive is a place for shared journeys in photographs and stories.",
+            )}
+          </p>
+          <Link className="text-link" to="/">
+            {tr("Back to the journal")}
             <ArrowUpRight size={18} />
+          </Link>
+          <Link className="archive-studio-link" to="/studio">
+            {tr("Open the studio")}
           </Link>
         </div>
       )}
-      <div className="archive-end">
-        <span className="small-line" />
-        <p>
-          <Reveal as="span">{tr("And so much still to discover.")}</Reveal>
-        </p>
-        <Compass />
-      </div>
+      {sorted.length > 0 && (
+        <div className="archive-end">
+          <span className="small-line" />
+          <p>
+            <Reveal as="span">{tr("And so much still to discover.")}</Reveal>
+          </p>
+          <Compass />
+        </div>
+      )}
     </main>
   );
 }

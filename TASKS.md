@@ -1,6 +1,18 @@
 # Entwicklungsaufgaben
 
+### W05 — Leser- und Gestalterweg auf Start/Archiv klären (01.11.2026)
+
+- Status: **G2-Designrichtung und lokale Übernahme ausdrücklich freigegeben; integriert, gezielter lokaler Commit nach Post-Integration-Checks.** Modell: GPT-6 Luna, medium. Voraussetzung G1 laut W04 freigegeben und übernommen.
+- Draft/Basis: `/Users/ericwilts/.codex/worktrees/w05/WANDER`, Branch `codex/w05`, Ausgangsrevision `4d442ea195ab978134da2c3af252cfbc48c2515b` (W01–W04-Basis).
+- Scope: ausschließlich `src/Public.tsx` (Home/Archive), `src/refinement.css`, `src/translations.json` und dieser W05-Eintrag. Header/Footer, API, Storyrenderer, Backend/Datenmodell und gespeicherte Inhalte bleiben außerhalb.
+- Abnahme: ein dominantes, asymmetrisches Reisemotiv plus kurzer Produktnutzen; Lesepfad vor Studiozugang, keine Kontoerstellungsbehauptung und keine zweite gleichgewichtige Kopie des neuesten Covers. Archivmagazin mit gewichtetem Auftakt/ruhigeren Folgeeinträgen, Index und Sortierung erhalten. 0/1/20 Wegwerfreisen, lange Titel/Untertitel, Hoch-/Quercover und DE/EN bei 390/1280 px; keine leeren Lücken oder abgeschnittenen Titel. Daten-/Ladefehler verständlich.
+- Umsetzung: Start mit einer 7:5-Bild-/Textkomposition am Desktop und semantisch gestapeltem Mobilaufbau; ein Leser-CTA zum Archiv, nachgeordnet `/studio`; das aktuelle Cover erscheint nur als Hauptmotiv. Ergänzende Auswahl nutzt ausschließlich weitere vorhandene Reisen. Magazinarchiv gewichtet den ersten Eintrag, Folgeeinträge bleiben ruhiger; Index und Sortierung unverändert. G1-Tokens, Bildplatzhalter/Aspect-Ratio, eager/high-priority Cover-Request, Alttext und Source-Wechsel berücksichtigt. Keine Header/Footer-, API-, Renderer-, Backend- oder Inhaltsänderungen.
+- Browserdraft: `http://127.0.0.1:5180/` aus diesem Worktree, mit lokalem Wegwerf-API-Fixture auf `127.0.0.1:5018`; Vorhervergleich derselben Basisrevision unter `http://127.0.0.1:5181/`. Fixture erzeugt ausschließlich temporäre 0/1/20 Reisen, lange Titel/Untertitel und Bildfehler, keine gespeicherten Inhalte. Native Browserprüfung: 390×844 und 1280×916 (Responsive DevTools); zusätzlich sichtbare schmale IAB-Prüfung bei 319px. DE/EN, Start und Archiv geprüft. 0 Reisen: ehrlicher leerer Zustand auf Start/Archiv, keine erfundene Auswahl und keine widersprüchliche Archiv-Folgezeile. 1 Reise: genau ein Covermotiv, keine Auswahlgruppe. 20 Reisen: Start zeigt nur weitere vorhandene Reisen; Archiv zeigt 20 Einträge, Sortierung Neueste/Älteste und Indexansicht bedienbar. Lange Titel/Untertitel brechen um; Hoch- und Querformat in den realen Fixture-Medien sichtbar, ohne horizontales Überlaufen oder Titel-Clipping im geprüften Viewport. Ladefehler zeigt verständlichen Text und „Try again“; fehlerhafte Coverquelle zeigt Bild-Alttext/Fallback, Wiederherstellung nach Quellenwechsel geladen.
+- Screenshots: mobile EN/IAB (319px sichtbare Fläche) `/private/tmp/w05-mobile-en-319.png`; Desktop responsive Browseraufnahme `/private/tmp/w05-desktop-1280.png`. Vorher/Nachher wurden mit identischem 20-Reisen-Fixture in der nativen Browserprüfung verglichen. Browserabdeckung 390/1280 sowie DE/EN bestätigt; keine externen Medien oder echte Inhalte.
+- Checks: `npm run test:frontend` — 31/31 bestanden; `npm run build` — erfolgreich (TypeScript/Vite, 2068 Module); Übersetzungs-JSON parsebar; `git diff --check` erfolgreich. Diffumfang: ausschließlich `TASKS.md`, `src/Public.tsx`, `src/refinement.css`, `src/translations.json`. Nach der visuellen Prüfung wurden G2 und lokale Übernahme ausdrücklich freigegeben. Post-Integration-Checks: Frontendtests 31/31, Build und `git diff --check` bestanden. Der W05-Auftragsdiff wird gezielt lokal committed. Kein Push oder Deployment.
+
 ### B05 — Sichere Git- und Worktree-Grundlage für W05 (01.11.2026)
+
 - Auftrag/Abnahme: ausschließlich W04-Übernahme und Git-Historie prüfen, gezielten Basisumfang vor ausdrücklicher Commitfreigabe zeigen; danach eigenen isolierten W05-Worktree mit `codex/`-Branch erstellen und W01–W04 samt Designgrundlagen kontrollieren. Keine W05-Implementierung, Pushes oder Deployments; sämtliche anderen Änderungen, lokalen Daten und bisherigen Worktrees erhalten.
 - Ausgangspunkt: Originalcheckout `/Users/ericwilts/Documents/WANDER`, Branch `feature/agent-orchestration`, HEAD `0d270ae4a0bb959a1eb0ea9f39000b3c4b59e319`; Index leer, keine Konflikte. Sechs bestehende weitere Worktrees, keine an diesen Chat angehängten Artefakte; fremder W04-Draft wird ausschließlich gelesen.
 - Basisbefund: W01–W03 sowie Design-, Audit-, Planungs- und Workflowgrundlagen sind bereits in HEAD enthalten. Die übernommenen `src/journal.css`, `src/refinement.css` und der W04-Abschluss in `TASKS.md` stimmen vor Ergänzung dieses B05-Eintrags bytegleich mit `/Users/ericwilts/.codex/worktrees/w04-design-foundation/WANDER` überein. W04-CSS fehlt in HEAD und der Branchhistorie; interne Codex-Diff-Snapshots ersetzen keinen bestätigten Basis-Commit.
@@ -9,6 +21,7 @@
 - Status: Basis-Commitfreigabe ausstehend; noch kein Commit und kein W05-Worktree. Die abschließende Basiskontrolle im neuen Worktree folgt erst nach ausdrücklicher Freigabe.
 
 ### W04 — Präzision und gemeinsamer UI-Motionmaßstab (01.11.2026)
+
 - Status: **G1-Designrichtung vom Nutzer am 01.11.2026 freigegeben; drei geprüfte W04-Dateien kontrolliert lokal übernommen.** Modell: GPT-6 Luna, medium. W04 bleibt begrenzter Pilot; weitere Ausbreitung benötigt eigene Freigabe.
 - Draft/Basis: `/Users/ericwilts/.codex/worktrees/w04-design-foundation/WANDER`, detached auf `0d270ae4a0bb959a1eb0ea9f39000b3c4b59e319` (`chore: establish verified W04 baseline`). HEAD exakt geprüft; erforderliche Designgrundlagen sowie die bestätigten W01–W03-Dateien und -Übernahmen sind vorhanden. Bestehende Änderungen aus dem Originalcheckout wurden nicht in den Draft gezogen.
 - Scope: nur `src/refinement.css`, `src/journal.css` und dieser W04-Abschnitt. Keine Änderung an Importreihenfolge, Story-/Backenddaten, Autorenparametern, Reveal-/Parallax-/Filmstrip-Logik oder Schema.
@@ -19,6 +32,7 @@
 - Checks: `npm run test:frontend` — 31/31 bestanden; `npm run build` — erfolgreich (TypeScript/Vite, 2068 Module); native Browserprüfung Desktop/Mobil und Vorher/Nachher; `git diff --check` erfolgreich. Screenshot-/Browserreferenz: `http://127.0.0.1:5184/` (Story direkt `/journeys/fichtelgebirge`; statische Beispiele `/inspiration/quiet-atlas` und `/inspiration/after-hours`). G1 gestattet die lokale Übernahme dieser drei geprüften Dateien; keine weiteren Dateien übernommen. OS-Reduced-Motion bleibt offener Prüfpunkt. Kein Commit, Push, Deployment oder Rollout; jede Ausbreitung über den Pilot hinaus benötigt eigene Freigabe.
 
 ### B04 — Sichere Arbeitsgrundlage vor W04 prüfen (01.11.2026)
+
 - Auftrag/Scope: vollständigen Gitstatus und vorhandene Worktrees prüfen, W01–W03 gegen Übernahmenachweise abgleichen, notwendige Code-/Design-/Planungs-/Workflowdateien von historischer Orchestratorarbeit und lokalen Artefakten trennen; genauen lokalen Basis-Commit vorschlagen. W04 nicht beginnen.
 - Abnahme: Frontendtests und Build des aktuellen Checkouts sowie einer temporären Quellkopie mit ausschließlich dem vorgeschlagenen Basisumfang; bestehende Dateien erhalten, keine Anwendungsänderung, kein Commit/Push/Deployment, keine Produktdaten oder Secrets kopieren.
 - Ausgangspunkt: Originalcheckout `/Users/ericwilts/Documents/WANDER`, Branch `feature/agent-orchestration`, HEAD `c2b54b34e22310ebae92d984ec33e7ee87ed2156`; 17 geänderte versionierte und 13 unversionierte Dateien, Index leer, keine Konflikte. Keine angehängten Worktrees; vier weitere Git-Worktrees vorhanden und unverändert belassen.
@@ -27,6 +41,7 @@
 - Status: Vorbereitung abgeschlossen, kein Basis-Commit und kein neuer W04-Worktree angelegt; beide benötigen einen gesonderten ausdrücklichen Auftrag. Technisch vollständiger aktueller Anwendungs-/Planungsstand ist von sämtlichen ungesicherten historischen Werkzeugänderungen zu unterscheiden. Für einen wortwörtlich vollständigen Checkout-Snapshot müssten die zehn historischen scripts-Dateien separat geprüft/freigegeben und ebenfalls gesichert werden. Designrichtung/Zielpublikum/Referenzmotive bleiben vor dem W04-Start ausdrücklich zu bestätigen.
 
 ### W03 — Automatische Schriftfarbe nach Kontrast wählen (01.11.2026)
+
 - Status / Modell: lokal übernommen nach ausdrücklicher Nutzerfreigabe / **GPT-6 Luna, medium**. Voraussetzung W02 geprüft und im Original übernommen.
 - Draft: `/Users/ericwilts/.codex/worktrees/w03-contrast/WANDER`, Branch `codex/w03-contrast`, Ausgangsrevision `c2b54b34e22310ebae92d984ec33e7ee87ed2156`.
 - Basis früherer übernommener Aufträge im Draft: W01 entfernt den Hookaufruf aus `src/StoryExperience.tsx` (SHA-1 `823ddbdcb2237726803aadd20e25f03b327885bf`); W02 ändert die mobile Titelregel in `src/styles.css` (SHA-1 `2733a536cdd5da4c6f7664e15b7d839e914e5bb0`). Beide gezielten Deltas stimmen mit dem Original überein und wurden nicht erneut übertragen.
@@ -39,6 +54,7 @@
 - Übernahme: ausschließlich `src/journalModel.ts`, `tests/surface-colors.test.ts` und dieser W03-Eintrag aus dem geprüften Draft übertragen. Keine Commits, Pushes oder Deployments.
 
 ### W02 — Mobile Archivtitel vollständig lesbar machen (01.11.2026)
+
 - Status / Modell: übernommen / **GPT-6 Luna, low**. Voraussetzung W01 geprüft und übernommen.
 - Draft: `/Users/ericwilts/.codex/worktrees/w02-archive-title/WANDER`, Ausgangscommit `c2b54b34e22310ebae92d984ec33e7ee87ed2156`; geprüft im detached HEAD.
 - Scope: ausschließlich mobile `.archive-heading h1`-Regel in `src/styles.css` und dieser Eintrag. DE/EN-Texte/Markup unverändert.
@@ -48,6 +64,7 @@
 - Übernahme: ausschließlich der geprüfte CSS-Hunk und dieser W02-Status in den Original-Checkout übertragen. Keine Commits, Pushes oder Deployments.
 
 ### W01 — Manuelle Bildreihe ohne automatische Verschiebung (01.11.2026)
+
 - Status / Modell: übernommen / **GPT-6 Luna, low**. Voraussetzung: Auditbefund A01 bestätigt.
 - Draft: `/Users/ericwilts/.codex/worktrees/w01/WANDER`, Branch `codex/w01`, Ausgangscommit `c2b54b34e22310ebae92d984ec33e7ee87ed2156`. Übernahme nach ausdrücklicher Freigabe; übrige ungesicherte Originaländerungen erhalten.
 - Scope: nur `PhotoRail` und `useRailHint`-Import in `src/StoryExperience.tsx`, plus dieser Eintrag. `src/useRailHint.ts` nur gelesen und nicht gelöscht.
@@ -56,6 +73,7 @@
 - Übernahme: nur W01-Diff integriert; keine Commits, Pushes oder Deployments.
 
 ### P2 — Abschließende strategische Qualitätsprüfung (01.11.2026)
+
 - Auftrag: bestehende fünf Auditdokumente kritisch auf Premium-Ambition, Designkonkretion, Abhängigkeiten, Modellkosten und ausführbare Worker-Prompts prüfen; kein erneutes Repository-Audit.
 - Scope: gezielte Verbesserungen in `DEVELOPMENT_PLAN.md`, `DESIGN_GUIDELINES.md`, `AGENT_TASKS.md`; diesen Auftrag in `TASKS.md` dokumentieren. Ausgangsaudit und Projektübersicht als Evidenz erhalten.
 - Ausgangspunkt: Originalcheckout `/Users/ericwilts/Documents/WANDER`, HEAD `c2b54b34e22310ebae92d984ec33e7ee87ed2156`; vorhandene ungesicherte Dateien erhalten. Reine Dokumentarbeit, kein Anwendungsentwurf.
@@ -65,6 +83,7 @@
 - Nachweise: Aufgaben-/Modellkonsistenz, lokale Links, Markdown/Whitespace und `git diff --check` erfolgreich. Ausgangsaudit/Projektübersicht bytegleich, alte TASKS-Einträge und übrige versionierte Dateien unverändert. Kein neuer Build, Laufzeit- oder Browsernachweis bei dieser reinen Dokumentänderung. Plan schrittweise beauftragbar; zuerst W01, vor W04 Zielpublikum/Designrichtung/Referenzmotive bestätigen.
 
 ### P1 — Master-Audit und Premium-Produktstrategie (01.11.2026)
+
 - Aktueller Auftrag: Repository und zentrale Produktpfade selbst prüfen, erreichbare Referenzen untersuchen, ein begründetes Premium-Zielbild und eine kostenoptimierte Umsetzungskette mit eigenständigen Worker-Prompts erstellen. Keine anderen offenen Aufgaben starten.
 - Umfang: neue `PROJECT_OVERVIEW.md`, `DESIGN_GUIDELINES.md`, `PRODUCT_AUDIT.md`, `DEVELOPMENT_PLAN.md`, `AGENT_TASKS.md`; nur diesen Auftrag in `TASKS.md` ergänzen. Anwendungscode, Daten, Abhängigkeiten und bestehende ungesicherte Änderungen bleiben erhalten.
 - Ausgangspunkt: `/Users/ericwilts/Documents/WANDER`, `feature/agent-orchestration`, Commit `c2b54b34e22310ebae92d984ec33e7ee87ed2156`, vorhandene ungesicherte Workflow-/Orchestrator-Dokumentation; keine angehängten Worktrees. Reines Dokumentationsaudit im aktuellen Checkout; für spätere Anwendungsänderungen gilt die Worktree-/Freigaberegel.
@@ -75,6 +94,7 @@
 - Ergebnisdateien: `PROJECT_OVERVIEW.md`, `DESIGN_GUIDELINES.md`, `PRODUCT_AUDIT.md`, `DEVELOPMENT_PLAN.md`, `AGENT_TASKS.md`; Belege in `docs/audit-2026-11-01/`. Ältere Statusangaben unten bleiben historisch; insbesondere T7 nicht nochmals beauftragen, der Validator ist bereits implementiert.
 
 ### N1 — Nativer Codex-Entwicklungsworkflow (01.11.2026)
+
 - Auftrag: bestehende Struktur und installierte Codex-Funktionen prüfen; kostensparende native Delegation, Browserfeedback und ausdrückliche Übernahmefreigabe einrichten. Keine Produktaufgabe T7/A1 starten.
 - Dateien: `AGENTS.md`, `.codex/config.toml`, `docs/DEVELOPMENT.md`, Einstieg in `README.md` und historischer Hinweis in `ARCHITECTURE.md`. Anwendungscode und vorhandene Orchestrator-Arbeit erhalten.
 - Status: Konfiguration eingerichtet; Validierung siehe `docs/DEVELOPMENT.md`. Kein echter Subagent für Probeaufgaben, kein Commit/Push/Deployment.
@@ -89,6 +109,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 **Prüfkürzel:** F = `npm run test:frontend`, B = `npm run build`, A = `npm run test:all`. Für UI-Aufgaben zusätzlich die genannten Browserfälle in DE/EN durchführen. Fehlt die Browserumgebung, Prüfung ausdrücklich offen melden. Bei Fehlschlägen nur direkt verursachte Fehler beheben. Tests, die einen bestehenden Defekt zeigen, nicht durch geänderte Erwartungen grün machen.
 
 ### T1 — Bibliotheksfehler von leerem Bestand unterscheiden
+
 - Status / Modell: erledigt / **LUNA_MEDIUM**. Unabhängig.
 - Dateien: `src/Studio.tsx` (`StudioLibrary`), ggf. `src/translations.json`.
 - Befund/Ziel: Nach fehlgeschlagenem Laden erscheinen derzeit Fehler und Erstbenutzer-Leerzustand gleichzeitig. Lade-, Fehler- und Leerzustand eindeutig machen; Wiederholen mit vorhandenen Button-Klassen anbieten.
@@ -96,6 +117,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B; Browser: Anfrage `/api/journeys` blockieren → Fehler → freigeben/Wiederholen; zusätzlich leere und gefüllte Bibliothek.
 
 ### T2 — Mobile Navigation mit Escape schließen
+
 - Status / Modell: erledigt / **LUNA_MEDIUM**. Unabhängig.
 - Dateien: `src/App.tsx` (`Header`).
 - Befund/Ziel: Menü besitzt einen Toggle und schließt beim Routenwechsel, aber keinen Escape-Handler. Nur bei offenem Menü Escape behandeln und Fokus zum Toggle zurückgeben; Listener aufräumen.
@@ -103,6 +125,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B; Browser bei 390 px per Tastatur öffnen/schließen und Link folgen; Desktopnavigation bei 1200 px prüfen.
 
 ### T3 — Vorhandene ARIA-Verknüpfungen in Field erhalten
+
 - Status / Modell: erledigt / **LUNA_MEDIUM**. Unabhängig.
 - Dateien: `src/components.tsx` (`Field`); Aufrufstellen nur gezielt lesen.
 - Befund/Ziel: `cloneElement` überschreibt `aria-labelledby` und `aria-describedby` des Kindes. Vorhandene ID-Token mit generierter Label-/Hint-ID kombinieren, Duplikate entfernen; ohne Hint vorhandene Beschreibung erhalten.
@@ -110,6 +133,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B; Browser/DOM mit temporären, nicht eingecheckten Beispielen: eigene ARIA-IDs, mit/ohne Hint, ohne eigene ARIA-IDs; Accessibility-Name und -Beschreibung kontrollieren.
 
 ### T4 — Regressionstests für Placement-Fallbacks ergänzen
+
 - Status / Modell: erledigt / **LUNA_LOW**. Unabhängig; ausschließlich Tests ändern.
 - Dateien: `tests/editor-model.test.ts`; lesen: `src/journalModel.ts`, `src/types.ts`.
 - Ziel: Bisher nicht explizit abgesicherte Kompatibilitätsregeln für `placementsFor`, `modulePhotos`, `rootPhotos` festhalten.
@@ -117,6 +141,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B. Falls Verhalten abweicht, Defekt separat melden; Produktionscode bleibt außerhalb dieser Aufgabe.
 
 ### T5 — Regressionstests für Änderungen während Save ergänzen
+
 - Status / Modell: erledigt / **LUNA_MEDIUM**. Unabhängig; ausschließlich Tests ändern.
 - Dateien: `tests/editor-model.test.ts`; lesen: `src/journalModel.ts` (`mergeSavedJourney`).
 - Ziel: Bestehenden Save-Test um Verlustschutz für Reihenfolge und Löschung erweitern.
@@ -124,6 +149,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B. Keine Änderung am Merge-Verfahren; abweichende Ergebnisse an Sol melden.
 
 ### T6 — Späte Ladefehler des Editors ignorieren
+
 - Status / Modell: erledigt / **LUNA_LOW**. Unabhängig.
 - Dateien: `src/ModularEditor.tsx`, ausschließlich Lade-Effect mit Abhängigkeit `[slug]`; Referenz: `StoryLoader` in `src/StoryExperience.tsx`.
 - Befund/Ziel: Erfolg prüft bereits `alive`, Fehler setzt Zustand ohne Prüfung. Dieselbe `alive`-Prüfung im Fehlerpfad ergänzen; keine weitere Zustandsbereinigung oder Save-Änderung.
@@ -131,6 +157,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: F, B; Browser: verzögerte fehlschlagende Ladeanfrage, vor Antwort Route verlassen; außerdem aktiven Ladefehler und erfolgreichen Einstieg prüfen.
 
 ### T7 — Wiederherstellungsdaten vor Übernahme prüfen
+
 - Status / Modell: offen / **Sol**. Nach T4/T5 empfohlen.
 - Dateien: `src/ModularEditor.tsx` (Recovery lesen/übernehmen), neu `src/recoveryModel.ts`, neu `tests/recovery-model.test.ts`; lesen: `src/types.ts`.
 - Befund/Ziel: Recovery prüft derzeit nur JSON und Reise-ID. Kleinen reinen Validator für die anschließend benötigten Datenformen einführen; bestehendes Speicherformat und Schlüssel beibehalten. Vor Implementierung Übernahmepfad gezielt prüfen.
@@ -138,6 +165,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: neue Logiktests für gültige/ungültige Daten und Legacy-Optionen, A, B; Browser: gültigen Entwurf wiederherstellen, kaputte Recovery ignorieren, Neuladen ohne Recovery. Nur isolierte Testdaten verwenden.
 
 ### A1 — Architekturentscheidung bei neuem Betriebsmodell (zurückgestellt)
+
 - Status / Modell: **nicht starten ohne Produktauftrag / Astra**. Kein aktueller Umbau nötig.
 - Auslöser: Mehrbenutzerbetrieb, Cloudhosting oder gleichzeitiges Bearbeiten derselben Reise wird ausdrücklich beauftragt.
 - Dateien: neu `docs/adr/001-operating-model.md`, danach `ARCHITECTURE.md`/`TASKS.md`; gezielt lesen: `backend/app.py`, `backend/models.py`, `backend/migrations.py`, `src/api.ts`, Save/Recovery in `src/ModularEditor.tsx`.
@@ -146,6 +174,7 @@ Ausgangsprüfung: F erfolgreich (6 Tests), Backend erfolgreich (77 Tests), B erf
 - Prüfungen: Entscheidung gegen Auth/CSRF, Medienzugriff, atomare Composition und Veröffentlichungsstände prüfen; bei reiner Dokumentation Pfad-/Konsistenzprüfung, später A/B und konkrete Integrationstests in Folgeaufgaben festlegen.
 
 ### O1 — Intelligente Koordination des bestehenden Python-Orchestrators
+
 - Status: umgesetzt; expliziter Nutzerauftrag vom 01.11.2026, unabhängig von T7/A1. Keine Änderungen am Anwendungscode.
 - Dateien: `scripts/orchestrator*.py`, zugehörige Offline-Tests, `scripts/README-orchestrator.md`, `PROJECT_MEMORY.json`, Architekturhinweis.
 - Umfang: lokale Kontextsuche und Cache, günstiger direkter Worker, begrenzte Nachanalyse/Astra-Delegation, belegtes bestätigtes Gedächtnis, getrennte Aufgaben-/Sitzungsbudgets, MULTILINE und sichere Rücksetzung bei gewöhnlichen Fehlern. Manuelle Modi, isolierte Vorschau, Dateifreigaben und ausdrückliches APPLY erhalten.

@@ -269,6 +269,80 @@ textarea:focus-visible,
 .journal-content {
   padding: 0 clamp(20px, 5vw, 92px);
 }
+.chapter-overview {
+  margin: 0 clamp(20px, 6vw, 96px);
+  color: var(--canvas-ink);
+  background: #f4f0e8;
+  border-bottom: 1px solid #d3d7cf;
+}
+.chapter-overview summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  list-style: none;
+}
+.chapter-overview summary::-webkit-details-marker {
+  display: none;
+}
+.chapter-overview summary::after {
+  content: "+";
+  font-size: 18px;
+  line-height: 1;
+}
+.chapter-overview[open] summary::after {
+  content: "−";
+}
+.chapter-overview summary span {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.chapter-overview ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 12px;
+}
+.chapter-overview li + li {
+  border-top: 1px solid #d3d7cf;
+}
+.chapter-overview a {
+  min-height: 44px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 2px;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.chapter-overview a:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chapter-overview time {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.canvas-theme-after-hours .chapter-overview {
+  color: #f0ecdf;
+  background: #292f26;
+  border-color: #3b4339;
+}
+.canvas-theme-after-hours .chapter-overview li + li {
+  border-color: #3b4339;
+}
+.canvas-theme-after-hours .chapter-overview summary span,
+.canvas-theme-after-hours .chapter-overview time {
+  color: #b9c0b4;
+}
 .journal-intro {
   max-width: 760px;
   margin: 70px auto;
@@ -316,7 +390,7 @@ textarea:focus-visible,
   margin-bottom: 14px;
 }
 .module-prose {
-  max-width: 680px;
+  max-width: var(--module-text-width, 56ch);
   margin: 0 auto;
   white-space: pre-wrap;
   font-size: 17px;
@@ -379,8 +453,8 @@ textarea:focus-visible,
 }
 .module-photo-grid figcaption {
   font-size: 13px;
-  line-height: 1.7;
-  padding-top: 10px;
+  line-height: 1.6;
+  padding-top: 12px;
 }
 .module-align-staggered .module-photo-grid {
   padding-top: var(--module-offset, 50px);

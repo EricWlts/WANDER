@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { ArrowDown, Camera, Pencil } from "lucide-react";
 import { Picture, dateRange, dateLabel } from "./components";
 import { Reveal, resolveReveal, journeyReveal } from "./Reveal";
@@ -38,7 +38,14 @@ export const moduleNames: Record<Chapter["kind"], [string, string]> = {
   text: ["Text", "Text"],
   quote: ["Quote", "Zitat"],
 };
-function layoutStyle(l: Layout, kind: Chapter["kind"]): CSSProperties {
+function layoutStyle(
+  l: Layout,
+  kind: Chapter["kind"],
+  edition: string,
+): CSSProperties {
+  const chapter = kind === "chapter";
+  const defaultGap = chapter && edition !== "after-hours" ? 24 : 18;
+  const defaultPadding = chapter && edition !== "after-hours" ? 48 : 32;
   const columns =
     l.columns ||
     (kind === "pair" ? 2 : kind === "image" || kind === "hero" ? 1 : 4);
@@ -53,16 +60,33 @@ function layoutStyle(l: Layout, kind: Chapter["kind"]): CSSProperties {
     "--module-text-align": l.text_align || "left",
     "--module-inset": `${l.inset ?? 0}px`,
     "--module-cols": columns,
-    "--module-gap": `${l.gap ?? 18}px`,
-    "--module-padding": `${l.padding ?? 36}px`,
+    "--module-gap": `${l.gap ?? defaultGap}px`,
+    "--module-padding": `${l.padding ?? defaultPadding}px`,
     "--module-offset": `${l.offset ?? 50}px`,
     "--module-mobile-cols": l.mobile_columns ?? Math.min(columns, 2),
-    "--module-mobile-gap": `${l.mobile_gap ?? l.gap ?? 18}px`,
-    "--module-mobile-padding": `${l.mobile_padding ?? l.padding ?? 36}px`,
+    "--module-mobile-gap": `${l.mobile_gap ?? l.gap ?? defaultGap}px`,
+    "--module-mobile-padding": `${l.mobile_padding ?? l.padding ?? (chapter ? (edition === "after-hours" ? 24 : 32) : 36)}px`,
     "--module-title-size": `${l.title_size || 72}px`,
     "--module-ratio":
       l.ratio && l.ratio !== "original" ? l.ratio.replace(":", "/") : "auto",
   } as CSSProperties;
+}
+function followChapterLink(event: MouseEvent<HTMLAnchorElement>) {
+  const ownerDocument = event.currentTarget.ownerDocument;
+  const view = ownerDocument.defaultView;
+  event.preventDefault();
+  const target = ownerDocument.getElementById(
+    event.currentTarget.hash.slice(1),
+  );
+  if (!target) return;
+
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({
+    block: "start",
+    behavior: view?.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+  });
 }
 function Selectable({
   children,
@@ -88,7 +112,7 @@ function Selectable({
       id={elementId}
       style={style}
       className={`${className} ${editing ? "canvas-editable" : ""} ${active && editing ? "canvas-selected" : ""}`}
-      tabIndex={editing ? 0 : undefined}
+      tabIndex={editing ? 0 : -1}
       aria-label={editing ? label : undefined}
       onClick={
         editing
@@ -148,6 +172,7 @@ export function JournalCanvas({
       !c.layout?.parent_id ||
       !journey.chapters.some((d) => d.id === c.layout?.parent_id),
   );
+  const rootChapters = roots.filter((chapter) => chapter.kind === "chapter");
   const loose = rootPhotos(journey, "loose"),
     film = rootPhotos(journey, "filmstrip");
   function photoClick(
@@ -256,7 +281,7 @@ export function JournalCanvas({
         key={module.id}
         style={
           {
-            ...layoutStyle(layout, kind),
+            ...layoutStyle(layout, kind, theme),
             "--module-bg": surface.background,
             "--canvas-ink": layout.text_color || surface.ink,
           } as CSSProperties
@@ -462,6 +487,35 @@ export function JournalCanvas({
           <ArrowDown size={20} />
         </a>
       </Selectable>
+      {!editing && rootChapters.length > 1 && (
+        <details className="chapter-overview">
+          <summary>
+            {t("Chapters", "Kapitel")}
+            <span>{rootChapters.length}</span>
+          </summary>
+          <ol>
+            {rootChapters.map((chapter) => (
+              <li key={chapter.id}>
+                <a
+                  href={`#canvas-module-${chapter.id}`}
+                  onClick={followChapterLink}
+                >
+                  {chapter.date && (
+                    <time dateTime={chapter.date}>
+                      {dateLabel(chapter.date, {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </time>
+                  )}
+                  <span>{chapter.title}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       <div id="journal-content" className="journal-content">
         {journey.introduction && (
           <Selectable

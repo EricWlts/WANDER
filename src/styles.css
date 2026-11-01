@@ -2355,8 +2355,9 @@ input[type="radio"] {
     padding-top: 50px;
   }
   .archive-heading h1 {
-    font-size: 77px;
+    font-size: clamp(42px, 15vw, 60px);
     margin: 25px 0;
+    overflow-wrap: anywhere;
   }
   .archive-heading > p {
     position: static;

@@ -11,7 +11,6 @@ import {
   Share2,
 } from "lucide-react";
 import { sequenceIndex } from "./journalModel";
-import { useRailHint } from "./useRailHint";
 import { JournalCanvas } from "./JournalCanvas";
 import { useMotionOff } from "./Motion";
 import { t, useLocale } from "./I18n";
@@ -246,7 +245,6 @@ export function PhotoRail({
   const ref = useRef<HTMLDivElement>(null),
     drag = useRef<{ x: number; left: number; active: boolean } | null>(null),
     suppress = useRef(false);
-  useRailHint(ref, photos.map((p) => p.placement_id || p.id).join(","));
   if (!photos.length) return null;
   return (
     <div className="photo-rail-shell">

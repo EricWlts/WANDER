@@ -23,11 +23,15 @@ Das neue Passwort wird verdeckt abgefragt; mindestens zwölf Zeichen. `.env.exam
 
 ## KI-gestützte Entwicklung
 
-Für KI-gestützte Codeänderungen im Terminal: `python3 -B scripts/orchestrator.py --interactive`.
-Natürlichsprachliche Wünsche, geprüfter isolierter Entwurf, separate Vite-Vorschau,
-Folgefeedback und explizites `APPLY`/`DISCARD` sind in der
-[Orchestrator-Anleitung](scripts/README-orchestrator.md#interaktive-entwicklung) beschrieben.
-Die isolierte Vorschau enthält keinen Backendzugriff.
+Entwicklungswünsche direkt im WANDER-Chat in Codex beschreiben, zum Beispiel:
+„Mach den Abstand unter dem Titel auf Mobilgeräten kleiner. Zeig mir zuerst eine Vorschau.“
+Codex nutzt native Subagenten nach Aufwand (Luna → Sol → Astra nur bei Eskalation),
+prüft einen isolierten Entwurf und öffnet die lokale Browser-Vorschau. Feedback bleibt
+im selben Entwurf; erst „Diesen Stand übernehmen“ gibt die lokale Übernahme frei.
+Push und Deployment brauchen eine eigene Freigabe.
+
+Einrichtung, Modellgrenzen und Vorschau mit Testdaten: [Entwicklungsworkflow](docs/DEVELOPMENT.md).
+Der vorhandene Python-Orchestrator bleibt erhalten, wird für diesen Ablauf aber nicht verwendet.
 
 ## Reisen gestalten
 

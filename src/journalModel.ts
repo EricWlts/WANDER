@@ -9,18 +9,41 @@ export const typePresets = {
   large: 30,
   display: 44,
 } as const;
-export function surfaceColors(background: string) {
-  let hex = background.slice(1);
+function linearRgb(hexColor: string) {
+  let hex = hexColor.slice(1);
   if (hex.length === 3)
     hex = hex
       .split("")
-      .map((c) => c + c)
+      .map((channel) => channel + channel)
       .join("");
-  const rgb = [0, 2, 4]
+  return [0, 2, 4]
     .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
     .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  const light = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 0.3;
-  return { background, ink: light ? "#26302B" : "#F2F3EF" };
+}
+function relativeLuminance(hexColor: string) {
+  const rgb = linearRgb(hexColor);
+  return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+}
+export function contrastRatio(foreground: string, background: string) {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+export function surfaceColors(background: string) {
+  const darkBrand = "#26302B";
+  const lightBrand = "#F2F3EF";
+  const firstChoice = relativeLuminance(background) > 0.3 ? darkBrand : lightBrand;
+  const otherBrand = firstChoice === darkBrand ? lightBrand : darkBrand;
+  const ink = [firstChoice, otherBrand].find(
+    (candidate) => contrastRatio(candidate, background) >= 4.5,
+  );
+  if (ink) return { background, ink };
+
+  const blackRatio = contrastRatio("#000000", background);
+  const whiteRatio = contrastRatio("#FFFFFF", background);
+  return { background, ink: blackRatio >= whiteRatio ? "#000000" : "#FFFFFF" };
 }
 export function placementsFor(
   module: Chapter,

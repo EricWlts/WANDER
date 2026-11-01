@@ -43,3 +43,13 @@ Dateiangaben in der Tabelle liegen unter `src/`, sofern nicht anders angegeben.
 - `npm run build`: TypeScript + Vite; `tests/` gehört derzeit nicht zum TypeScript-Build. `npm test`: isolierte Backendtests; `npm run test:all` kombiniert beide Testsuiten. Kein Lint-Script vorhanden.
 - UI-Änderungen zusätzlich manuell im Browser prüfen; Build/Logiktests belegen weder Darstellung noch Interaktion. Keine Testbibliothek nebenbei installieren.
 - Pro Auftrag nur den zugewiesenen Eintrag aus `TASKS.md` und dessen Dateien lesen. Bei größerem Scope stoppen und an Sol übergeben; Systemwechsel zuerst mit Astra entscheiden. Keine präventive Großzerlegung der großen Editor-/CSS-Dateien.
+
+## Lokaler Entwicklungsorchestrator
+
+**Historischer Nebenpfad, nicht der aktive Entwicklungsworkflow.** Seit dem Auftrag vom 01.11.2026 gelten für neue Entwicklungswünsche die nativen Codex-Regeln in `AGENTS.md`, `.codex/config.toml` und `docs/DEVELOPMENT.md`. Den Python-Orchestrator nicht starten. Die folgenden Angaben dokumentieren nur den erhaltenen Bestand.
+
+- Anwendungscode bleibt unabhängig vom Python-Orchestrator unter `scripts/`; keine zusätzlichen Abhängigkeiten. Manuelle CLI-Modi und isolierte Produktionsvorschau bleiben erhalten.
+- `orchestrator.py`: CLI, Sandbox, Prozessgruppen, Hash-/Pfadkontrollen und ausdrückliches Apply. `orchestrator_planning.py`: begrenztes Dossier, Schema, Routing und Planbelege. `orchestrator_execution.py`: serielle freigegebene Ausführung und separate Prüfkopie.
+- `orchestrator_interactive.py`: derselbe Entwurf über Feedbackrunden, Aufgaben-/Sitzungsbudgets, begrenzte Astra-Delegation und Wiederherstellung nach gewöhnlichen Fehlern. `orchestrator_coordination.py`: lokale Eskalations-/Budgetregeln, direkte lokale Aufgaben, Mehrzeileneingabe und Gedächtnisvalidierung.
+- `PROJECT_MEMORY.json` ergänzt die primären Regeln ausschließlich mit ausdrücklich vom Nutzer bestätigten Aussagen samt Beleg. Modelle schreiben diese Datei nicht. `REMEMBER` schreibt deterministisch im Entwurf; Freigabe, Prüfungen und APPLY bleiben Pflicht.
+- Offlineprüfung: `python3 -B -m unittest discover -s scripts -p 'test_orchestrator*.py' -v`; alle Modellprozesse mocken. Details, Grenzen und Befehle: `scripts/README-orchestrator.md`.

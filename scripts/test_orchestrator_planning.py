@@ -69,10 +69,11 @@ class ValidationTests(unittest.TestCase):
 
     def test_astra_triggers_only_for_planning(self):
         self.assertFalse(p.needs_astra(plan(), "Tippfehler", o))
-        for flag in ("architecture", "large", "coupled"):
-            self.assertTrue(p.needs_astra(plan(flags=[flag]), "Feature", o))
+        self.assertFalse(p.needs_astra(plan(), "CSS Hover ohne Astra", o))
+        for flag in ("architecture",):
+            self.assertFalse(p.needs_astra(plan(flags=[flag]), "Feature", o))
         self.assertTrue(p.needs_astra(plan(), "Mehrbenutzerbetrieb", o))
-        self.assertTrue(p.needs_astra(plan([task(str(i)) for i in range(4)]), "Feature", o))
+        self.assertFalse(p.needs_astra(plan([task(str(i)) for i in range(4)]), "Feature", o))
         self.assertFalse(p.needs_astra(plan(flags=["risky"]), "Recovery", o))
 
     def test_budget_limits_and_unknown_usage(self):
@@ -128,7 +129,7 @@ class ValidationTests(unittest.TestCase):
 
 
 class LifecycleTests(unittest.TestCase):
-    def simulate(self, values, tokens=10, max_calls=2, mutate=False, code=0, changed_original=False):
+    def simulate(self, values, tokens=10, max_calls=2, mutate=False, code=0, changed_original=False, request="Menü schließen"):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -158,7 +159,7 @@ class LifecycleTests(unittest.TestCase):
             usage = {"input_tokens": tokens, "output_tokens": 0} if tokens is not None else {}
             log.write_text(json.dumps({"type": "turn.completed", "usage": usage}) + "\n")
             if mutate:
-                (cwd / "src/App.tsx").write_text("unexpected")
+                (cwd / "context.json").write_text("unexpected")
             if changed_original:
                 (self.root / "src/App.tsx").write_text("external")
             return code
@@ -169,7 +170,7 @@ class LifecycleTests(unittest.TestCase):
             mock.start()
             self.addCleanup(mock.stop)
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            result = o.main(["Menü schließen", "--auto", "--max-calls", str(max_calls)])
+            result = o.main([request, "--auto", "--max-calls", str(max_calls)])
         self.report = json.loads(next(self.root.glob("artifacts/orchestrator/*/report.json")).read_text())
         return result
 
@@ -192,7 +193,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(json.loads(output.getvalue())["status"], "analysis_pending")
 
     def test_astra_low_only_plans_and_retains_risks(self):
-        self.assertEqual(self.simulate([plan(flags=["coupled", "risky"]), plan()]), 0)
+        self.assertEqual(self.simulate([plan(flags=["architecture", "risky"]), plan()], request="Mehrbenutzerbetrieb"), 0)
         self.assertEqual(len(self.commands), 2)
         self.assertIn("gpt-6-astra", self.commands[1])
         self.assertIn('model_reasoning_effort="low"', self.commands[1])
@@ -200,16 +201,16 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual([c["phase"] for c in self.report["calls"]], ["analysis", "architecture"])
 
     def test_no_escalation_when_budget_or_unknown_usage(self):
-        self.assertEqual(self.simulate([plan(flags=["large"])], max_calls=1), 1)
+        self.assertEqual(self.simulate([plan(flags=["architecture"])], max_calls=1, request="Mehrbenutzerbetrieb"), 1)
         self.assertEqual(len(self.commands), 1)
         self.assertEqual(self.report["status"], "stopped")
 
     def test_unknown_usage_prevents_astra(self):
-        self.assertEqual(self.simulate([plan(flags=["large"])], tokens=None), 1)
+        self.assertEqual(self.simulate([plan(flags=["architecture"])], tokens=None, request="Mehrbenutzerbetrieb"), 1)
         self.assertEqual(len(self.commands), 1)
 
     def test_token_limit_prevents_astra(self):
-        self.assertEqual(self.simulate([plan(flags=["large"])], tokens=20000), 1)
+        self.assertEqual(self.simulate([plan(flags=["architecture"])], tokens=20000, request="Mehrbenutzerbetrieb"), 1)
         self.assertEqual(len(self.commands), 1)
 
     def test_bad_response_has_no_retry(self):
@@ -247,6 +248,31 @@ class LifecycleTests(unittest.TestCase):
         cache.write_text('{"plan": null}')
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(o.main(["Menü schließen", "--auto"]), 1)
+        self.assertEqual(len(self.commands), 1)
+
+    def test_context_is_bounded_and_analysis_workspace_has_no_source(self):
+        self.assertEqual(self.simulate([plan()]), 0)
+        workspace = next(self.root.glob('artifacts/orchestrator/*plan-*/workspace'))
+        self.assertEqual([f.name for f in workspace.iterdir()], ['context.json'])
+        dossier = json.loads((workspace / 'context.json').read_text())
+        self.assertLessEqual(len(dossier['scanned_files']), 32)
+        self.assertLessEqual(dossier['scanned_bytes'], 384000)
+        self.assertLessEqual(len(dossier['snippets']), 6)
+        self.assertTrue(all(len(s) <= 2000 for s in dossier['snippets'].values()))
+        self.assertNotIn('TASKS.md', dossier['snippets'])
+
+    def test_agent_flags_do_not_launch_astra_for_local_task(self):
+        self.assertEqual(self.simulate([plan(flags=['large', 'coupled', 'architecture'])]), 0)
+        self.assertEqual(len(self.commands), 1)
+
+    def test_cache_plan_modification_rejected_without_call(self):
+        self.assertEqual(self.simulate([plan()]), 0)
+        cache = next(self.root.glob('artifacts/orchestrator/plan-*.json'))
+        value = json.loads(cache.read_text())
+        value['plan']['tasks'][0]['goal'] = 'anderes Ziel'
+        cache.write_text(json.dumps(value))
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(o.main(['Menü schließen', '--auto']), 1)
         self.assertEqual(len(self.commands), 1)
 
     def test_lock_stops_parallel_planner(self):

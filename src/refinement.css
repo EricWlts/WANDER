@@ -708,7 +708,7 @@ body {
   --active-hover: 1;
 }
 .picture img {
-  transition: transform 750ms cubic-bezier(0.2, 0.65, 0.3, 1);
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @media (hover: hover) and (pointer: fine) {
   .picture:hover,

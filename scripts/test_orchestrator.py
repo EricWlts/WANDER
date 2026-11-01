@@ -75,7 +75,7 @@ class SafetyTests(unittest.TestCase):
             self.assertEqual(o.usage_from_log(log)["input_tokens"], "unknown")
             log.write_text('{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19,"input_tokens_details":{"cached_tokens":3}}}\n')
             self.assertEqual(o.usage_from_log(log), {"input_tokens": 12, "output_tokens": 7,
-                "total_tokens": 19, "cached_input_tokens": 3, "reasoning_output_tokens": "unknown"})
+                "total_tokens": 19, "cached_input_tokens": 3, "uncached_input_tokens": 9, "reasoning_output_tokens": "unknown"})
 
     def test_review_apply_and_conflicts_use_only_approved_temporary_files(self):
         with tempfile.TemporaryDirectory() as tmp:

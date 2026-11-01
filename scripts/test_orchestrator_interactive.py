@@ -179,23 +179,28 @@ class InteractiveTests(unittest.TestCase):
         self.analysis_plan = plan(flags=['unclear'])
         with self.assertRaises(o.Stop):
             self.develop(s)
-        self.analysis_plan = plan()
+        self.assertEqual(len(self.analysis), 3)  # Luna, one followup, Astra; no workers.
+        self.assertEqual(self.calls, [])
+        self.analysis_plan = plan(flags=['architecture'])
         with self.assertRaises(o.Stop):
             self.develop(s, 'Mehrbenutzerbetrieb')
         self.assertEqual(self.calls, [])
-        self.assertEqual(s.tokens.calls, 3)
+        self.assertEqual(s.tokens.calls, 4)
 
-    def test_failed_checks_lock_draft_without_repair_loop(self):
+    def test_failed_checks_restore_draft_and_allow_next_request(self):
         s = self.session()
         self.failure = 'test'
-        with self.assertRaises(o.Stop):
+        with self.assertRaisesRegex(o.Stop, 'wiederhergestellt'):
             self.develop(s)
-        self.assertTrue(s.blocked)
-        with self.assertRaises(o.Stop):
-            self.develop(s, 'erneut')
+        self.assertFalse(s.blocked)
+        self.assertEqual((s.workspace / 'src/App.tsx').read_text(), 'before')
         self.assertEqual(len(self.calls), 1)
         with self.assertRaises(o.Stop):
             s.apply(lambda _: 'APPLY')
+        self.failure = None
+        self.develop(s, 'Neuer Wunsch')
+        self.assertTrue(s.ready)
+        s.verify()
 
     def test_unknown_usage_prevents_next_model_call(self):
         s = self.session()
@@ -220,7 +225,9 @@ class InteractiveTests(unittest.TestCase):
         self.calls.clear()
         with self.assertRaises(o.Stop):
             self.develop(s)
-        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(len(self.calls), 4)  # Two attempts, one Astra delegation, two final attempts.
+        self.assertFalse(s.blocked)
+        self.assertEqual(len([c for c in s.calls if c.get("phase") == "astra"]), 1)
 
     def test_session_budget_not_reset_by_feedback_or_discard(self):
         s = self.session()
@@ -277,6 +284,177 @@ class InteractiveTests(unittest.TestCase):
             self.assertNotIn('proxy', config)
             s.stop_preview()
             kill.assert_called_once_with(12345, i.signal.SIGKILL)
+
+    def test_direct_local_request_avoids_analysis(self):
+        s = self.session()
+        self.develop(s, 'Entferne Text in src/App.tsx')
+        self.assertFalse(hasattr(self, 'analysis'))
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(s.calls[0]['reasoning'], 'low')
+
+    def test_followup_can_resolve_uncertainty_without_astra(self):
+        s = self.session()
+        answers = iter([plan(flags=['unclear']), plan()])
+        with patch.object(p, 'call_phase', side_effect=lambda *a: next(answers)) as call:
+            self.develop(s)
+        self.assertEqual([c.args[0] for c in call.call_args_list], ['analysis', 'followup'])
+        self.assertTrue(s.ready)
+
+    def test_architecture_astra_delegates_complex_work_to_sol(self):
+        s = self.session()
+        self.analysis_plan = plan([task(complexity='complex')])
+        self.develop(s, 'Architektur der Navigation prüfen')
+        self.assertEqual(len(self.analysis), 1)
+        self.assertIn('Technical Lead', self.analysis[0])
+        self.assertIn(o.SOL[0], self.calls[0])
+        brief = json.loads(next(s.run.glob('planning-*/report.json')).read_text())
+        self.assertIn('user_goal', brief['escalation_brief'])
+        self.assertTrue(brief['astra_reasons'])
+
+    def test_second_negative_feedback_escalates_same_draft(self):
+        s = self.session()
+        self.develop(s)
+        self.develop(s, 'Nein, der Schatten ist falsch')
+        self.develop(s, 'Immer noch falsch, weniger Schatten')
+        self.assertEqual(len([c for c in s.calls if c.get('phase') == 'astra']), 1)
+        self.assertIn('attempts_and_feedback', self.analysis[-1])
+        self.assertTrue(s.ready)
+
+    def test_task_overrun_does_not_exhaust_session(self):
+        s = self.session()
+        original = o.usage_from_log
+        with patch.object(o, 'usage_from_log', return_value={
+                'total_tokens': 20360, 'input_tokens': 20000, 'output_tokens': 360}):
+            with self.assertRaises(o.Stop):
+                self.develop(s)
+        self.assertFalse(s.blocked)
+        self.assertEqual(s.tokens.tokens, 20360)
+        self.develop(s, 'Neuer begrenzter Wunsch')
+        self.assertTrue(s.ready)
+        self.assertLess(s.tokens.tokens, s.tokens.max_tokens)
+
+    def test_real_session_limit_stops_next_call_even_after_discard(self):
+        s = self.session()
+        s.tokens.max_tokens = 15
+        self.develop(s)
+        with self.assertRaises(o.Stop):
+            self.develop(s, 'Nochmals')
+        self.assertEqual(len(self.calls), 1)
+        budgets = s.tokens, s.workers
+        s.discard()
+        replacement = i.Session(s.args, o, self.storage, budgets)
+        with self.assertRaises(o.Stop):
+            self.develop(replacement)
+
+    def test_failed_feedback_restores_previous_reviewable_report(self):
+        s = self.session()
+        self.develop(s)
+        before, report = dict(s.expected), s.report_bytes
+        self.failure = 'test'
+        with self.assertRaises(o.Stop):
+            self.develop(s, 'Neue Anpassung')
+        self.assertTrue(s.ready)
+        self.assertEqual(s.expected, before)
+        self.assertEqual((s.run / 'report.json').read_bytes(), report)
+        s.verify()
+        s.apply(lambda _: 'APPLY')
+
+    def test_test_mutation_remains_integrity_failure(self):
+        s = self.session()
+        self.failure = 'check_mutation'
+        with self.assertRaisesRegex(o.Stop, 'Integritätsfehler'):
+            self.develop(s)
+        self.assertTrue(s.blocked)
+
+    def test_remember_is_local_explicit_and_apply_only(self):
+        s = self.session()
+        self.develop(s, 'REMEMBER preference | Weniger Schatten | Explizit vom Nutzer in dieser Eingabe bestätigt')
+        self.assertFalse(self.calls)
+        self.assertFalse(hasattr(self, 'analysis'))
+        self.assertFalse((self.root / 'PROJECT_MEMORY.json').exists())
+        data = json.loads((s.workspace / 'PROJECT_MEMORY.json').read_text())
+        self.assertEqual(data['entries'][0]['confirmed_by'], 'user')
+        self.assertEqual(len(s.checks), 2)
+        s.apply(lambda _: 'APPLY')
+        self.assertEqual(json.loads((self.root / 'PROJECT_MEMORY.json').read_text()), data)
+
+    def test_multiline_is_one_request_and_commands_are_literal_inside(self):
+        s = self.session()
+        inputs = iter(['MULTILINE', 'Hover ändern', 'APPLY', 'Zweite Zeile', '/SEND', 'EXIT'])
+        with patch.object(i, 'Session', return_value=s), patch.object(s, 'develop') as develop:
+            i.interactive(s.args, o, lambda _: next(inputs))
+        self.assertEqual(develop.call_args.args[0], 'Hover ändern\nAPPLY\nZweite Zeile')
+        self.assertFalse(self.calls)
+
+    def test_multiline_cancel_and_oversize_drain(self):
+        import orchestrator_coordination as c
+        inputs = iter(['text', '/CANCEL'])
+        self.assertEqual(c.multiline(lambda _: next(inputs), o.Stop), '')
+        inputs = iter(['x' * 12001, 'APPLY', '/SEND', 'next'])
+        with self.assertRaises(o.Stop):
+            c.multiline(lambda _: next(inputs), o.Stop)
+        self.assertEqual(next(inputs), 'next')
+
+    def test_blocked_worker_gets_one_astra_delegation_to_sol(self):
+        s = self.session()
+        original = self.process
+        def process(command, cwd, timeout, log, prompt=None):
+            if command[0] == 'codex':
+                if '--ignore-rules' in command and 'Technical Lead' in prompt:
+                    self.analysis_plan = plan([task(complexity='complex')])
+                elif '--ignore-rules' not in command:
+                    self.result = 'blocked' if not self.calls else 'complete'
+            return original(command, cwd, timeout, log, prompt)
+        with patch.object(o, 'run_process', side_effect=process):
+            self.develop(s)
+        self.assertEqual(len(self.calls), 2)
+        self.assertIn(o.SOL[0], self.calls[-1])
+        self.assertEqual(len([c for c in s.calls if c.get('phase') == 'astra']), 1)
+        self.assertTrue(s.ready)
+
+    def test_timeout_with_unexpected_previously_allowed_file_locks(self):
+        s = self.session()
+        s.allowed.add('src/Other.tsx')
+        original = self.process
+        def process(command, cwd, timeout, log, prompt=None):
+            if command[0] == 'codex' and '--ignore-rules' not in command:
+                (cwd / 'src/Other.tsx').write_text('unexpected during timeout')
+                raise o.Stop('Timeout')
+            return original(command, cwd, timeout, log, prompt)
+        with patch.object(o, 'run_process', side_effect=process), self.assertRaises(o.Stop):
+            self.develop(s)
+        self.assertTrue(s.blocked)
+
+    def test_failed_test_with_source_mutation_still_locks(self):
+        s = self.session()
+        original = self.process
+        def process(command, cwd, timeout, log, prompt=None):
+            if command[0] == 'npm':
+                (cwd / 'src/App.tsx').write_text('modified by failing test')
+                return 1
+            return original(command, cwd, timeout, log, prompt)
+        with patch.object(o, 'run_process', side_effect=process), self.assertRaises(o.Stop):
+            self.develop(s)
+        self.assertTrue(s.blocked)
+
+    def test_single_command_in_multiline_cannot_exit_or_apply(self):
+        s = self.session()
+        inputs = iter(['MULTILINE', 'APPLY', '/SEND', 'EXIT'])
+        with patch.object(i, 'Session', return_value=s), patch.object(s, 'develop') as develop, \
+                patch.object(s, 'apply', side_effect=AssertionError('implicit apply')):
+            i.interactive(s.args, o, lambda _: next(inputs))
+        develop.assert_called_once()
+        self.assertEqual(develop.call_args.args[0], 'APPLY')
+        self.assertTrue(develop.call_args.kwargs['literal'])
+
+    def test_models_cannot_write_confirmed_memory(self):
+        s = self.session()
+        self.analysis_plan = plan([task(paths=['PROJECT_MEMORY.json'])])
+        with self.assertRaises(o.Stop):
+            self.develop(s, 'Merke dir etwas automatisch')
+        self.assertFalse(self.calls)
+        self.assertFalse((s.workspace / 'PROJECT_MEMORY.json').exists())
+        self.assertEqual(o.main(['Gedächtnis ändern', '--allow', 'PROJECT_MEMORY.json', '--dry-run']), 1)
 
     def test_cli_validation_without_workers(self):
         for flags in (['--auto'], ['--dry-run'], ['task'], ['--allow', 'src/App.tsx'],

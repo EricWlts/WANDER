@@ -460,6 +460,8 @@ def main(argv=None):
     parser.add_argument("--auto", action="store_true", help="Sichere automatische Analyse/Planung; noch keine Coding-Ausführung")
     parser.add_argument("--max-calls", type=int, default=2, help="Aufruflimit der automatischen Planung (1–2)")
     parser.add_argument("--max-tokens", type=int, default=20000, help="Beobachtetes Tokenbudget zwischen Modellaufrufen")
+    parser.add_argument("--session-tokens", type=int, default=120000, help="Beobachtetes Gesamttokenlimit der interaktiven Sitzung")
+    parser.add_argument("--session-calls", type=int, default=40, help="Gesamtaufrufe der interaktiven Sitzung")
     parser.add_argument("--review", metavar="LAUF", help="Diff eines Laufs anzeigen (Pfad oder Lauf-ID)")
     parser.add_argument("--apply", metavar="LAUF", help="Diff prüfen und nach Bestätigung übernehmen")
     parser.add_argument("--file", action="append", default=[], help="Bei Review/Apply einzelne freigegebene Datei auswählen")
@@ -493,6 +495,8 @@ def main(argv=None):
         if not args.task.strip() or not 1 <= args.timeout <= 3600:
             raise Stop("Aufgabe oder Timeout ungültig.")
         allowed = sorted({safe_path(p) for p in args.allow})
+        if 'PROJECT_MEMORY.json' in allowed:
+            raise Stop('Projektgedächtnis nur über explizites REMEMBER in der interaktiven Sitzung ändern.')
         model = route(args.task + " " + " ".join(allowed))
         rules = "\n".join((ROOT / p).read_text() for p in RULES)
         if args.dry_run:

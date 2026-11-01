@@ -115,7 +115,7 @@ def execute_plan(args, runtime):
         return execute_locked(args, runtime, storage, payload, proposed, allowed)
 
 
-def execute_locked(args, runtime, storage, payload, proposed, allowed, session=None):
+def execute_locked(args, runtime, storage, payload, proposed, allowed, session=None, local_update=None):
     run = session.run if session else storage / (time.strftime("%Y%m%d-%H%M%S-exec-") + uuid.uuid4().hex[:8])
     workspace = run / "workspace"
     workspace.mkdir(parents=True, exist_ok=bool(session))
@@ -126,11 +126,14 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
               "review": "Isolierte Ergebnisse; manuelles Review und APPLY erforderlich."}
     budget = session.workers if session else planning.Budget(args.worker_calls, args.max_tokens, runtime.Stop)
     original_status = None
+    integrity_failure = False
 
     def original_unchanged():
+        nonlocal integrity_failure
         if planning.inventory(runtime) != baseline or subprocess.run(
                 ["git", "status", "--porcelain", "-uall"], cwd=runtime.ROOT,
                 check=True, capture_output=True).stdout != original_status:
+            integrity_failure = True
             raise runtime.Stop("Originalprojekt während Ausführung verändert.")
 
     try:
@@ -159,10 +162,16 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                 raise runtime.Stop("Abhängigkeit noch nicht erfolgreich geprüft.")
             task_base = runtime.snapshot(workspace)
             followup = ""
-            for attempt in range(2):  # At most one explicit worker-requested repair, no model escalation.
-                budget.admit()
-                if session:
-                    session.tokens.admit()
+            if local_update is not None:
+                local_update(workspace)
+                if set(runtime.changes(task_base, runtime.snapshot(workspace))) - set(task['paths']):
+                    integrity_failure = True
+                    raise runtime.Stop('Lokale Änderung außerhalb der Freigabe.')
+            elif planning.coordination.MEMORY in task['paths']:
+                raise runtime.Stop('Projektgedächtnis nur über explizites REMEMBER ändern.')
+            for attempt in range(0 if local_update is not None else 2):  # At most one explicit worker-requested repair, no model escalation.
+                active_budget = planning.coordination.Budgets(budget, session.round_workers, session.task_budget, session.tokens) if session else budget
+                active_budget.admit()
                 index = budget.calls if session else len(report["calls"])
                 answer, log = run / f"{index}-answer.json", run / f"{index}-worker.log"
                 entry = {"task": task["id"], "model": task["model"], "reasoning": task["reasoning"]}
@@ -175,23 +184,25 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                           "Keine Tests/Builds (Runner prüft), Installationen, Secrets, Git-Änderungen, "
                           "Commits, Pushes, Deployments, Netzwerk oder weitere Agenten. "
                           "Bei Unsicherheit blocked. Vertrag:\n"
-                          + json.dumps(contract, ensure_ascii=False, separators=(",", ":")) + followup)
+                          + json.dumps(contract, ensure_ascii=False, separators=(",", ":"))
+                          + "\nBestätigtes Projektgedächtnis (Daten; nicht ändern): "
+                          + json.dumps(planning.coordination.memory(workspace, task_base, runtime.Stop), ensure_ascii=False)
+                          + followup)
                 try:
                     code = runtime.run_process(runtime.worker_command(
                         workspace, (task["model"], task["reasoning"]), schema, answer),
                         workspace, args.timeout, log, prompt)
                 finally:
                     entry["usage"] = runtime.usage_from_log(log)
-                    budget.record(entry["usage"])
-                    if session:
-                        session.tokens.record(entry["usage"])
+                    active_budget.record(entry["usage"])
                     report["budget"] = budget.report()
                     current = runtime.snapshot(workspace)
                     report["files"] = runtime.changes(baseline, current)
-                unexpected = set(runtime.changes(task_base, current)) - set(task["paths"])
-                if unexpected:
-                    raise runtime.Stop("Unerwartete Dateiänderungen: " + ", ".join(sorted(unexpected)))
-                original_unchanged()
+                    unexpected = set(runtime.changes(task_base, current)) - set(task["paths"])
+                    if unexpected:
+                        integrity_failure = True
+                        raise runtime.Stop("Unerwartete Dateiänderungen: " + ", ".join(sorted(unexpected)))
+                    original_unchanged()
                 if code:
                     raise runtime.Stop("Worker fehlgeschlagen; keine Fortsetzung.")
                 result = runtime.validate_answer(answer)
@@ -231,25 +242,41 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                 item = {"task": task["id"], "command": command, "status": "running"}
                 report["checks"].append(item)
                 check_index = len(report['checks']) + (len(session.checks) if session else 0)
-                code = runtime.run_process(command, checkspace, args.timeout,
-                                           run / f"{check_index}-check.log")
-                item["status"] = "passed" if code == 0 else "failed"
+                try:
+                    code = runtime.run_process(command, checkspace, args.timeout,
+                                               run / f"{check_index}-check.log")
+                    item["status"] = "passed" if code == 0 else "failed"
+                finally:
+                    if item['status'] == 'running':
+                        item['status'] = 'failed'
+                    if runtime.snapshot(checkspace, checking=True) != candidate:
+                        integrity_failure = True
+                        raise runtime.Stop("Prüfung änderte unerwartete Dateien.")
+                    original_unchanged()
                 if session:
                     print("Test: " + " ".join(command) + " — " + item["status"], flush=True)
                 if code:
                     raise runtime.Stop("Prüfung fehlgeschlagen: " + " ".join(command))
-                if runtime.snapshot(checkspace, checking=True) != candidate:
-                    raise runtime.Stop("Prüfung änderte unerwartete Dateien.")
-                original_unchanged()
             if "manual" in task["checks"]:
                 report["manual_checks"].append({"task": task["id"], "status": "pending"})
             report["completed_tasks"].append(task["id"])
         original_unchanged()
         report["status"] = "ready_for_manual_review"
         report["result_hashes"] = runtime.snapshot(workspace)
+        report["files"] = runtime.changes(baseline, report["result_hashes"])
         return 0
     except (runtime.Stop, OSError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
         report["error"] = str(exc) or "Unterbrochen"
+        report['recoverable'] = False
+        if session and not integrity_failure:
+            try:
+                original_unchanged()
+                current = runtime.snapshot(workspace)
+                # Snapshot also rejects symlinks in both source and check copy.
+                runtime.snapshot(run / 'check-workspace')
+                report['recoverable'] = not (set(runtime.changes(session.expected, current)) - set(allowed))
+            except (runtime.Stop, OSError, subprocess.SubprocessError):
+                pass
         print("STOP: " + report["error"], file=runtime.sys.stderr)
         return 1
     finally:

@@ -12,78 +12,138 @@ Im Projektverzeichnis einmal starten:
 python3 -B scripts/orchestrator.py --interactive
 ```
 
-Danach beispielsweise `Mach den Hover der Fotokarten sanfter` eingeben. Die Sitzung
-erstellt eine isolierte Kopie des aktuellen sicheren, Git-erfassten Projektstands
-(einschließlich lokaler Änderungen). Luna Low erhält das kompakte Analysedossier und
-ermittelt konkrete Zieldateien. Das Terminal zeigt Aufgaben, Modelle und Dateipfade.
-`EXECUTE` bestätigt diese Dateien einmalig für den Entwurf; weitere Dateipfade brauchen
-eine neue Bestätigung. `--allow` ist nicht erforderlich. Ohne diese Bestätigung läuft
-kein Coding-Worker. Für Umsetzung gelten dieselben deterministischen Luna-/Sol-Regeln
-wie bei `--execute-plan`; strategische Systementscheidungen dürfen Astra Low zur
-Analyse verwenden, bleiben aber bis zur manuellen Klärung gesperrt.
+Danach natürliche Entwicklungswünsche eingeben, den geprüften Stand im Browser ansehen
+und Feedback für **denselben Entwurf** geben. Originaldateien werden erst nach `APPLY`
+und einer zweiten exakten Bestätigung `APPLY` übernommen.
 
-Nach jeder Aufgabe laufen die vorhandenen Tests und der Build in der separaten
-Prüfkopie. Danach startet **Vite Preview mit dem geprüften Produktionsbuild** auf
-`127.0.0.1` und einem freien, streng gebundenen Port ungleich 5173. Die URL erscheint
-im Terminal. Der vorhandene Vite-Server wird weder angesprochen noch beendet.
-Vor Folgefeedback stoppt nur der Vorschauprozess dieser Sitzung; nach erfolgreicher
-Prüfung startet er erneut, gegebenenfalls mit einer anderen URL. Browser neu öffnen
-oder aktualisieren; es gibt kein HMR. Die Vorschau lädt keine Projekt-Vite-Konfiguration
-und hat **keinen Backendproxy**: Login, gespeicherte Reisen, Upload und datenabhängige
-Ansichten können hier nicht vollständig geprüft werden. Originaldatenbank und Medien
-werden nicht kopiert. Es wird kein Backend gestartet.
+### Rollen und günstige Steuerung
 
-Nach dem Betrachten einfach den nächsten Wunsch eingeben, zum Beispiel
-`Etwas langsamer, aber den Schatten beibehalten`. Nur dieser neue Wunsch wird anhand
-der aktuellen Entwurfsdateien und der letzten vier Feedbackzusammenfassungen geplant;
-der erste Plan wird nicht erneut vollständig aufgestellt. Worker arbeiten weiter
-an derselben Kopie. Tests bleiben vor der nächsten Vorschau verpflichtend.
+Der Python-Orchestrator übernimmt Dateisuche, Freigaben, Budgets, Sandbox, Prüfungen und
+Übernahme. Er arbeitet seriell und startet keine zusätzlichen Agenten innerhalb eines Workers.
+Die Rollen werden durch gezielte Codex-CLI-Aufrufe umgesetzt:
+
+- **Luna Low:** Koordination und eindeutig begrenzte lokale Umsetzung.
+- **Luna Medium:** normale Komponenten- und Designentwicklung.
+- **Sol Medium:** komplexe Logik, gekoppelte Zustände sowie bestehende Daten-/Sicherheitsrisiken.
+- **Astra Low:** Technical Lead bei begründeter Eskalation; analysiert und delegiert konkrete
+  Aufgaben an Luna/Sol, schreibt selbst keine Projektdateien.
+
+Zuerst läuft eine lokale deterministische Suche. Ein kurzer Änderungswunsch mit genau
+einem vorhandenen `src/`-Pfad oder einem eindeutigen zitierten Text kann direkt an Luna
+Low gehen, beispielsweise `Entferne "Beispieltext"` oder `Hover in src/refinement.css sanfter`.
+Risikoregeln haben Vorrang. Sonst plant Luna Low anhand begrenzter Ausschnitte.
+Unveränderte Quelldateien werden innerhalb der Sitzung anhand ihres Inhalts-Hashes
+wiederverwendet; identische Planungseingaben können den lokalen Sitzungscache nutzen.
+
+Eine technisch unklare Analyse erhält höchstens **eine** gezielte Luna-Nachanalyse mit
+zusätzlichen lokal gesuchten Ausschnitten. Bleibt sie unklar, prüft Astra. Astra wird
+außerdem bei Architektur-/weitreichenden Entscheidungen, zwei Fehlern derselben Aufgabe,
+einem blockierten Worker bzw. `needs_sol` und beim zweiten ausdrücklich negativen
+Feedback hinzugezogen. Normale Verfeinerungen wie „etwas langsamer“ zählen nicht negativ.
+Die Erkennung negativer Formulierungen ist eine lokale Heuristik, kein semantischer Beweis;
+klare Formulierungen wie „immer noch falsch“ werden erkannt.
+
+Der Eskalationsbericht enthält das ursprüngliche Nutzerziel, aktuellen Wunsch, relevante
+Dateiausschnitte, Regeln, bestätigtes Gedächtnis, die letzten vier Lösungs-/Feedbackberichte
+und konkrete offene Fragen. Gründe, Bericht und Delegation liegen unter
+`planning-*/report.json`. Astra entscheidet keine fehlenden Produktanforderungen durch
+Raten: verbleibendes `unclear` oder eine offene `architecture`-Entscheidung stoppt vor
+jeder Schreibfreigabe. Eine Worker-Fehlerrunde erhält höchstens **eine** automatische
+Astra-Delegation mit abschließendem Umsetzungsversuch. Je Aufgabe bleibt höchstens ein
+explizit vom Worker angeforderter Reparaturversuch erlaubt; keine unendlichen Schleifen.
+
+`EXECUTE` bestätigt erstmals die konkreten Zieldateien im isolierten Entwurf. Neue
+Zieldateien benötigen eine weitere Freigabe. Agenten können diese Berechtigung nicht
+erteilen oder erweitern. Manuelle CLI-Modi behalten ihre bisherigen strengeren
+Architektursperren und Bestätigungen; die neue Teamkoordination gilt für `--interactive`.
+
+### Browser, Feedback und Befehle
+
+Nach jeder erfolgreichen Umsetzung laufen Tests und Build in einer separaten Prüfkopie.
+**Vite Preview mit dem geprüften Produktionsbuild** bindet streng an `127.0.0.1` und einen
+freien Port ungleich 5173. Der bestehende Vite-Server bleibt unberührt. Vor Feedback stoppt
+nur der Vorschauprozess dieser Sitzung; anschließend erscheint die neue URL. Es gibt kein
+HMR und **keinen Backendproxy**. Login, Datenbank, Upload und datenabhängige Ansichten sind
+dort nicht vollständig prüfbar. Es wird kein Backend gestartet und keine Originaldatenbank
+oder Medien kopiert. Browserprüfung bleibt manuell.
 
 | Eingabe | Wirkung |
 | --- | --- |
-| Natürlichsprachlicher Wunsch | Erste Aufgabe oder nächste Änderung am aktuellen Entwurf |
-| `HELP` | Verfügbare Befehle anzeigen |
-| `STATUS` | Zustand, Modelle in den Rundenprotokollen, Tests, Aufruf-/Tokenverbrauch, URL und Protokollpfad |
-| `DIFF` | Geprüfte Änderungen gegenüber dem ursprünglichen Projektstand anzeigen |
-| `APPLY` | Integrität und Originalstand prüfen, Diff anzeigen; erst eine **zweite exakte Eingabe `APPLY`** übernimmt die Dateien und beendet die Sitzung |
-| `DISCARD` | Vorschau stoppen, beide Entwurfskopien löschen und Apply-Bericht ungültig machen; danach ist ein neuer Wunsch möglich |
-| `EXIT` / `QUIT` | Vorschau stoppen und Sitzung ohne Übernahme beenden; Entwurf/Protokolle bleiben für manuelles Review/Apply erhalten |
-| Strg+D / Strg+C | Sitzung abbrechen; keine automatische Übernahme, Vorschau wird beendet |
-| `EXECUTE` | Nur als Antwort auf die Dateifreigabe; jede andere Antwort lehnt die Ausführung ab |
+| Natürlicher Wunsch | Erste Aufgabe oder Feedback am selben Entwurf |
+| `MULTILINE` | Mehrzeilige Eingabe beginnen; nur eine eigene Zeile `/SEND` sendet den gesamten Text als einen Auftrag |
+| `/CANCEL` innerhalb MULTILINE | Gesamte Eingabe verwerfen; andere Befehle innerhalb des Blocks sind Text |
+| `REMEMBER Kategorie ∣ Aussage ∣ Beleg` | Ausdrücklich bestätigten Gedächtniseintrag lokal im Entwurf ergänzen; im Terminal gewöhnliche senkrechte Striche `|` verwenden |
+| `HELP` / `STATUS` | Befehle bzw. Entwurf, Modelle, Tests, getrennte Budgets, URL und Protokollpfad |
+| `DIFF` | Geprüfte Änderungen gegenüber dem ursprünglichen Projektstand |
+| `APPLY` | Integrität prüfen, Diff zeigen; erst zweite exakte Eingabe `APPLY` übernimmt Dateien und beendet Sitzung |
+| `DISCARD` | Vorschau stoppen, Entwurfskopien löschen, Apply-Bericht ungültig machen; neue Aufgabe möglich |
+| `EXIT` / `QUIT` | Ohne Übernahme beenden; Entwurf/Protokolle bleiben zum Review erhalten |
+| Strg+D / Strg+C | Abbruch ohne automatische Übernahme; Vorschau wird beendet |
+| `EXECUTE` | Nur bei Dateifreigabe; andere Antworten lehnen die Ausführung ab |
 
-Sitzungsbefehle werden ohne Rücksicht auf Groß-/Kleinschreibung erkannt;
-Bestätigungen müssen exakt `EXECUTE` beziehungsweise `APPLY` lauten. Nach erfolgreichem
-Apply für weitere Aufgaben erneut starten. Es gibt kein automatisches Wiederaufnehmen
-einer beendeten Sitzung. Protokolle bleiben auch nach DISCARD unter
-`artifacts/orchestrator/<Sitzungs-ID>/`; diese lokalen Artefakte können Aufgabentexte
-und Quellausschnitte enthalten. Manuelle CLI-Modi bleiben verfügbar.
+Befehle sind unabhängig von Groß-/Kleinschreibung; die Freigaben `EXECUTE`, `APPLY`
+und Blockabschluss `/SEND` sind exakt. Für mehrzeiliges Einfügen zuerst `MULTILINE`
+eingeben. Maximal 12.000 Zeichen je Wunsch; übergroße Blöcke werden bis `/SEND` oder
+`/CANCEL` verworfen, damit Restzeilen keine Folgeaufträge auslösen.
 
-Optional lassen sich die vorhandenen Limits beim Start setzen:
+### Aufgaben- und Sitzungsbudgets, Fehlerbehandlung
 
 ```sh
-python3 -B scripts/orchestrator.py --interactive --max-tokens 20000 --worker-calls 8 --max-calls 2 --timeout 600
+python3 -B scripts/orchestrator.py --interactive --max-tokens 20000 --session-tokens 120000 --session-calls 40 --worker-calls 8 --max-calls 2 --timeout 600
 ```
 
-Das Tokenbudget gilt gemeinsam für Analyse, Astra und Coding über die **gesamte
-Sitzung**, auch nach DISCARD. Insgesamt sind höchstens `--worker-calls + --max-calls`
-Modellaufrufe erlaubt (Standard 10), davon höchstens `--worker-calls` Coding-Aufrufe
-(Standard 8). Jede Feedbackplanung benötigt erneut einen Analyseaufruf; je Wunsch
-bleibt das Planungslimit `--max-calls` (1–2) erhalten. Pro Aufgabe höchstens ein
-ausdrücklich angeforderter Reparaturversuch; fehlgeschlagene Tests starten keine
-Reparaturschleife. Unbekannte Tokenzahlen oder ausgeschöpfte Limits verhindern den
-nächsten Modellaufruf. Ein einzelner laufender Aufruf kann das beobachtete Budget
-überschreiten; dies ist **kein hartes Kostenlimit**. Es werden keine Preise geschätzt.
+`--max-tokens` gilt in der interaktiven Sitzung **je Nutzerauftrag**, gemeinsam für
+Planung, Astra und Umsetzung einschließlich automatischer Wiederaufnahme. Ein neuer
+Wunsch erhält ein neues Aufgabenbudget. `--max-calls` begrenzt Luna-Planung (1–2),
+zusätzlich höchstens ein Astra-Aufruf je Planung; `--worker-calls` begrenzt alle
+Coding-Aufrufe des Nutzerauftrags einschließlich Reparatur/Delegation (1–16).
 
-Unklare Pläne führen zu keiner Schreibfreigabe; der Wunsch kann präzisiert werden.
-Fehlgeschlagene Umsetzung oder Integritätsfehler sperren den Entwurf: dann DISCARD
-oder EXIT verwenden. Änderungen am Original, an der geprüften Kopie oder dem Bericht
-werden vor Weiterarbeit/Apply abgelehnt. Auch nach der Apply-Bestätigung werden
-Original- und Ergebnisstand nochmals geprüft. Hashes erkennen nachträgliche Änderungen
-an bereits geänderten Dateien. Ein zweiter Orchestrator wird während der Sitzung per
-Lock abgewiesen. Browserprüfung bleibt manuell. Pfad-/Hashkontrollen ergänzen die
-bestehende CLI-Sandbox; sie ersetzen keine vollständige Isolation gegen bösartige
-Prozesse mit denselben Betriebssystemrechten. Apply kopiert Dateien einzeln und ist
-keine dateiübergreifende Transaktion. Keine Commits, Pushes oder Deployments.
+`--session-tokens` und `--session-calls` begrenzen die gesamte Sitzung, auch nach
+Fehlern oder DISCARD. Standard: 120.000 beobachtete Token und 40 Modellaufrufe.
+Ein einzelner Analyseaufruf mit beispielsweise 20.360 Token beendet beim Standardbudget
+weitere Modellarbeit dieses Auftrags, sperrt aber nicht die Sitzung, solange das
+Gesamtbudget reicht. Bei echtem Gesamtlimit sind weitere Modellaufrufe gesperrt;
+STATUS, DIFF, APPLY eines zuvor geprüften Stands und DISCARD bleiben möglich.
+Unbekannte Usage stoppt sicher weitere Modellaufrufe der Sitzung. Die Limits sind
+Zulassungsprüfungen **zwischen** Aufrufen: ein laufender Aufruf kann sie überschreiten.
+Es gibt kein garantiertes hartes Kostenlimit und keine unbelegte Preisschätzung.
+
+Gewöhnliche Worker-/Prozessfehler und fehlgeschlagene Tests stellen den letzten
+geprüften Stand samt Apply-Bericht wieder her. Ein neuer Wunsch ist bei verbleibendem
+Budget möglich. Fehlerrunden bleiben in `round-*.json` und Prozesslogs nachvollziehbar.
+Unerlaubte Dateien, veränderte Testquellen, Symlinks oder Änderungen am Original sind
+Integritätsfehler und sperren weiterhin den Entwurf: DISCARD oder EXIT verwenden.
+Eine sichere Rücksetzung kann niemals ungeprüfte Änderungen zur Übernahme freigeben.
+
+### Kompaktes Projektgedächtnis
+
+`AGENTS.md` und `ARCHITECTURE.md` bleiben die primären Regeln. Ergänzend enthält
+`PROJECT_MEMORY.json` höchstens 24 knappe Einträge zu `architecture`, `design`, `solution`,
+`error` oder `preference`. Die Datei gehört in die Versionskontrolle; wie alle
+Projektquellen muss sie für spätere Sitzungen Git-erfasst sein. Sie startet leer.
+
+Beispiel (die Eingabe selbst bestätigt Aussage und Beleg ausdrücklich):
+
+```text
+REMEMBER preference | Bei Karten weniger Schatten verwenden | Vom Nutzer mit dieser Eingabe ausdrücklich bestätigt
+```
+
+Der Befehl ergänzt den Eintrag deterministisch ohne Modellaufruf, verlangt dieselbe
+Dateifreigabe und Prüfungen wie jede Änderung und wird erst durch APPLY dauerhaft.
+Modelle dürfen diese Datei nicht ändern, auch nicht im manuellen Worker-Modus. Nur
+Einträge mit Kategorie, kurzer Aussage, Beleg und `confirmed_by: user` werden geladen.
+Der Orchestrator kann die Wahrheit eines Nutzerbelegs nicht eigenständig beweisen;
+`REMEMBER` ist die ausdrückliche menschliche Bestätigung. Kein automatisches Lernen aus
+KI-Aussagen oder Gesprächsprotokollen. Bei voller Datei manuell konsolidieren. Technische
+Fehlerrunden bleiben lokale Laufzeitberichte und werden nicht automatisch zu Projektwissen.
+
+Protokolle liegen unter `artifacts/orchestrator/<Sitzungs-ID>/` und können Aufgabentexte
+und Quellausschnitte enthalten. Kein automatisches Wiederaufnehmen beendeter Sitzungen.
+Original, Entwurf, Prüfquellen und Apply-Bericht werden vor Weiterarbeit/Übernahme sowie
+nach der Bestätigung erneut geprüft. Ein Lock verhindert parallele echte Läufe.
+Hash-/Pfadkontrollen ergänzen die CLI-Sandbox; sie ersetzen keine Betriebssystemisolation
+gegen bösartige Prozesse mit denselben Rechten. Apply kopiert Dateien einzeln und ist
+keine dateiübergreifende Transaktion. Keine Commits, Pushes, Installationen oder Deployments.
 
 ## Automatische Planung und ausdrücklich freigegebene Ausführung
 

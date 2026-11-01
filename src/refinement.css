@@ -1,4 +1,12 @@
 :root {
+  --ui-duration-feedback: 140ms;
+  --ui-duration-compact: 200ms;
+  --ui-ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ui-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ui-control-gap: 8px;
+  --ui-field-gap: 16px;
+  --ui-group-gap: 32px;
+  --ui-section-gap: 48px;
   --paper: #ecedeb;
   --studio-paper: #e2e5e1;
   --panel: #f6f7f4;
@@ -39,6 +47,31 @@ body {
 }
 .home-intro {
   padding-top: 30px;
+}
+.home-cover .cover-shade {
+  background: linear-gradient(
+    180deg,
+    rgba(8, 20, 14, 0.46) 0%,
+    rgba(8, 20, 14, 0.16) 20%,
+    rgba(9, 21, 15, 0.52) 100%
+  );
+}
+.home-cover .cover-top {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  text-shadow: 0 1px 12px #0008;
+}
+.home-cover .cover-title .eyebrow {
+  gap: 24px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+.home-cover .cover-caption {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  line-height: 1.45;
 }
 .field input,
 .field textarea,
@@ -269,7 +302,7 @@ body {
   padding-block: clamp(32px, 5vw, 76px);
 }
 .number-control {
-  margin-bottom: 20px;
+  margin-bottom: var(--ui-field-gap);
   min-width: 0;
 }
 .number-control > span {
@@ -338,7 +371,7 @@ body {
   margin-bottom: 16px;
 }
 .color-control .field {
-  margin-bottom: 10px;
+  margin-bottom: var(--ui-field-gap);
 }
 .color-input {
   display: grid;
@@ -487,7 +520,51 @@ body {
   margin-bottom: 16px;
 }
 .module-inspector .inspector-section {
-  margin-top: 12px;
+  margin-top: var(--ui-group-gap);
+}
+.module-inspector .inspector-section + .inspector-section {
+  margin-top: var(--ui-section-gap);
+}
+.lightbox-controls > button {
+  transition:
+    background-color var(--ui-duration-compact) var(--ui-ease-exit),
+    color var(--ui-duration-compact) var(--ui-ease-exit);
+}
+.lightbox-controls > button:hover {
+  transition:
+    background-color var(--ui-duration-feedback) var(--ui-ease-enter),
+    color var(--ui-duration-feedback) var(--ui-ease-enter);
+  background-color: #f2f3ef;
+  color: #20241f;
+}
+@media (max-width: 760px) {
+  .home-cover .cover-shade {
+    background: linear-gradient(
+      180deg,
+      rgba(8, 20, 14, 0.62) 0%,
+      rgba(8, 20, 14, 0.2) 20%,
+      rgba(9, 21, 15, 0.52) 100%
+    );
+  }
+  .home-cover .cover-top {
+    gap: 16px;
+  }
+  .home-cover .cover-top > span:last-child {
+    max-width: 50%;
+  }
+  .home-cover .cover-title .eyebrow {
+    gap: 16px;
+    letter-spacing: 0.07em;
+  }
+  .home-cover .cover-side {
+    display: none;
+  }
+  .home-cover .cover-caption {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    letter-spacing: 0.035em;
+  }
 }
 .inspector-photo-picker button > span {
   right: 2px;

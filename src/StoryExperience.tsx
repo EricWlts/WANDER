@@ -6,7 +6,12 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -128,39 +133,144 @@ export function ExampleStory() {
 }
 export function JourneyStory() {
   const { slug } = useParams();
-  return <StoryLoader path={`/journeys/${slug}?public=1`} />;
+  return <StoryLoader path={`/journeys/${slug}?public=1`} slug={slug} />;
 }
-function StoryLoader({ path }: { path: string }) {
-  const [journey, setJourney] = useState<Journey | null>(null),
-    [error, setError] = useState("");
+type StoryCover = Pick<
+  Photo,
+  "id" | "url" | "srcset" | "alt" | "width" | "height"
+>;
+
+// History state is optional UI context, never a substitute for the public response.
+function linkedStoryCover(state: unknown, slug?: string): StoryCover | null {
+  if (!slug || !state || typeof state !== "object" || !("storyCover" in state))
+    return null;
+  const link = state.storyCover;
+  if (
+    !link ||
+    typeof link !== "object" ||
+    !("slug" in link) ||
+    link.slug !== slug ||
+    !("cover" in link)
+  )
+    return null;
+  const cover = link.cover;
+  if (!cover || typeof cover !== "object") return null;
+  const value = cover as Record<string, unknown>;
+  if (
+    !Number.isSafeInteger(value.id) ||
+    Number(value.id) <= 0 ||
+    typeof value.url !== "string" ||
+    typeof value.srcset !== "string" ||
+    typeof value.alt !== "string" ||
+    value.alt.length > 2000 ||
+    typeof value.width !== "number" ||
+    !Number.isFinite(value.width) ||
+    value.width <= 0 ||
+    typeof value.height !== "number" ||
+    !Number.isFinite(value.height) ||
+    value.height <= 0
+  )
+    return null;
+  // Only same-origin display variants; originals and arbitrary/external URLs are excluded.
+  const displayUrl = (url: string) =>
+    new RegExp(`^/media/${value.id}/(?:640|1280|2200|3840)$`).test(url) ||
+    /^\/images\/[a-zA-Z0-9_-]+-(?:640|1280|2200|3840)\.webp$/.test(url);
+  if (
+    !displayUrl(value.url) ||
+    value.srcset.length > 2000 ||
+    (value.srcset &&
+      !value.srcset.split(",").every((candidate) => {
+        const parts = candidate.trim().split(/\s+/);
+        return (
+          parts.length === 2 &&
+          displayUrl(parts[0]) &&
+          /^[1-9]\d*w$/.test(parts[1])
+        );
+      }))
+  )
+    return null;
+  return {
+    id: Number(value.id),
+    url: value.url,
+    srcset: value.srcset,
+    alt: value.alt,
+    width: value.width,
+    height: value.height,
+  };
+}
+function StoryLoader({ path, slug }: { path: string; slug?: string }) {
+  const location = useLocation();
+  const cover = linkedStoryCover(location.state, slug);
+  const [result, setResult] = useState<{
+    path: string;
+    journey?: Journey;
+    error?: string;
+  } | null>(null);
+  // Check identity while rendering too: a new route must never paint the old story.
+  const current = result?.path === path ? result : null;
   useEffect(() => {
     let alive = true;
-    setJourney(null);
-    setError("");
-    api<Journey>(path)
-      .then((j) => {
-        if (alive) {
-          setJourney(j);
-          document.title = `${j.title} — WANDER`;
-        }
+    const controller = new AbortController();
+    setResult(null);
+    api<Journey>(path, { signal: controller.signal })
+      .then((journey) => {
+        if (!alive) return;
+        if (slug && journey.slug !== slug)
+          throw new Error(tr("This story is out of reach."));
+        setResult({ path, journey });
+        document.title = `${journey.title} — WANDER`;
       })
       .catch((e) => {
-        if (alive) setError(e.message);
+        if (alive) setResult({ path, error: e.message });
       });
     return () => {
       alive = false;
+      controller.abort();
       document.title = "WANDER — Every journey deserves to be remembered.";
     };
-  }, [path]);
-  if (error)
-    return <PageState title={tr("This story is out of reach.")} text={error} />;
-  if (!journey)
+  }, [path, slug]);
+  useLayoutEffect(() => {
+    // App's initial hash lookup can run before the asynchronous story exists.
+    if (current?.journey && location.hash)
+      document
+        .getElementById(location.hash.slice(1))
+        ?.scrollIntoView({ behavior: "instant" });
+  }, [current?.journey, location.hash]);
+  if (current?.error)
     return (
+      <PageState
+        title={tr("This story is out of reach.")}
+        text={current.error}
+      />
+    );
+  if (!current?.journey)
+    return cover ? (
+      <main id="main" className="story-cover-loading" aria-busy="true">
+        <div className="story-cover-loading-status" role="status">
+          <h1>{tr("Opening a little world…")}</h1>
+          <p>{tr("Loading photographs")}</p>
+        </div>
+        <div className="story-cover-loading-frame">
+          <img
+            src={cover.url}
+            srcSet={cover.srcset}
+            sizes="100vw"
+            alt={cover.alt}
+            width={cover.width}
+            height={cover.height}
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+      </main>
+    ) : (
       <PageState title={tr("Opening a little world…")}>
         <p>{tr("Loading photographs")}</p>
       </PageState>
     );
-  return <StoryExperience key={journey.slug} journey={journey} />;
+  return (
+    <StoryExperience key={current.journey.slug} journey={current.journey} />
+  );
 }
 export function DayTeaser({
   day,

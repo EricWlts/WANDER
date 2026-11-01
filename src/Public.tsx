@@ -68,6 +68,23 @@ export function Home() {
           <article className="home-feature-story">
             <Link
               to={`/journeys/${journey.slug}`}
+              state={
+                journey.cover
+                  ? {
+                      storyCover: {
+                        slug: journey.slug,
+                        cover: {
+                          id: journey.cover.id,
+                          url: journey.cover.url,
+                          srcset: journey.cover.srcset,
+                          alt: journey.cover.alt,
+                          width: journey.cover.width,
+                          height: journey.cover.height,
+                        },
+                      },
+                    }
+                  : undefined
+              }
               className="home-feature-image-link"
               aria-label={`${tr("Read the journey")}: ${journey.title}`}
             >

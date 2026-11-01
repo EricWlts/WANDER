@@ -1346,3 +1346,120 @@ body {
     gap: 12px;
   }
 }
+
+/* W09: make the first creating action visible before edition cards on mobile. */
+.new-journey-step {
+  margin: 0 0 var(--ui-control-gap);
+  color: var(--olive);
+  font: 600 11px/1.4 Manrope, Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.new-journey-photos > .inspector-note {
+  max-width: 42ch;
+  line-height: 1.65;
+}
+.new-journal-body .upload-pick {
+  min-height: 230px;
+  border-color: #aab4a2;
+  background: #f6f7f4;
+}
+.new-journal-body {
+  gap: var(--ui-section-gap);
+}
+.new-journal-body .upload-pick > span {
+  font-size: 15px;
+}
+.new-journal-body .upload-pick > small {
+  font-size: 12px;
+}
+.new-journal .upload-component > input.sr-only {
+  width: 1px;
+  min-height: 1px;
+  height: 1px;
+  padding: 0;
+}
+.module-picker-groups {
+  display: grid;
+  gap: var(--ui-group-gap);
+}
+.module-picker-group {
+  border-top: 1px solid var(--line);
+  padding-top: var(--ui-field-gap);
+}
+.module-picker-group-heading h3 {
+  margin: 0 0 5px;
+  font: 500 22px/1.2 var(--serif);
+}
+.module-picker-group-heading p {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.module-picker-group .module-picker-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-control-gap);
+  margin-top: 0;
+}
+.module-picker-grid button {
+  min-height: 138px;
+  padding: 12px;
+  gap: var(--ui-control-gap);
+  align-content: start;
+}
+.module-picker-grid button > svg {
+  align-self: center;
+}
+.module-picker-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.module-picker-card-copy small {
+  color: #687365;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.module-picker-group .module-schematic {
+  height: 52px;
+}
+@media (max-width: 760px) {
+  .new-journey-photos {
+    order: 1;
+  }
+  .new-journey-edition {
+    order: 2;
+  }
+  .new-journal-body .upload-pick {
+    min-height: 170px;
+  }
+  .new-journal-body {
+    gap: var(--ui-group-gap);
+  }
+  .new-edition > div {
+    height: 112px;
+  }
+  .new-edition > div > span {
+    font-size: 23px;
+    bottom: 8px;
+    padding: 8px 10px;
+  }
+  .new-journal-heading > p {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .module-picker-group .module-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-control-gap);
+  }
+  .module-picker-grid button {
+    min-height: 136px;
+    padding: 10px;
+  }
+  .module-picker-group-heading h3 {
+    font-size: 20px;
+  }
+  .module-picker-groups {
+    gap: var(--ui-field-gap);
+  }
+}

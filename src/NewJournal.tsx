@@ -51,13 +51,16 @@ export function NewJournal() {
         <h1>{t("Begin with a photograph.", "Am Anfang steht ein Foto.")}</h1>
         <p>
           {t(
-            "Bring your memories. Give them a rhythm of your own.",
-            "Bring deine Erinnerungen mit. Gib ihnen deinen eigenen Rhythmus.",
+            "Add photographs, shape your story, then review and publish when you are ready.",
+            "Füge Fotos hinzu, gestalte deine Geschichte und prüfe sie, bevor du veröffentlichst.",
           )}
         </p>
       </div>
       <div className="new-journal-body">
-        <div>
+        <section className="new-journey-edition">
+          <p className="new-journey-step">
+            {t("Choose an edition", "Edition auswählen")}
+          </p>
           <div className="new-edition-picker">
             {(["quiet-atlas", "after-hours"] as const).map((id) => (
               <button
@@ -95,8 +98,11 @@ export function NewJournal() {
               "Beide Welten lassen sich später in jedem Tag kombinieren.",
             )}
           </p>
-        </div>
-        <div>
+        </section>
+        <section className="new-journey-photos">
+          <p className="new-journey-step">
+            {t("Start with photographs", "Mit Fotos beginnen")}
+          </p>
           <Upload
             journeyId={journey?.id}
             ensureJourney={ensureJourney}
@@ -111,11 +117,11 @@ export function NewJournal() {
           )}
           <p className="inspector-note">
             {t(
-              "Uploads are saved in your private collection. Publish when you are ready.",
-              "Uploads werden in deiner privaten Sammlung gespeichert. Veröffentliche, wenn du bereit bist.",
+              "Your journey is created with the first upload. You can shape, review, and publish it in the next step.",
+              "Deine Reise entsteht mit dem ersten Upload. Im nächsten Schritt kannst du sie gestalten, prüfen und veröffentlichen.",
             )}
           </p>
-        </div>
+        </section>
       </div>
     </main>
   );

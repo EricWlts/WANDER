@@ -1819,50 +1819,119 @@ export function ModularEditor() {
               "Wähle ein Modul. Jedes Detail lässt sich später anpassen.",
             )}
           </p>
-          <div className="module-picker-grid">
-            {Object.entries(moduleNames)
-              .filter(([key]) => key !== "gallery")
-              .map(([key, names]) => (
-                <button key={key} onClick={() => add(key as Chapter["kind"])}>
-                  <span className={`module-schematic schematic-${key}`}>
-                    {key === "quote" ? (
-                      <span className="quote-sample">
-                        <b>“</b>
-                        {t("A moment, kept.", "Ein Moment, der bleibt.")}
-                      </span>
-                    ) : key === "rail" || key === "filmstrip" ? (
-                      <span className="sequence-sample">
-                        {[
-                          "forest",
-                          "river",
-                          "mountains",
-                          "moss",
-                          "forest",
-                          "river",
-                        ].map((name, index) => (
-                          <img
-                            key={index}
-                            src={`/images/${name}-640.webp`}
-                            alt=""
-                          />
-                        ))}
-                        <span className="sequence-cue">
-                          {key === "rail" ? "↔" : "∞"}
+          <div className="module-picker-groups">
+            {([
+              {
+                title: t("Tell the story", "Erzählen"),
+                note: t(
+                  "Set a scene, add a thought, or keep a line.",
+                  "Einen Tag eröffnen, Gedanken teilen oder einen Satz bewahren.",
+                ),
+                kinds: ["chapter", "text", "quote"],
+              },
+              {
+                title: t("Show photographs", "Bilder zeigen"),
+                note: t(
+                  "Choose one frame or bring photographs into relation.",
+                  "Ein Motiv zeigen oder mehrere Bilder in Beziehung setzen.",
+                ),
+                kinds: ["image", "pair", "wall", "gallery", "hero"],
+              },
+              {
+                title: t("Build a sequence", "Sequenzen"),
+                note: t(
+                  "Let readers discover at their own pace, or add a moving accent.",
+                  "Lass Leser selbst entdecken oder setze einen bewegten Akzent.",
+                ),
+                kinds: ["rail", "filmstrip"],
+              },
+            ] as const).map((group) => (
+              <section className="module-picker-group" key={group.title}>
+                <div className="module-picker-group-heading">
+                  <h3>{group.title}</h3>
+                  <p>{group.note}</p>
+                </div>
+                <div className="module-picker-grid">
+                  {group.kinds.map((key) => {
+                    const names = moduleNames[key];
+                    const use = ({
+                      pair: t(
+                        "Show the relationship between two photographs.",
+                        "Die Beziehung zwischen zwei Fotos zeigen.",
+                      ),
+                      wall: t(
+                        "Give an overview of a place or a moment.",
+                        "Einen Überblick über einen Ort oder Moment geben.",
+                      ),
+                      rail: t(
+                        "Invite readers to explore the photographs at their own pace.",
+                        "Zum Entdecken im eigenen Tempo einladen.",
+                      ),
+                      filmstrip: t(
+                        "Add a moving, atmospheric accent.",
+                        "Einen bewegten, atmosphärischen Akzent setzen.",
+                      ),
+                      image: t(
+                        "Give one photograph room to speak.",
+                        "Einem einzelnen Foto Raum geben.",
+                      ),
+                      gallery: t(
+                        "Gather photographs into a browsable collection.",
+                        "Fotos in einer blätterbaren Sammlung bündeln.",
+                      ),
+                      hero: t(
+                        "Open with a defining photograph.",
+                        "Mit einem prägenden Foto eröffnen.",
+                      ),
+                    } as Partial<Record<Chapter["kind"], string>>)[key];
+                    return (
+                      <button key={key} onClick={() => add(key)}>
+                        <span className={`module-schematic schematic-${key}`}>
+                          {key === "quote" ? (
+                            <span className="quote-sample">
+                              <b>“</b>
+                              {t("A moment, kept.", "Ein Moment, der bleibt.")}
+                            </span>
+                          ) : key === "rail" || key === "filmstrip" ? (
+                            <span className="sequence-sample">
+                              {[
+                                "forest",
+                                "river",
+                                "mountains",
+                                "moss",
+                                "forest",
+                                "river",
+                              ].map((name, index) => (
+                                <img
+                                  key={index}
+                                  src={`/images/${name}-640.webp`}
+                                  alt=""
+                                />
+                              ))}
+                              <span className="sequence-cue">
+                                {key === "rail" ? "↔" : "∞"}
+                              </span>
+                            </span>
+                          ) : (
+                            <>
+                              <i />
+                              <i />
+                              <i />
+                              <i />
+                            </>
+                          )}
                         </span>
-                      </span>
-                    ) : (
-                      <>
-                        <i />
-                        <i />
-                        <i />
-                        <i />
-                      </>
-                    )}
-                  </span>
-                  <strong>{t(...names)}</strong>
-                  <Plus size={16} />
-                </button>
-              ))}
+                        <span className="module-picker-card-copy">
+                          <strong>{t(...names)}</strong>
+                          {use && <small>{use}</small>}
+                        </span>
+                        <Plus size={16} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </Modal>
       )}

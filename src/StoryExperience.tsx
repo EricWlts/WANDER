@@ -1,5 +1,11 @@
 import { tr } from "./I18n";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -11,6 +17,12 @@ import {
   Share2,
 } from "lucide-react";
 import { sequenceIndex } from "./journalModel";
+import {
+  PhotoViewerModel,
+  decodedImageRequest,
+  viewerIndex,
+  type ViewerState,
+} from "./photoViewerModel";
 import { JournalCanvas } from "./JournalCanvas";
 import { useMotionOff } from "./Motion";
 import { t, useLocale } from "./I18n";
@@ -462,15 +474,61 @@ export function PhotoViewer({
   initial: number;
   onClose: () => void;
 }) {
-  const [index, setIndex] = useState(initial),
-    root = useRef<HTMLDivElement>(null),
+  useLocale();
+  const motionOff = useMotionOff();
+  const [view, setView] = useState<ViewerState>({
+    target: viewerIndex(initial, photos.length),
+    visible: null,
+    status: "loading",
+  });
+  const imageSlot = useRef<HTMLDivElement>(null);
+  const displayedImage = useRef<HTMLImageElement | null>(null);
+  const model = useRef<PhotoViewerModel | null>(null);
+  const root = useRef<HTMLDivElement>(null),
     closeRef = useRef(onClose),
     id = useRef(crypto.randomUUID()),
     gesture = useRef({ total: 0, last: 0, locked: false }),
     touch = useRef<{ x: number; y: number } | null>(null);
   closeRef.current = onClose;
-  const next = (direction: number) =>
-    setIndex((i) => (i + direction + photos.length) % photos.length);
+  useEffect(() => {
+    displayedImage.current = null;
+    imageSlot.current?.replaceChildren();
+    const session = new PhotoViewerModel(
+      photos.map((photo) => photo.large_url),
+      initial,
+      decodedImageRequest,
+      (state) => {
+        setView(state);
+      },
+    );
+    model.current = session;
+    session.select(initial);
+    return () => {
+      session.dispose();
+      model.current = null;
+    };
+  }, [photos, initial]);
+  useLayoutEffect(() => {
+    const slot = imageSlot.current;
+    const image = view.image;
+    if (!slot || !image || view.visible === null) return;
+    const prior = displayedImage.current;
+    image.alt = photos[view.visible]?.alt || "";
+    image.removeAttribute("aria-hidden");
+    image.className = "lightbox-current";
+    displayedImage.current = image;
+    if (!motionOff && prior && prior !== image) {
+      prior.className = "lightbox-prior";
+      prior.alt = "";
+      prior.setAttribute("aria-hidden", "true");
+      image.classList.add("is-entering");
+      slot.replaceChildren(prior, image);
+      const timer = window.setTimeout(() => prior.remove(), 240);
+      return () => window.clearTimeout(timer);
+    }
+    slot.replaceChildren(image);
+  }, [view.visible, view.image, photos, motionOff]);
+  const next = (direction: number) => model.current?.move(direction);
   useEffect(() => {
     if (history.state?.wanderLightbox !== id.current)
       history.pushState(
@@ -487,11 +545,7 @@ export function PhotoViewer({
     const key = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         e.preventDefault();
-        setIndex(
-          (i) =>
-            (i + (e.key === "ArrowRight" ? 1 : -1) + photos.length) %
-            photos.length,
-        );
+        model.current?.move(e.key === "ArrowRight" ? 1 : -1);
       }
     };
     window.addEventListener("popstate", pop);
@@ -510,9 +564,7 @@ export function PhotoViewer({
       g.total += e.deltaX;
       if (Math.abs(g.total) > 45) {
         g.locked = true;
-        setIndex(
-          (i) => (i + (g.total > 0 ? 1 : -1) + photos.length) % photos.length,
-        );
+        model.current?.move(g.total > 0 ? 1 : -1);
       }
     };
     const el = root.current;
@@ -524,11 +576,12 @@ export function PhotoViewer({
     };
   }, [photos.length]);
   function close() {
+    model.current?.dispose();
     if (history.state?.wanderLightbox === id.current) history.back();
     else onClose();
   }
-  const photo = photos[index];
-  if (!photo) return null;
+  const photo = view.visible === null ? null : photos[view.visible];
+  if (!photos.length) return null;
   return (
     <Modal
       title={t("Photograph viewer", "Fotoansicht")}
@@ -559,33 +612,55 @@ export function PhotoViewer({
             next(dx < 0 ? 1 : -1);
         }}
       >
-        <div className="lightbox-image" key={photo.id}>
-          <img src={photo.large_url} alt={photo.alt || ""} />
+        <div className="lightbox-image" aria-busy={view.status === "loading"}>
+          <div ref={imageSlot} className="lightbox-image-layers" />
+          {view.status !== "ready" && (
+            <div
+              className={`lightbox-status${photo ? " has-photo" : ""}`}
+              role="status"
+              aria-live="polite"
+            >
+              <p>
+                {view.status === "error"
+                  ? t(
+                      "Could not load photograph",
+                      "Foto konnte nicht geladen werden",
+                    )
+                  : t("Loading photograph", "Foto wird geladen")}{" "}
+                {view.target + 1} / {photos.length}
+              </p>
+              {view.status === "error" && (
+                <button
+                  className="text-button"
+                  onClick={() => model.current?.retry()}
+                >
+                  {t("Try again", "Erneut versuchen")}
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="lightbox-caption">
           <div>
-            {photo.edits?.show_title && <p>{photo.title}</p>}
-            {photo.description && <span>{photo.description}</span>}
-            {photo.source_url && (
+            {photo?.edits?.show_title && <p>{photo.title}</p>}
+            {photo?.description && <span>{photo.description}</span>}
+            {photo?.source_url && (
               <a href={photo.source_url} target="_blank" rel="noreferrer">
                 {t("Photo", "Foto")}: {photo.credit} ↗
               </a>
             )}
           </div>
           <span aria-live="polite">
-            {index + 1} / {photos.length}
+            {view.visible === null ? "—" : view.visible + 1} / {photos.length}
           </span>
         </div>
-        {photo.original_url && (
-          <a
-            className="original-link"
-            href={photo.original_url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("Open full-resolution copy", "Vollauflösung öffnen")} ↗
-          </a>
-        )}
+        <div className="original-link lightbox-original">
+          {photo?.original_url && (
+            <a href={photo.original_url} target="_blank" rel="noreferrer">
+              {t("Open full-resolution copy", "Vollauflösung öffnen")} ↗
+            </a>
+          )}
+        </div>
         {photos.length > 1 && (
           <div className="lightbox-controls">
             <button

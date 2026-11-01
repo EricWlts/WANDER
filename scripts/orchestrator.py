@@ -198,6 +198,8 @@ def usage_from_log(path):
                 usage[key] = sum(values)
     except OSError:
         pass
+    a, c = usage["input_tokens"], usage["cached_input_tokens"]
+    usage["uncached_input_tokens"] = a - c if type(a) is int and type(c) is int and c <= a else "unknown"
     return usage
 
 
@@ -237,6 +239,8 @@ def review_run(run, apply=False, selected=None, input_fn=None):
     if invalid_base_path:
         raise Stop("Ungültiger Basispfad im Laufbericht.")
     current = snapshot(workspace)
+    if "result_hashes" in report and report["result_hashes"] != current:
+        raise Stop("Projektkopie wurde nach der Prüfung verändert.")
     if set(changes(base, current)) != changed:
         raise Stop("Projektkopie wurde nach dem Lauf unerwartet verändert.")
     paths = sorted(changed if selected is None else set(selected))
@@ -267,6 +271,16 @@ def review_run(run, apply=False, selected=None, input_fn=None):
     confirm = input_fn or input
     if confirm("Zur Übernahme aller angezeigten Änderungen APPLY eingeben: ") != "APPLY":
         raise Stop("Übernahme nicht bestätigt.")
+    if (json.loads(report_path.read_text()) != report or snapshot(workspace) != current):
+        raise Stop("Lauf während Bestätigung verändert.")
+    for path in paths:
+        original = ROOT / path
+        if any(ROOT.joinpath(*Path(path).parts[:i]).is_symlink()
+               for i in range(1, len(Path(path).parts) + 1)):
+            raise Stop("Symlink im Übernahmepfad: " + path)
+        actual = hashlib.sha256(original.read_bytes()).hexdigest() if original.is_file() else None
+        if actual != base.get(path):
+            raise Stop("Konflikt während Bestätigung: " + path)
     for path in paths:
         source, target = workspace / path, ROOT / path
         if source.exists():
@@ -437,17 +451,31 @@ def execute_locked(args, model, allowed, rules, storage):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("task", nargs="?", help="Eine konkrete Aufgabe oder TASKS.md-ID mit Beschreibung")
+    parser.add_argument("--interactive", action="store_true", help="Natürlichsprachliche Sitzung mit Entwurf und Vite-Vorschau")
     parser.add_argument("--allow", action="append", default=[], help="Erlaubte Datei relativ zum Projekt; wiederholbar")
     parser.add_argument("--timeout", type=int, default=600, help="Sekunden je Worker/Prüfung (1–3600)")
     parser.add_argument("--dry-run", action="store_true", help="Nur Plan ausgeben; keine Aufrufe oder Schreibzugriffe")
+    parser.add_argument("--execute-plan", metavar="LAUF-ID", help="Validierten Plan nach Dateifreigabe isoliert ausführen")
+    parser.add_argument("--worker-calls", type=int, default=8, help="Gesamte Workeraufrufe (1–16), höchstens eine Reparatur je Aufgabe")
     parser.add_argument("--auto", action="store_true", help="Sichere automatische Analyse/Planung; noch keine Coding-Ausführung")
     parser.add_argument("--max-calls", type=int, default=2, help="Aufruflimit der automatischen Planung (1–2)")
-    parser.add_argument("--max-tokens", type=int, default=20000, help="Beobachtetes Tokenlimit zwischen Planungsaufrufen")
+    parser.add_argument("--max-tokens", type=int, default=20000, help="Beobachtetes Tokenbudget zwischen Modellaufrufen")
     parser.add_argument("--review", metavar="LAUF", help="Diff eines Laufs anzeigen (Pfad oder Lauf-ID)")
     parser.add_argument("--apply", metavar="LAUF", help="Diff prüfen und nach Bestätigung übernehmen")
     parser.add_argument("--file", action="append", default=[], help="Bei Review/Apply einzelne freigegebene Datei auswählen")
     args = parser.parse_args(argv)
     try:
+        if args.interactive:
+            if (args.task or args.auto or args.execute_plan or args.review or args.apply
+                    or args.allow or args.file or args.dry_run):
+                raise Stop("--interactive ist ein eigener Modus; nur Budget-/Timeoutoptionen kombinieren.")
+            import orchestrator_interactive
+            return orchestrator_interactive.interactive(args, sys.modules[__name__])
+        if args.execute_plan:
+            if args.auto or args.review or args.apply or args.allow or args.file or args.task:
+                raise Stop("--execute-plan ist ein gesonderter Modus ohne zusätzliche Aufgaben/Dateifreigaben.")
+            import orchestrator_execution
+            return orchestrator_execution.execute_plan(args, sys.modules[__name__])
         if args.review or args.apply:
             if args.auto:
                 raise Stop("--auto kann nicht mit Review/Apply kombiniert werden.")

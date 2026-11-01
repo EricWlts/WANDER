@@ -21,6 +21,14 @@ Das zufällige Studio-Passwort erscheint nur beim allerersten Start im Terminal.
 
 Das neue Passwort wird verdeckt abgefragt; mindestens zwölf Zeichen. `.env.example` dokumentiert optionale Variablen. `.env` wird nicht automatisch geladen.
 
+## KI-gestützte Entwicklung
+
+Für KI-gestützte Codeänderungen im Terminal: `python3 -B scripts/orchestrator.py --interactive`.
+Natürlichsprachliche Wünsche, geprüfter isolierter Entwurf, separate Vite-Vorschau,
+Folgefeedback und explizites `APPLY`/`DISCARD` sind in der
+[Orchestrator-Anleitung](scripts/README-orchestrator.md#interaktive-entwicklung) beschrieben.
+Die isolierte Vorschau enthält keinen Backendzugriff.
+
 ## Reisen gestalten
 
 1. **Mein Studio → Neue Reise:** Edition als Startpunkt wählen und Fotos hochladen. Erst beim Upload entsteht ein privater Entwurf. Anschließend „Deine Reise gestalten“ öffnen.

@@ -115,16 +115,16 @@ def execute_plan(args, runtime):
         return execute_locked(args, runtime, storage, payload, proposed, allowed)
 
 
-def execute_locked(args, runtime, storage, payload, proposed, allowed):
-    run = storage / (time.strftime("%Y%m%d-%H%M%S-exec-") + uuid.uuid4().hex[:8])
+def execute_locked(args, runtime, storage, payload, proposed, allowed, session=None):
+    run = session.run if session else storage / (time.strftime("%Y%m%d-%H%M%S-exec-") + uuid.uuid4().hex[:8])
     workspace = run / "workspace"
-    workspace.mkdir(parents=True)
+    workspace.mkdir(parents=True, exist_ok=bool(session))
     baseline = payload["source"]
     report = {"status": "stopped", "plan_id": args.execute_plan, "allowed": allowed,
               "base_hashes": baseline, "files": [], "calls": [], "checks": [],
               "manual_checks": [], "completed_tasks": [], "write_approval": allowed,
               "review": "Isolierte Ergebnisse; manuelles Review und APPLY erforderlich."}
-    budget = planning.Budget(args.worker_calls, args.max_tokens, runtime.Stop)
+    budget = session.workers if session else planning.Budget(args.worker_calls, args.max_tokens, runtime.Stop)
     original_status = None
 
     def original_unchanged():
@@ -137,19 +137,23 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed):
         original_status = subprocess.run(["git", "status", "--porcelain", "-uall"],
                                          cwd=runtime.ROOT, check=True, capture_output=True).stdout
         original_unchanged()
-        for name in baseline:
-            target = workspace / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            runtime.shutil.copy2(runtime.ROOT / name, target)
-        if runtime.snapshot(workspace) != baseline:
-            raise runtime.Stop("Projektstand während Kopie verändert.")
-        if runtime.run_process(["git", "init", "--quiet", str(workspace)], runtime.ROOT, 30, run / "init.log"):
-            raise runtime.Stop("Isoliertes Git-Verzeichnis fehlt.")
+        if session:
+            session.verify()
+        else:
+            for name in baseline:
+                target = workspace / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                runtime.shutil.copy2(runtime.ROOT / name, target)
+            if runtime.snapshot(workspace) != baseline:
+                raise runtime.Stop("Projektstand während Kopie verändert.")
+            if runtime.run_process(["git", "init", "--quiet", str(workspace)], runtime.ROOT, 30, run / "init.log"):
+                raise runtime.Stop("Isoliertes Git-Verzeichnis fehlt.")
         schema = run / "schema.json"
         schema.write_text(json.dumps(runtime.SCHEMA))
-        dependencies = set()
+        dependencies = {p for p in ("node_modules", ".venv")
+                        if session and (run / "check-workspace" / p).is_dir()}
         checkspace = run / "check-workspace"
-        checkspace.mkdir()
+        checkspace.mkdir(exist_ok=bool(session))
         for task in proposed["tasks"]:
             if not set(task["depends_on"]) <= set(report["completed_tasks"]):
                 raise runtime.Stop("Abhängigkeit noch nicht erfolgreich geprüft.")
@@ -157,10 +161,14 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed):
             followup = ""
             for attempt in range(2):  # At most one explicit worker-requested repair, no model escalation.
                 budget.admit()
-                index = len(report["calls"])
+                if session:
+                    session.tokens.admit()
+                index = budget.calls if session else len(report["calls"])
                 answer, log = run / f"{index}-answer.json", run / f"{index}-worker.log"
                 entry = {"task": task["id"], "model": task["model"], "reasoning": task["reasoning"]}
                 report["calls"].append(entry)
+                if session:
+                    print(f"Umsetzung: {task['model']} / {task['reasoning']} — {task['goal']}", flush=True)
                 contract = {k: task[k] for k in planning.TASK["properties"]}
                 prompt = ("Eine Aufgabe in isolierter Kopie. AGENTS.md/ARCHITECTURE.md beachten; "
                           "nur relevante Dateien lesen. Nur paths sind ausdrücklich schreibfreigegeben. "
@@ -175,6 +183,8 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed):
                 finally:
                     entry["usage"] = runtime.usage_from_log(log)
                     budget.record(entry["usage"])
+                    if session:
+                        session.tokens.record(entry["usage"])
                     report["budget"] = budget.report()
                     current = runtime.snapshot(workspace)
                     report["files"] = runtime.changes(baseline, current)
@@ -220,9 +230,12 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed):
             for command in commands:
                 item = {"task": task["id"], "command": command, "status": "running"}
                 report["checks"].append(item)
+                check_index = len(report['checks']) + (len(session.checks) if session else 0)
                 code = runtime.run_process(command, checkspace, args.timeout,
-                                           run / f"{len(report['checks'])}-check.log")
+                                           run / f"{check_index}-check.log")
                 item["status"] = "passed" if code == 0 else "failed"
+                if session:
+                    print("Test: " + " ".join(command) + " — " + item["status"], flush=True)
                 if code:
                     raise runtime.Stop("Prüfung fehlgeschlagen: " + " ".join(command))
                 if runtime.snapshot(checkspace, checking=True) != candidate:
@@ -233,6 +246,7 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed):
             report["completed_tasks"].append(task["id"])
         original_unchanged()
         report["status"] = "ready_for_manual_review"
+        report["result_hashes"] = runtime.snapshot(workspace)
         return 0
     except (runtime.Stop, OSError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
         report["error"] = str(exc) or "Unterbrochen"

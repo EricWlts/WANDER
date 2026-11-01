@@ -4,6 +4,8 @@ import { PhotoWall } from "./PhotoWall";
 import { t } from "./I18n";
 import {
   editionColors,
+  contrastRatio,
+  surfaceColors,
   modulePhotos,
   offsetsFor,
   typePresets,
@@ -13,18 +15,36 @@ export function AppearanceSettings({
   layout,
   edition,
   inherited,
+  moduleScope = false,
   onChange,
 }: {
   layout: Layout;
   edition: Journey["story_template"];
   inherited?: string;
+  moduleScope?: boolean;
   onChange: (p: Partial<Layout>) => void;
 }) {
   return (
     <details className="inspector-section">
       <summary>{t("Surface colour", "Hintergrundfarbe")}</summary>
+      <p className="inspector-note">
+        {moduleScope
+          ? t(
+              "This module: empty colour follows the journey or its own edition.",
+              "Dieses Modul: Eine leere Farbe folgt der Reise oder seiner eigenen Edition.",
+            )
+          : t(
+              "Journey default: modules inherit this surface unless they choose their own colour or edition.",
+              "Reisevorgabe: Module übernehmen diese Fläche, sofern sie keine eigene Farbe oder Edition wählen.",
+            )}
+      </p>
       <ColorControl
         label={t("Background", "Hintergrund")}
+        resetLabel={
+          moduleScope
+            ? t("Use inherited surface", "Geerbte Fläche verwenden")
+            : undefined
+        }
         value={layout.background}
         fallback={inherited || editionColors[edition]}
         onChange={(background) => onChange({ background })}
@@ -36,11 +56,16 @@ export function TypographySettings({
   layout,
   onChange,
   open = true,
+  background = "#ECEDEB",
 }: {
   layout: Layout;
   open?: boolean;
+  background?: string;
   onChange: (p: Partial<Layout>) => void;
 }) {
+  const ratio = layout.text_color
+    ? contrastRatio(layout.text_color, background)
+    : undefined;
   return (
     <details className="inspector-section" open={open}>
       <summary>{t("Typography & position", "Typografie & Position")}</summary>
@@ -121,9 +146,34 @@ export function TypographySettings({
       <ColorControl
         label={t("Text colour", "Textfarbe")}
         value={layout.text_color}
-        fallback="#26302B"
+        fallback={surfaceColors(background).ink}
+        resetLabel={t(
+          "Use automatic text colour",
+          "Automatische Textfarbe verwenden",
+        )}
         onChange={(text_color) => onChange({ text_color })}
       />
+      <p className="inspector-note">
+        {layout.text_color
+          ? t(
+              "This module uses an individual text colour.",
+              "Dieses Modul verwendet eine eigene Textfarbe.",
+            )
+          : t(
+              "Automatic text colour follows this module’s surface.",
+              "Die automatische Textfarbe folgt der Fläche dieses Moduls.",
+            )}
+      </p>
+      {ratio !== undefined && ratio < 4.5 && (
+        <p className="inspector-note contrast-note">
+          {t("Low text contrast", "Geringer Textkontrast")} · {ratio.toFixed(2)}
+          :1.{" "}
+          {t(
+            "Aim for at least 4.5:1 for reading text. Your colour is kept.",
+            "Für Lesetext sind mindestens 4,5:1 empfohlen. Deine Farbe bleibt erhalten.",
+          )}
+        </p>
+      )}
       <details className="type-fine">
         <summary>{t("Fine adjustments", "Feineinstellungen")}</summary>
         <NumberStepper

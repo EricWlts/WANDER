@@ -81,10 +81,12 @@ export function ColorControl({
   value,
   fallback,
   onChange,
+  resetLabel,
 }: {
   label: string;
   value?: string;
   fallback: string;
+  resetLabel?: string;
   onChange: (v: string | undefined) => void;
 }) {
   const [raw, setRaw] = useState(value || ""),
@@ -159,7 +161,8 @@ export function ColorControl({
         }}
       >
         <RotateCcw size={13} />
-        {t("Reset to theme colour", "Theme-Farbe wiederherstellen")}
+        {resetLabel ||
+          t("Reset to theme colour", "Theme-Farbe wiederherstellen")}
       </button>
     </div>
   );

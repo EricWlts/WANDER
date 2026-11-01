@@ -71,12 +71,24 @@ export function MotionControl({
           </select>
         </label>
       </div>
+      <p className="inspector-note">
+        {t(
+          "During scrolling, duration controls smoothing. Delay applies to playback previews.",
+          "Beim Scrollen steuert die Dauer die Glättung. Die Verzögerung gilt für Wiedergabevorschauen.",
+        )}
+      </p>
       <details className="motion-advanced">
         <summary>{t("Advanced settings", "Erweiterte Einstellungen")}</summary>
         {(
           [
-            ["duration", 600, 4000, 100, t("Duration", "Dauer")],
-            ["delay", 0, 3000, 100, t("Delay", "Verzögerung")],
+            [
+              "duration",
+              600,
+              4000,
+              100,
+              t("Duration / scroll smoothing", "Dauer / Scrollglättung"),
+            ],
+            ["delay", 0, 3000, 100, t("Preview delay", "Vorschauverzögerung")],
             ["intensity", 0, 100, 1, t("Intensity", "Intensität")],
           ] as const
         ).map(([key, min, max, step, name]) => (

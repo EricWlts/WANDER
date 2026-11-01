@@ -38,6 +38,7 @@ import {
 import { ModulePhotographs } from "./ModulePhotographs";
 import {
   placementsFor,
+  editionColors,
   mergeSavedJourney,
   sequenceIndex,
   rootPhotos,
@@ -161,6 +162,7 @@ export function ModularEditor() {
     [mobile, setMobile] = useState(window.innerWidth < 760),
     [picker, setPicker] = useState(false),
     [tab, setTab] = useState<"canvas" | "modules" | "settings">("canvas"),
+    [previewReturn, setPreviewReturn] = useState(0),
     [replay, setReplay] = useState(0),
     [viewerPhotos, setViewerPhotos] = useState<Photo[]>([]),
     [viewer, setViewer] = useState<number | null>(null),
@@ -235,12 +237,73 @@ export function ModularEditor() {
       restoring.current = false;
       return;
     }
-    if (selected.type === "module" && innerWidth > 760)
-      document
-        .querySelector<HTMLIFrameElement>(".preview-frame")
-        ?.contentDocument?.getElementById(`canvas-module-${selected.id}`)
-        ?.scrollIntoView({ block: "center", behavior: "instant" });
-  }, [selected]);
+    if (innerWidth <= 760 && tab !== "canvas") return;
+    const frame = requestAnimationFrame(() => {
+      const doc =
+        document.querySelector<HTMLIFrameElement>(
+          ".preview-frame",
+        )?.contentDocument;
+      if (!doc) return;
+      const moduleId =
+        selected.type === "module"
+          ? selected.id
+          : selected.type === "photo"
+            ? selected.moduleId
+            : undefined;
+      let target: Element | null =
+        moduleId !== undefined
+          ? doc.getElementById(`canvas-module-${moduleId}`)
+          : doc.querySelector(
+              selected.type === "intro"
+                ? ".journal-intro"
+                : selected.type === "photo" && selected.context === "loose"
+                  ? ".journal-loose"
+                  : selected.type === "photo" &&
+                      selected.context === "filmstrip"
+                    ? ".journal-canvas > .filmstrip-section"
+                    : ".journal-cover",
+            );
+      if (
+        target &&
+        selected.type === "photo" &&
+        selected.placementId &&
+        moduleId !== undefined &&
+        journey
+      ) {
+        const chapter = journey.chapters.find((c) => c.id === moduleId);
+        const index = chapter
+          ? modulePhotos(chapter, journey).findIndex(
+              (p) => p.placement_id === selected.placementId,
+            )
+          : -1;
+        const figures = Array.from(
+          target.querySelectorAll(
+            "figure, .film-group:not(.film-duplicate) > .film-frame",
+          ),
+        ).filter((figure) => figure.closest(".journal-module") === target);
+        if (index >= 0) target = figures[index] || target;
+      }
+      if (
+        target &&
+        selected.type === "photo" &&
+        selected.placementId &&
+        !moduleId &&
+        journey &&
+        (selected.context === "loose" || selected.context === "filmstrip")
+      ) {
+        const index = rootPhotos(journey, selected.context).findIndex(
+          (p) => p.placement_id === selected.placementId,
+        );
+        if (index >= 0)
+          target =
+            target.querySelectorAll(
+              "figure, .film-group:not(.film-duplicate) > .film-frame",
+            )[index] || target;
+      }
+      target?.scrollIntoView({ block: "center", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected, tab, previewReturn]);
   const [recovery, setRecovery] = useState<Journey | null>(null);
   useEffect(() => {
     if (!journey) return;
@@ -647,6 +710,11 @@ export function ModularEditor() {
       />
     );
   const j = journey;
+  const selectionLabel = photo
+    ? `${photo.title === "Untitled photograph" ? t("Photograph", "Foto") : photo.title}${photoModule ? ` · ${photoModule.title || t(...moduleNames[photoModule.kind])} · ${modulePhotos(photoModule, j).findIndex((p) => p.placement_id === photo.placement_id) + 1}` : ""}`
+    : selected.type === "intro"
+      ? t("Introduction", "Einleitung")
+      : module?.title || j.title;
   const selectCanvas = (s: Selection) => {
     if (s.type === "photo" && s.moduleId) {
       if (history.state?.wanderImageEditor !== imageHistory.current) {
@@ -989,6 +1057,20 @@ export function ModularEditor() {
           </aside>
         )}
         <div className="canvas-area">
+          {mode === "edit" && (
+            <div className="canvas-selection">
+              <span>
+                {t("Selected", "Ausgewählt")}: {selectionLabel}
+              </span>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => setTab("settings")}
+              >
+                {t("Edit selection", "Auswahl bearbeiten")}
+              </button>
+            </div>
+          )}
           <div className="canvas-context">
             {mode === "edit" ? (
               <button
@@ -1050,6 +1132,32 @@ export function ModularEditor() {
               <Settings2 size={17} />
             </div>
             <div className="inspector-body">
+              <div className="inspector-selection">
+                <span>
+                  {photo
+                    ? t("This image placement", "Diese Bildverwendung")
+                    : module
+                      ? t("This module", "Dieses Modul")
+                      : t("Journey", "Reise")}
+                </span>
+                <strong>{selectionLabel}</strong>
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={() => {
+                    setTab("canvas");
+                    setPreviewReturn((value) => value + 1);
+                  }}
+                >
+                  {t(
+                    "Show selection in preview",
+                    "Auswahl in der Vorschau zeigen",
+                  )}
+                </button>
+              </div>
+              <h3 className="inspector-group-title">
+                {t("Content", "Inhalt")}
+              </h3>
               {photo ? (
                 <>
                   {photoModule && (
@@ -1073,8 +1181,8 @@ export function ModularEditor() {
                   {photoModule && (
                     <p className="inspector-note">
                       {t(
-                        "Crop adjustments apply only to this module. Titles and alternative descriptions belong to the source photograph.",
-                        "Zuschnittänderungen gelten nur für dieses Modul. Titel und alternative Beschreibungen gehören zum Ausgangsfoto.",
+                        "Crop adjustments apply only to this image placement, including when the same source is used again. Titles and descriptions belong to the source photograph.",
+                        "Zuschnittänderungen gelten nur für diese Bildverwendung, auch bei mehrfach verwendeter Quelle. Titel und Beschreibungen gehören zum Ausgangsfoto.",
                       )}
                     </p>
                   )}
@@ -1163,47 +1271,6 @@ export function ModularEditor() {
                 </Field>
               ) : (
                 <>
-                  {module && (
-                    <div className="module-tools">
-                      <button
-                        disabled={moduleIndex === 0}
-                        aria-label={t("Move up", "Nach oben")}
-                        onClick={() => reorder(module.id, -1)}
-                      >
-                        <ArrowUp size={17} />
-                      </button>
-                      <button
-                        disabled={
-                          moduleIndex ===
-                          j.chapters.filter(
-                            (c) =>
-                              (c.layout?.parent_id || null) ===
-                              (module.layout?.parent_id || null),
-                          ).length -
-                            1
-                        }
-                        aria-label={t("Move down", "Nach unten")}
-                        onClick={() => reorder(module.id, 1)}
-                      >
-                        <ArrowDown size={17} />
-                      </button>
-                      <button
-                        aria-label={t("Duplicate module", "Modul duplizieren")}
-                        onClick={() => duplicate(module)}
-                      >
-                        <Copy size={17} />
-                      </button>
-                      <button
-                        aria-label={t(
-                          "Remove module; photographs are preserved",
-                          "Modul entfernen; Fotos bleiben erhalten",
-                        )}
-                        onClick={() => remove(module.id)}
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </div>
-                  )}
                   {!module && (
                     <button
                       className="button button-outline cover-replace-button"
@@ -1218,40 +1285,6 @@ export function ModularEditor() {
                         "Titelbild auswählen / hochladen",
                       )}
                     </button>
-                  )}
-                  <AppearanceSettings
-                    layout={layout}
-                    edition={
-                      module?.layout?.edition &&
-                      module.layout.edition !== "inherit"
-                        ? module.layout.edition
-                        : j.story_template
-                    }
-                    inherited={
-                      module &&
-                      (!module.layout?.edition ||
-                        module.layout.edition === "inherit")
-                        ? j.layout?.background
-                        : undefined
-                    }
-                    onChange={(p) => layoutChange(module?.id ?? null, p)}
-                  />
-                  {!module && (
-                    <label className="check-field">
-                      <input
-                        type="checkbox"
-                        checked={j.layout?.text_animations !== false}
-                        onChange={(e) =>
-                          layoutChange(null, {
-                            text_animations: e.target.checked,
-                          })
-                        }
-                      />
-                      {t(
-                        "Allow individual text animations",
-                        "Individuelle Textanimationen zulassen",
-                      )}
-                    </label>
                   )}
                   <Field label={t("Title", "Titel")}>
                     <input
@@ -1318,55 +1351,6 @@ export function ModularEditor() {
                           />
                         </Field>
                       )}
-                      {module.kind !== "chapter" && (
-                        <Field
-                          label={t("Inside a day", "Innerhalb eines Tages")}
-                        >
-                          <select
-                            value={module.layout?.parent_id || ""}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                parent_id: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                          >
-                            <option value="">
-                              {t("Journey level", "Reiseebene")}
-                            </option>
-                            {j.chapters
-                              .filter(
-                                (c) =>
-                                  c.kind === "chapter" && !c.layout?.parent_id,
-                              )
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.title}
-                                </option>
-                              ))}
-                          </select>
-                        </Field>
-                      )}
-                      <Field label={t("Design world", "Gestaltungswelt")}>
-                        <select
-                          value={module.layout?.edition || "inherit"}
-                          onChange={(e) =>
-                            layoutChange(module.id, {
-                              edition: e.target.value as Layout["edition"],
-                            })
-                          }
-                        >
-                          <option value="inherit">
-                            {t(
-                              "Inherit journey edition",
-                              "Edition der Reise übernehmen",
-                            )}
-                          </option>
-                          <option value="quiet-atlas">Quiet Atlas</option>
-                          <option value="after-hours">After Hours</option>
-                        </select>
-                      </Field>
                     </>
                   ) : (
                     <>
@@ -1448,88 +1432,6 @@ export function ModularEditor() {
                       </Field>
                     </>
                   )}
-                  {(!module || module.kind === "hero") && (
-                    <>
-                      <Field label={t("Title composition", "Titelkomposition")}>
-                        <select
-                          value={layout.title_style || "overlay"}
-                          onChange={(e) =>
-                            layoutChange(module?.id ?? null, {
-                              title_style: e.target
-                                .value as Layout["title_style"],
-                            })
-                          }
-                        >
-                          <option value="overlay">
-                            {t("Over the image", "Auf dem Bild")}
-                          </option>
-                          <option value="overlap">
-                            {t("Compact overlap", "Kompakte Überlappung")}
-                          </option>
-                          <option value="below">
-                            {t("Close to the image", "Bildnah darunter")}
-                          </option>
-                        </select>
-                      </Field>
-                      <Field label={t("Heading size", "Überschriftengröße")}>
-                        <input
-                          type="range"
-                          min={28}
-                          max={160}
-                          value={layout.title_size || 100}
-                          onChange={(e) =>
-                            layoutChange(module?.id ?? null, {
-                              title_size: Number(e.target.value),
-                            })
-                          }
-                        />
-                      </Field>
-                      <label className="check-field">
-                        <input
-                          type="checkbox"
-                          checked={layout.parallax ?? true}
-                          onChange={(e) =>
-                            layoutChange(module?.id ?? null, {
-                              parallax: e.target.checked,
-                            })
-                          }
-                        />
-                        {t(
-                          "Subtle cover parallax",
-                          "Dezentes Titelbild-Parallax",
-                        )}
-                      </label>
-                      {(layout.parallax ?? true) && (
-                        <Field
-                          label={t(
-                            "Cover parallax strength",
-                            "Stärke des Titelbild-Parallax",
-                          )}
-                        >
-                          <input
-                            type="range"
-                            min="20"
-                            max="140"
-                            step="5"
-                            value={layout.parallax_intensity ?? 90}
-                            onChange={(e) =>
-                              layoutChange(module?.id ?? null, {
-                                parallax_intensity: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </Field>
-                      )}
-                    </>
-                  )}
-                  {(!module || !["text", "quote"].includes(module.kind)) && (
-                    <HoverZoomControl
-                      value={layout.hover_zoom}
-                      onChange={(hover_zoom) =>
-                        layoutChange(module?.id ?? null, { hover_zoom })
-                      }
-                    />
-                  )}
                   {module && !["text", "quote"].includes(module.kind) && (
                     <>
                       <ModulePhotographs
@@ -1581,6 +1483,166 @@ export function ModularEditor() {
                           onBusy={setUploadBusy}
                         />
                       )}
+                    </>
+                  )}
+                  {!module && (
+                    <details className="inspector-section">
+                      <summary>{t("Story text", "Reisetexte")}</summary>
+                      {(
+                        [
+                          "introduction",
+                          "reflection",
+                          "closing",
+                          "description",
+                        ] as const
+                      ).map((key, i) => (
+                        <Field
+                          key={key}
+                          label={
+                            [
+                              t("Introduction", "Einleitung"),
+                              t("Reflection", "Rückblick"),
+                              t("Closing", "Abschluss"),
+                              t(
+                                "Archive description",
+                                "Beschreibung im Archiv",
+                              ),
+                            ][i]
+                          }
+                        >
+                          <textarea
+                            rows={3}
+                            maxLength={
+                              key === "introduction"
+                                ? 20000
+                                : key === "closing"
+                                  ? 5000
+                                  : 2000
+                            }
+                            value={j[key]}
+                            onChange={(e) => change({ [key]: e.target.value })}
+                          />
+                        </Field>
+                      ))}
+                    </details>
+                  )}
+                  <h3 className="inspector-group-title">
+                    {t("Layout & typography", "Layout & Typografie")}
+                  </h3>
+                  {module && (
+                    <details className="inspector-section">
+                      <summary>
+                        {t("Edition & placement", "Edition & Einordnung")}
+                      </summary>
+                      {module.kind !== "chapter" && (
+                        <Field
+                          label={t("Inside a day", "Innerhalb eines Tages")}
+                        >
+                          <select
+                            value={module.layout?.parent_id || ""}
+                            onChange={(e) =>
+                              layoutChange(module.id, {
+                                parent_id: e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              })
+                            }
+                          >
+                            <option value="">
+                              {t("Journey level", "Reiseebene")}
+                            </option>
+                            {j.chapters
+                              .filter(
+                                (c) =>
+                                  c.kind === "chapter" && !c.layout?.parent_id,
+                              )
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.title}
+                                </option>
+                              ))}
+                          </select>
+                        </Field>
+                      )}
+                      <Field label={t("Design world", "Gestaltungswelt")}>
+                        <select
+                          value={module.layout?.edition || "inherit"}
+                          onChange={(e) =>
+                            layoutChange(module.id, {
+                              edition: e.target.value as Layout["edition"],
+                            })
+                          }
+                        >
+                          <option value="inherit">
+                            {t(
+                              "Inherit journey edition",
+                              "Edition der Reise übernehmen",
+                            )}
+                          </option>
+                          <option value="quiet-atlas">Quiet Atlas</option>
+                          <option value="after-hours">After Hours</option>
+                        </select>
+                      </Field>{" "}
+                    </details>
+                  )}
+                  <AppearanceSettings
+                    moduleScope={!!module}
+                    layout={layout}
+                    edition={
+                      module?.layout?.edition &&
+                      module.layout.edition !== "inherit"
+                        ? module.layout.edition
+                        : j.story_template
+                    }
+                    inherited={
+                      module &&
+                      (!module.layout?.edition ||
+                        module.layout.edition === "inherit")
+                        ? j.layout?.background
+                        : undefined
+                    }
+                    onChange={(p) => layoutChange(module?.id ?? null, p)}
+                  />
+                  {(!module || module.kind === "hero") && (
+                    <>
+                      <Field label={t("Title composition", "Titelkomposition")}>
+                        <select
+                          value={layout.title_style || "overlay"}
+                          onChange={(e) =>
+                            layoutChange(module?.id ?? null, {
+                              title_style: e.target
+                                .value as Layout["title_style"],
+                            })
+                          }
+                        >
+                          <option value="overlay">
+                            {t("Over the image", "Auf dem Bild")}
+                          </option>
+                          <option value="overlap">
+                            {t("Compact overlap", "Kompakte Überlappung")}
+                          </option>
+                          <option value="below">
+                            {t("Close to the image", "Bildnah darunter")}
+                          </option>
+                        </select>
+                      </Field>
+                      <Field label={t("Heading size", "Überschriftengröße")}>
+                        <input
+                          type="range"
+                          min={28}
+                          max={160}
+                          value={layout.title_size || 100}
+                          onChange={(e) =>
+                            layoutChange(module?.id ?? null, {
+                              title_size: Number(e.target.value),
+                            })
+                          }
+                        />
+                      </Field>
+                    </>
+                  )}
+                  {module && !["text", "quote"].includes(module.kind) && (
+                    <>
                       <details className="inspector-section" open>
                         <summary>
                           {t("Layout & spacing", "Layout & Abstände")}
@@ -1720,63 +1782,143 @@ export function ModularEditor() {
                       <TypographySettings
                         open={["text", "quote"].includes(module.kind)}
                         layout={layout}
+                        background={
+                          layout.background ||
+                          (layout.edition && layout.edition !== "inherit"
+                            ? editionColors[layout.edition]
+                            : j.layout?.background ||
+                              editionColors[j.story_template])
+                        }
                         onChange={(p) => layoutChange(module.id, p)}
                       />
                     )}
-                  {module && (
-                    <MotionControl
-                      allowParallax={!["text", "quote"].includes(module.kind)}
-                      inherit={false}
-                      value={module.reveal || { effect: "none" }}
-                      label={t("Module motion", "Modulbewegung")}
-                      text={module.story || module.title}
-                      onChange={(v) => {
-                        moduleChange(module.id, { reveal: v });
-                        setReplay((r) => r + 1);
-                      }}
-                    />
-                  )}
-                  {!module && (
-                    <details className="inspector-section">
-                      <summary>{t("Story text", "Reisetexte")}</summary>
-                      {(
-                        [
-                          "introduction",
-                          "reflection",
-                          "closing",
-                          "description",
-                        ] as const
-                      ).map((key, i) => (
-                        <Field
-                          key={key}
-                          label={
-                            [
-                              t("Introduction", "Einleitung"),
-                              t("Reflection", "Rückblick"),
-                              t("Closing", "Abschluss"),
-                              t(
-                                "Archive description",
-                                "Beschreibung im Archiv",
-                              ),
-                            ][i]
+                  <details className="inspector-section">
+                    <summary>
+                      {t("Movement & details", "Bewegung & Details")}
+                    </summary>
+                    {!module && (
+                      <label className="check-field">
+                        <input
+                          type="checkbox"
+                          checked={j.layout?.text_animations !== false}
+                          onChange={(e) =>
+                            layoutChange(null, {
+                              text_animations: e.target.checked,
+                            })
                           }
-                        >
-                          <textarea
-                            rows={3}
-                            maxLength={
-                              key === "introduction"
-                                ? 20000
-                                : key === "closing"
-                                  ? 5000
-                                  : 2000
+                        />
+                        {t(
+                          "Allow individual text animations",
+                          "Individuelle Textanimationen zulassen",
+                        )}
+                      </label>
+                    )}
+                    {(!module || module.kind === "hero") && (
+                      <>
+                        <label className="check-field">
+                          <input
+                            type="checkbox"
+                            checked={layout.parallax ?? true}
+                            onChange={(e) =>
+                              layoutChange(module?.id ?? null, {
+                                parallax: e.target.checked,
+                              })
                             }
-                            value={j[key]}
-                            onChange={(e) => change({ [key]: e.target.value })}
                           />
-                        </Field>
-                      ))}
-                    </details>
-                  )}
+                          {t(
+                            "Subtle cover parallax",
+                            "Dezentes Titelbild-Parallax",
+                          )}
+                        </label>
+                        {(layout.parallax ?? true) && (
+                          <Field
+                            label={t(
+                              "Cover parallax strength",
+                              "Stärke des Titelbild-Parallax",
+                            )}
+                          >
+                            <input
+                              type="range"
+                              min="20"
+                              max="140"
+                              step="5"
+                              value={layout.parallax_intensity ?? 90}
+                              onChange={(e) =>
+                                layoutChange(module?.id ?? null, {
+                                  parallax_intensity: Number(e.target.value),
+                                })
+                              }
+                            />
+                          </Field>
+                        )}
+                      </>
+                    )}
+                    {(!module || !["text", "quote"].includes(module.kind)) && (
+                      <HoverZoomControl
+                        value={layout.hover_zoom}
+                        onChange={(hover_zoom) =>
+                          layoutChange(module?.id ?? null, { hover_zoom })
+                        }
+                      />
+                    )}
+                    {module && (
+                      <MotionControl
+                        allowParallax={!["text", "quote"].includes(module.kind)}
+                        inherit={false}
+                        value={module.reveal || { effect: "none" }}
+                        label={t("Module motion", "Modulbewegung")}
+                        text={module.story || module.title}
+                        onChange={(v) => {
+                          moduleChange(module.id, { reveal: v });
+                          setReplay((r) => r + 1);
+                        }}
+                      />
+                    )}
+                    {module && (
+                      <div className="module-tools">
+                        <button
+                          disabled={moduleIndex === 0}
+                          aria-label={t("Move up", "Nach oben")}
+                          onClick={() => reorder(module.id, -1)}
+                        >
+                          <ArrowUp size={17} />
+                        </button>
+                        <button
+                          disabled={
+                            moduleIndex ===
+                            j.chapters.filter(
+                              (c) =>
+                                (c.layout?.parent_id || null) ===
+                                (module.layout?.parent_id || null),
+                            ).length -
+                              1
+                          }
+                          aria-label={t("Move down", "Nach unten")}
+                          onClick={() => reorder(module.id, 1)}
+                        >
+                          <ArrowDown size={17} />
+                        </button>
+                        <button
+                          aria-label={t(
+                            "Duplicate module",
+                            "Modul duplizieren",
+                          )}
+                          onClick={() => duplicate(module)}
+                        >
+                          <Copy size={17} />
+                        </button>
+                        <button
+                          aria-label={t(
+                            "Remove module; photographs are preserved",
+                            "Modul entfernen; Fotos bleiben erhalten",
+                          )}
+                          onClick={() => remove(module.id)}
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    )}
+                  </details>
                 </>
               )}
             </div>
@@ -1798,6 +1940,7 @@ export function ModularEditor() {
             <button
               key={id}
               className={tab === id ? "active" : ""}
+              aria-current={tab === id ? "page" : undefined}
               onClick={() => setTab(id)}
             >
               <Icon size={18} />

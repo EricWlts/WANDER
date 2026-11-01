@@ -2303,3 +2303,93 @@ textarea:focus-visible,
     padding-top: 24px;
   }
 }
+
+/* W10: task order and persistent selection context in the existing inspector. */
+.inspector-selection {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+  overflow-wrap: anywhere;
+}
+.inspector-selection > span,
+.inspector-group-title {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.inspector-selection strong {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.inspector-group-title {
+  margin: 24px 0 16px;
+}
+.canvas-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+.module-inspector .text-link,
+.module-inspector summary {
+  min-height: 44px;
+}
+.module-inspector summary {
+  align-content: center;
+}
+.module-inspector .contrast-note {
+  border-left: 2px solid currentColor;
+  padding: 8px 12px;
+  color: var(--ink);
+}
+.module-inspector {
+  scroll-padding-block: 24px;
+}
+@supports (height: 100dvh) {
+  .module-inspector {
+    max-height: calc(100dvh - 88px);
+  }
+}
+@media (max-width: 760px) {
+  .modular-studio {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+  .editor-bar {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+  .module-inspector {
+    max-height: none;
+    padding-bottom: 48px;
+  }
+  .module-inspector input,
+  .module-inspector textarea,
+  .module-inspector select {
+    scroll-margin-block: 160px;
+  }
+  .inspector-body {
+    padding: 24px 22px;
+  }
+  .canvas-selection {
+    padding-inline: 10px;
+  }
+  .studio-mobile-tabs {
+    gap: 4px;
+    padding-inline: max(8px, env(safe-area-inset-left))
+      max(8px, env(safe-area-inset-right));
+  }
+  .studio-mobile-tabs button {
+    padding-inline: 12px;
+  }
+  .editor-actions .button,
+  .editor-actions .editor-mode {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

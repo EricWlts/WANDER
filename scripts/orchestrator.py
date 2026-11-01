@@ -166,27 +166,36 @@ def usage_from_log(path):
     usage = {"input_tokens": "unknown", "output_tokens": "unknown", "total_tokens": "unknown",
              "cached_input_tokens": "unknown", "reasoning_output_tokens": "unknown"}
     try:
+        events = []
         for line in path.read_text(errors="replace").splitlines():
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
-            if event.get("type") not in {"turn.completed", "response.completed"}:
-                continue
-            info = event.get("usage") or event.get("response", {}).get("usage") or {}
-            mapping = {"input_tokens": "input_tokens", "output_tokens": "output_tokens",
-                       "total_tokens": "total_tokens", "cached_input_tokens": "cached_input_tokens",
-                       "reasoning_output_tokens": "reasoning_output_tokens"}
-            for target, source in mapping.items():
-                value = info.get(source)
-                if isinstance(value, int) and value >= 0:
-                    usage[target] = value
-            details = info.get("input_tokens_details", {})
-            if usage["cached_input_tokens"] == "unknown" and isinstance(details.get("cached_tokens"), int):
-                usage["cached_input_tokens"] = details["cached_tokens"]
-            details = info.get("output_tokens_details", {})
-            if usage["reasoning_output_tokens"] == "unknown" and isinstance(details.get("reasoning_tokens"), int):
-                usage["reasoning_output_tokens"] = details["reasoning_tokens"]
+            if isinstance(event, dict):
+                events.append(event)
+        # Codex reports per-turn usage. Prefer these over response events to avoid
+        # counting the same response twice if both event families are present.
+        turns = [e for e in events if e.get("type") == "turn.completed"]
+        completed = turns or [e for e in events if e.get("type") == "response.completed"]
+        counts = {key: [] for key in usage}
+        for event in completed:
+            response = event.get("response")
+            info = event.get("usage") or (response.get("usage") if isinstance(response, dict) else {})
+            info = info if isinstance(info, dict) else {}
+            values = dict(info)
+            for field, details_field, nested in (
+                    ("cached_input_tokens", "input_tokens_details", "cached_tokens"),
+                    ("reasoning_output_tokens", "output_tokens_details", "reasoning_tokens")):
+                details = info.get(details_field)
+                if field not in values and isinstance(details, dict):
+                    values[field] = details.get(nested)
+            for key in counts:
+                value = values.get(key)
+                counts[key].append(value if type(value) is int and value >= 0 else None)
+        for key, values in counts.items():
+            if values and all(value is not None for value in values):
+                usage[key] = sum(values)
     except OSError:
         pass
     return usage
@@ -431,18 +440,26 @@ def main(argv=None):
     parser.add_argument("--allow", action="append", default=[], help="Erlaubte Datei relativ zum Projekt; wiederholbar")
     parser.add_argument("--timeout", type=int, default=600, help="Sekunden je Worker/Prüfung (1–3600)")
     parser.add_argument("--dry-run", action="store_true", help="Nur Plan ausgeben; keine Aufrufe oder Schreibzugriffe")
+    parser.add_argument("--auto", action="store_true", help="Sichere automatische Analyse/Planung; noch keine Coding-Ausführung")
+    parser.add_argument("--max-calls", type=int, default=2, help="Aufruflimit der automatischen Planung (1–2)")
+    parser.add_argument("--max-tokens", type=int, default=20000, help="Beobachtetes Tokenlimit zwischen Planungsaufrufen")
     parser.add_argument("--review", metavar="LAUF", help="Diff eines Laufs anzeigen (Pfad oder Lauf-ID)")
     parser.add_argument("--apply", metavar="LAUF", help="Diff prüfen und nach Bestätigung übernehmen")
     parser.add_argument("--file", action="append", default=[], help="Bei Review/Apply einzelne freigegebene Datei auswählen")
     args = parser.parse_args(argv)
     try:
         if args.review or args.apply:
+            if args.auto:
+                raise Stop("--auto kann nicht mit Review/Apply kombiniert werden.")
             run_arg = args.review or args.apply
             run = Path(run_arg)
             if not run.is_absolute():
                 run = ROOT / "artifacts" / "orchestrator" / run
             review_run(run, apply=bool(args.apply), selected=args.file or None)
             return 0
+        if args.auto:
+            import orchestrator_planning
+            return orchestrator_planning.plan(args, sys.modules[__name__])
         if not args.task or not args.allow:
             raise Stop("Aufgabe und mindestens ein --allow sind erforderlich.")
         if not args.task.strip() or not 1 <= args.timeout <= 3600:
@@ -459,7 +476,7 @@ def main(argv=None):
                               "review": "Isolierte Kopie; keine automatische Übernahme."}, indent=2, ensure_ascii=False))
             return 0
         return execute(args, model, allowed, rules)
-    except (Stop, OSError) as exc:
+    except (Stop, OSError, subprocess.SubprocessError) as exc:
         print("STOP: " + str(exc), file=sys.stderr)
         return 1
 

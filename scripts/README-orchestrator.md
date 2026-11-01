@@ -4,7 +4,90 @@ Python 3 mit Standardbibliothek, POSIX (macOS/Linux), installierte und angemelde
 Codex CLI, Git, npm sowie bereits installierte Projektabhängigkeiten erforderlich.
 Keine API-Integration, keine Installation zusätzlicher Abhängigkeiten.
 
-## Sicher beginnen
+## Automatische Analyse und Planung (erste sichere Ausbaustufe)
+
+`--auto` nimmt eine natürliche Anforderung entgegen und erstellt einen überprüfbaren
+Plan. **Diese Version startet im Auto-Modus keine Coding-Worker.** Sie implementiert
+bewusst die sichere erste Stufe; automatische Ausführung ist noch nicht freigeschaltet.
+Der bisherige manuelle Runner mit `--allow`, `--review` und `--apply` bleibt verfügbar.
+
+Erster kostenloser Test, ohne Modellaufruf und ohne Schreibzugriffe:
+
+```sh
+python3 -B scripts/orchestrator.py "Analysiere T7 aus TASKS.md und plane die Umsetzung" --auto --dry-run
+```
+
+Ohne vorhandenen Cache zeigt Dry-Run die geplante Pipeline und `analysis_pending`.
+Ein konkreter semantischer Plan kann ohne KI-Aufruf nicht vorweggenommen werden.
+Mit Cache zeigt derselbe Befehl die bereits validierte Aufgabenliste und Worker-Prompts.
+Um erstmals tatsächlich zu analysieren (kann Kontingent verbrauchen):
+
+```sh
+python3 -B scripts/orchestrator.py "Analysiere T7 aus TASKS.md und plane die Umsetzung" --auto --max-calls 2 --max-tokens 20000
+```
+
+Ablauf und Grenzen:
+
+- Luna Low untersucht gezielt relevante Dateien in einer isolierten Kopie der sicheren,
+  Git-erfassten Arbeitsdateien. Die Kopie enthält den Projektstand; Dateien werden nicht
+  vollständig in den Prompt eingebettet. Unversionierte Dateien, Dependencies und durch
+  den bestehenden Pfadfilter ausgeschlossene Dateien gehören nicht zur Analysequelle.
+  Bestehende Funktionen, Risiken, Aufgaben, Pfade, Akzeptanz und Prüfungen werden als JSON
+  ausgegeben und unabhängig von der CLI lokal streng validiert.
+- Astra Low startet ausschließlich zur Planung, wenn die Analyse `architecture`, `large`
+  oder `coupled` meldet, mehr als drei Aufgaben oder vier Zieldateien nennt oder die
+  bestehende Architekturregel im Nutzerauftrag greift (z. B. Mehrbenutzer/Cloudhosting).
+  Kleine lokale Aufgaben überspringen Astra. Maximal ein Astra-Aufruf, kein automatisches
+  höheres Reasoning und kein Coding durch Astra. Modellverfügbarkeit wird nicht durch
+  einen kostenpflichtigen Probeaufruf geprüft; ein Zugriffsfehler stoppt ohne Ersatzmodell.
+- Die Aufgabe eines Workers wird deterministisch vorgeschlagen: Risikoregeln aus dem
+  bisherigen Runner, `risky` oder `complex` → Sol Medium; `local` mit höchstens zwei
+  Dateien bzw. bestehender Low-Regel → Luna Low; sonst Luna Medium. Modell und Begründung
+  stehen pro Aufgabe im Bericht. Dies sind konservative Regeln, keine verlässliche
+  semantische Risikobewertung. Die menschliche Prüfung bleibt erforderlich.
+- Abhängigkeiten werden vorwärts aufgelöst; doppelte IDs, unbekannte Abhängigkeiten und
+  Zyklen stoppen. Höchstens acht Arbeitspakete. Worker-Prompts enthalten Ziel, Dateien,
+  Kriterien, Prüfungen, Randbedingungen und Abbruchregeln. Tests sind nur feste Kategorien
+  (`frontend`, `build`, `backend`, `manual`), keine ausführbaren Agentenbefehle.
+- Pfade müssen kanonisch, relativ und sicher sein. Bestehende Lesepfade müssen im
+  kopierten Git-Inventar vorkommen. Neue Zieldateien sind nur mit bekanntem Elternpfad
+  und ausgewählter Quell-/Dokumentationsendung als Vorschlag erlaubt. Globs, Traversal,
+  Secrets und unbekannte Lesedateien werden abgewiesen. **Kein Vorschlag wird zu einer
+  Schreibfreigabe.** `--auto` lässt sich nicht mit `--allow` oder Review/Apply kombinieren.
+- Beide Agenten nutzen `read-only`, keine Sandbox-Eskalation, keine weiteren Agenten,
+  ignorierte Benutzerkonfiguration und Exec-Regeln sowie getrennte kurzlebige Sitzungen.
+  Die bestehende CLI-Anmeldung bleibt erhalten. Hashprüfungen erkennen Änderungen an
+  Kopie oder Original. Der gemeinsame Runner-Lock verhindert parallele echte Läufe.
+  Sandbox und Hashprüfungen ersetzen keine zusätzliche Betriebssystemisolation gegen
+  absichtlich bösartige Prozesse; ein nachträglicher Hashvergleich rollt nichts zurück.
+- `--max-calls` (1–2, Standard 2) begrenzt Modellaufrufe pro Planung. `--max-tokens`
+  (Standard 20000) stoppt **nach beobachtetem Verbrauch weitere Aufrufe**. Unbekannte
+  Usage stoppt ebenfalls einen weiteren Aufruf. Ein einzelner CLI-Aufruf kann das Limit
+  überschreiten; keine harte Token-, Euro- oder Kontingentgarantie. Cache-/Reasoning-Tokens
+  werden nicht zusätzlich zu Input/Output doppelt gezählt.
+- `report.json` protokolliert Phase, Modell, Reasoning und Input-, Cache-, Output-, Total-
+  und Reasoning-Tokens, soweit geliefert; sonst `unknown`. Usage mehrerer CLI-Turns wird
+  summiert. Budgetdaten bleiben auch bei Fehlern erhalten. Es gibt keine Kostenschätzung.
+- Validierte Pläne werden nach exakter Anforderung, Hashes aller sicheren Git-Dateien und
+  Planerversion gecacht. Gleicher Stand wiederholt keine Analyse. Änderungen an erfassten
+  Dateien invalidieren den Cache; unversionierte Dateien werden weiterhin nicht berücksichtigt.
+  Cachedateien stehen unter `artifacts/orchestrator/plan-<Hash>.json`, vollständige
+  Planungsberichte unter `artifacts/orchestrator/<ID>/report.json`.
+  Ein ungültiger Cache stoppt und muss manuell entfernt werden. Er ist eine lokale,
+  vertrauenswürdige Laufzeitdatei, keine signierte Freigabe für Ausführung.
+- `unclear` erzeugt `needs_clarification`; andere erfolgreiche Pläne `planning_only`.
+  Planungsberichte können nicht über `--apply` übernommen werden. Ohne gültigen Plan,
+  bei Prozessfehlern oder Budgetabbruch gibt es keinen Retry und keinen verwendbaren Cache.
+
+Noch offen für die nächste Ausbaustufe: unabhängig geprüfte automatische Dateifreigaben,
+serielle Coding-Ausführung mehrerer Arbeitspakete in einer gemeinsamen isolierten Kopie,
+Testausführung pro Paket mit höchstens einem Reparaturversuch und budgetierte Sol-Eskalation.
+Bis dahin Aufgaben einzeln prüfen und über den manuellen Runner mit explizitem `--allow`
+ausführen. Dessen bisherige Grenzen gelten weiter, insbesondere Sol-Bestätigung und
+sofortiger Stopp nach fehlgeschlagenen Tests. Es gibt keine automatische Übernahme,
+keine Commits, Pushes oder Deployments.
+
+## Manuell sicher beginnen
 
 Im Projektverzeichnis, ausschließlich planen (keine KI-Aufrufe, keine Dateiänderungen):
 
@@ -29,7 +112,7 @@ AGENTS.md, ARCHITECTURE.md und TASKS.md müssen vorhanden und in Git erfasst sei
 
 ## Regeln und Grenzen
 
-- Kein KI-Routing: Architektur-/Astra-/Mehrbenutzer-/Cloudhosting-Aufträge stoppen.
+- Im manuellen Modus kein KI-Routing: Architektur-/Astra-/Mehrbenutzer-/Cloudhosting-Aufträge stoppen.
   Recovery, Autosave, Merge, gekoppelte Zustände, Composition, Veröffentlichung,
   Auth/CSRF, Datenbank/Migration und Backendpfade → `gpt-6.1-sol / medium`.
   T4/T6, Tippfehler, README/Dokumentation oder ausdrücklich lokale Testergänzungen
@@ -38,7 +121,7 @@ AGENTS.md, ARCHITECTURE.md und TASKS.md müssen vorhanden und in Git erfasst sei
   Risikoregeln haben Vorrang. Diese Heuristik ist keine semantische Sicherheitsanalyse;
   Aufgabe und Dry-Run-Plan manuell prüfen.
 - Sol erfordert vor jedem Aufruf interaktiv die Eingabe `SOL`, auch bei direktem
-  Routing. Keine Bestätigungs-Bypassoption. Astra wird niemals gestartet.
+  Routing. Keine Bestätigungs-Bypassoption. Im manuellen Modus wird Astra niemals gestartet.
 - Ein systemweiter Dateilock pro Projekt verhindert parallele Orchestratorläufe.
   Höchstens drei serielle Workeraufrufe: Start, insgesamt ein Reparaturversuch und
   eine Eskalation an Sol. Nur eindeutige strukturierte Workerantworten
@@ -105,8 +188,8 @@ keine Git-Aktion aus.
 ## Offline prüfen
 
 ```sh
-python3 -B -c 'from pathlib import Path; [compile(p.read_text(), str(p), "exec") for p in (Path("scripts/orchestrator.py"), Path("scripts/test_orchestrator.py"))]'
-python3 -B -m unittest discover -s scripts -p 'test_orchestrator.py' -v
+python3 -B -c 'from pathlib import Path; [compile(p.read_text(), str(p), "exec") for p in (Path("scripts/orchestrator.py"), Path("scripts/test_orchestrator.py"), Path("scripts/orchestrator_planning.py"), Path("scripts/test_orchestrator_planning.py"))]'
+python3 -B -m unittest discover -s scripts -p 'test_orchestrator*.py' -v
 ```
 
 Die Tests verwenden Mocks und lokale Python-Schlafprozesse zur Timeoutprüfung;
@@ -116,3 +199,7 @@ CLI-Referenz: [Offizielle OpenAI-Dokumentation](https://learn.chatgpt.com/docs/d
 Die verwendeten Flags wurden zusätzlich mit der installierten `codex exec --help`
 geprüft. Verfügbarkeit der Modellnamen hängt von der lokalen Codex-Anmeldung ab;
 ein nicht verfügbares Modell stoppt den Lauf, ohne automatischen Ersatz.
+
+Modell-IDs: [Offizielle Modellübersicht](https://developers.openai.com/api/docs/models).
+CLI 0.166.0 wurde lokal über `codex --help` und `codex exec --help` geprüft;
+der Auto-Modus prüft benötigte Exec-Flags vor echten Planungsaufrufen erneut.

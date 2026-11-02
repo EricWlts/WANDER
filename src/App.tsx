@@ -1,5 +1,8 @@
 import { tr } from "./I18n";
 import {
+  Component,
+  Suspense,
+  lazy,
   createContext,
   useContext,
   useRef,
@@ -13,9 +16,21 @@ import { LanguageSwitch, useLocale } from "./I18n";
 import { api, json } from "./api";
 import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
-import { Studio, JourneyEditor, GuidedEditor, NewJourney } from "./Studio";
 import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
 import { closeNavigationOnEscape } from "./mobileNavigation";
+
+type StudioPageName =
+  "Studio" | "NewJourney" | "JourneyEditor" | "GuidedEditor";
+// Share one cached lazy import across studio routes to avoid another loading
+// fallback when moving between exports of the already loaded module.
+const StudioPage = lazy(() =>
+  import("./Studio").then((module) => ({
+    default: ({ page }: { page: StudioPageName }) => {
+      const Page = module[page];
+      return <Page />;
+    },
+  })),
+);
 interface AppContextType {
   authenticated: boolean;
   ready: boolean;
@@ -85,13 +100,22 @@ export default function App() {
         <Route path="/archive" element={<Archive />} />
         <Route path="/about" element={<About />} />
         <Route path="/journeys/:slug" element={<JourneyStory />} />
-        <Route path="/studio" element={<Studio />} />
+        <Route path="/studio" element={<StudioRoute page="Studio" />} />
         <Route path="/inspiration" element={<Inspiration />} />
         <Route path="/inspiration/:templateId" element={<ExampleStory />} />
-        <Route path="/studio/new" element={<NewJourney />} />
-        <Route path="/studio/:slug/edit" element={<JourneyEditor />} />
-        <Route path="/studio/:slug" element={<JourneyEditor />} />
-        <Route path="/studio/:slug/setup" element={<GuidedEditor />} />
+        <Route path="/studio/new" element={<StudioRoute page="NewJourney" />} />
+        <Route
+          path="/studio/:slug/edit"
+          element={<StudioRoute page="JourneyEditor" />}
+        />
+        <Route
+          path="/studio/:slug"
+          element={<StudioRoute page="JourneyEditor" />}
+        />
+        <Route
+          path="/studio/:slug/setup"
+          element={<StudioRoute page="GuidedEditor" />}
+        />
         <Route
           path="*"
           element={
@@ -118,6 +142,49 @@ export default function App() {
         </div>
       )}
     </AppContext.Provider>
+  );
+}
+// Only studio failures replace the route content; header, footer and public routes
+// stay outside this boundary. A full reload retries a rejected lazy import.
+class StudioErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    if (this.state.failed) {
+      return (
+        <PageState
+          title={tr(
+            "The studio could not be opened.",
+            "Das Studio konnte nicht geöffnet werden.",
+          )}
+          text={tr(
+            "Reload to try again. Local recovery drafts remain in this browser; changes not yet saved may be lost.",
+            "Lade die Seite neu, um es erneut zu versuchen. Lokale Wiederherstellungsentwürfe bleiben in diesem Browser; noch nicht gesicherte Änderungen können verloren gehen.",
+          )}
+        >
+          <button className="button" onClick={() => window.location.reload()}>
+            {tr("Reload the studio", "Studio neu laden")}
+          </button>
+        </PageState>
+      );
+    }
+    return this.props.children;
+  }
+}
+function StudioRoute({ page }: { page: StudioPageName }) {
+  const { pathname } = useLocation();
+  // Moving to another studio URL clears a previous route failure.
+  return (
+    <StudioErrorBoundary key={pathname}>
+      <Suspense fallback={<PageState title={tr("Opening the studio…")} />}>
+        <StudioPage page={page} />
+      </Suspense>
+    </StudioErrorBoundary>
   );
 }
 function Header() {

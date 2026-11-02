@@ -88,23 +88,31 @@ export function Inspiration() {
         ))}
       </div>
       <div className="edition-grid" data-active={edition}>
-        {templates.map((template, index) => (
+        {templates.map((template) => (
           <article
             key={template.id}
             className={`edition-card edition-${template.id}`}
           >
             <Link to={`/inspiration/${template.id}`} className="edition-cover">
               <img
-                src="/images/forest-1280.webp"
+                src={template.cover}
+                width={1280}
+                height={template.id === "quiet-atlas" ? 960 : 854}
                 alt={
-                  t("Edition preview", "Editionsvorschau") +
-                  ": " +
-                  template.name
+                  template.id === "quiet-atlas"
+                    ? t("A sunlit woodland path", "Ein heller Waldweg")
+                    : t(
+                        "A figure walking among trees in warm light",
+                        "Eine Person zwischen Bäumen im warmen Licht",
+                      )
                 }
               />
-              <span>EDITION 0{index + 1}</span>
               <span className="edition-sample-title">
-                {t("A little closer.", "Ein Stück näher.")}
+                {template.id === "quiet-atlas"
+                  ? "The art of going nowhere"
+                  : template.id === "after-hours"
+                    ? "When the light stays"
+                    : template.name}
               </span>
             </Link>
             <div className="edition-copy">

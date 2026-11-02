@@ -1503,3 +1503,291 @@ body {
   text-align: center;
   pointer-events: none;
 }
+
+/* D02: compact the opening composition and keep its lead photo in view. */
+.home-intro {
+  padding: 48px 0 36px;
+}
+.home-intro .intro-composition {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: end;
+  gap: 48px;
+}
+.home-intro .intro-composition h1 {
+  max-width: none;
+  margin: 0;
+  font: 400 clamp(54px, 6.8vw, 96px) / 1.02 var(--serif);
+  letter-spacing: -0.035em;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+.home-intro .intro-aside {
+  max-width: 34ch;
+  margin-top: 0;
+  padding: 0;
+}
+.home-intro .intro-aside > p {
+  max-width: 34ch;
+  font: 400 16px / 1.6 var(--sans);
+}
+.home-paths {
+  gap: 12px;
+  margin-top: 20px;
+}
+.home-reader-link {
+  min-height: 44px;
+  font-size: 16px;
+}
+.home-studio-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--olive);
+  font-size: 15px;
+}
+.home-feature-image,
+.home-feature-loading {
+  aspect-ratio: 3 / 2;
+}
+.home-feature-image[style*="aspect-ratio"] {
+  aspect-ratio: 3 / 2 !important;
+}
+.home-feature-copy h2 {
+  margin: 20px 0 12px;
+  font: 400 clamp(44px, 4.5vw, 64px) / 1.06 var(--serif);
+  letter-spacing: -0.025em;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+.home-feature-copy > .eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.home-feature-subtitle {
+  font-size: clamp(24px, 2.2vw, 28px);
+  line-height: 1.25;
+}
+.home-feature-description {
+  font-size: 16px;
+  line-height: 1.6;
+}
+.home-feature-copy > .text-link {
+  margin-top: 24px;
+}
+.home-feature-story {
+  gap: 32px;
+}
+
+/* D02: the existing essay covers make the editions visually distinct. */
+.inspiration-page .editorial-heading {
+  padding: 40px 0 32px;
+  margin-bottom: 0;
+}
+.inspiration-page .editorial-heading h1 {
+  max-width: 15ch;
+  margin: 18px 0 16px;
+  font-size: clamp(48px, 5vw, 72px);
+  line-height: 1.04;
+  text-wrap: balance;
+}
+.inspiration-page .editorial-heading p {
+  max-width: 42ch;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.inspiration-page .editorial-heading > .eyebrow,
+.inspiration-page .edition-copy .eyebrow {
+  font: 400 13px / 1.5 var(--sans);
+  letter-spacing: 0.04em;
+}
+.inspiration-page .edition-grid {
+  gap: 32px;
+}
+.inspiration-page .edition-cover {
+  height: clamp(360px, 34vw, 500px);
+  background: #20241f;
+}
+.inspiration-page .edition-cover > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: none;
+}
+.inspiration-page .edition-cover:hover > img {
+  transform: none;
+}
+.inspiration-page .edition-sample-title {
+  z-index: 2;
+  margin: 0;
+  font-family: var(--serif) !important;
+  font-weight: 400 !important;
+  line-height: 1.04 !important;
+  letter-spacing: -0.025em !important;
+  text-wrap: balance;
+}
+.inspiration-page .edition-quiet-atlas .edition-cover {
+  background: #ecedeb;
+}
+.inspiration-page .edition-quiet-atlas .edition-cover > img {
+  inset: 24px 24px 80px;
+  width: calc(100% - 48px);
+  height: calc(100% - 104px);
+}
+.inspiration-page .edition-quiet-atlas .edition-cover:after {
+  display: none;
+}
+.inspiration-page .edition-quiet-atlas .edition-sample-title {
+  left: 24px !important;
+  right: 24px;
+  bottom: 18px !important;
+  max-width: none;
+  padding: 0 !important;
+  color: #26302b !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  font-size: 36px !important;
+}
+.inspiration-page .edition-after-hours .edition-cover:before {
+  background: linear-gradient(180deg, transparent 52%, #101a165c);
+}
+.inspiration-page .edition-after-hours .edition-cover > img {
+  filter: none;
+}
+.inspiration-page .edition-after-hours .edition-sample-title {
+  left: 32px !important;
+  bottom: 32px !important;
+  max-width: 85%;
+  padding: 0 !important;
+  color: #f2f4ed !important;
+  background: transparent !important;
+  font-size: 48px !important;
+  line-height: 1.02 !important;
+}
+.inspiration-page .edition-copy {
+  padding: 32px;
+}
+.inspiration-page .edition-copy h2 {
+  margin: 12px 0;
+  font: 400 44px / 1.08 var(--serif);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.inspiration-page .edition-copy p {
+  max-width: 42ch;
+  min-height: 0;
+  font: 400 16px / 1.6 var(--sans);
+}
+.inspiration-page .edition-copy .text-link {
+  min-height: 44px;
+  margin-top: 24px;
+  font-size: 16px;
+}
+.inspiration-page .reference-note {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (min-width: 761px) and (max-width: 1023px) {
+  .home-intro {
+    padding-block: 32px;
+  }
+  .home-intro .intro-composition {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .home-intro .intro-composition h1 {
+    max-width: 20ch;
+    font-size: 64px;
+  }
+  .home-intro .intro-aside {
+    max-width: 34ch;
+  }
+  .home-feature-story,
+  .home-feature-empty {
+    gap: 32px;
+  }
+  .inspiration-page .editorial-heading h1 {
+    font-size: 56px;
+  }
+  .inspiration-page .edition-sample-title {
+    font-size: 30px !important;
+  }
+  .inspiration-page .edition-after-hours .edition-sample-title {
+    left: 20px !important;
+    bottom: 20px !important;
+    font-size: 38px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-intro {
+    padding: 28px 0;
+  }
+  .home-intro .intro-composition {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .home-intro .intro-composition h1 {
+    max-width: none;
+    font-size: clamp(42px, 11vw, 58px);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+  }
+  .home-intro .intro-aside {
+    max-width: 34ch;
+    margin-top: 0;
+  }
+  .home-intro .intro-aside > p {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .home-paths {
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .home-feature-copy h2 {
+    font-size: clamp(38px, 10vw, 44px);
+  }
+  .home-feature-description {
+    font-size: 16px;
+  }
+  .home-feature-loading {
+    aspect-ratio: 3 / 2;
+  }
+  .inspiration-page .editorial-heading {
+    padding-block: 28px 24px;
+  }
+  .inspiration-page .editorial-heading h1 {
+    margin: 16px 0;
+    font-size: 48px;
+  }
+  .inspiration-page .edition-cover {
+    height: 330px;
+  }
+  .inspiration-page .edition-quiet-atlas .edition-cover > img {
+    inset: 16px 16px 80px;
+    width: calc(100% - 32px);
+    height: calc(100% - 96px);
+  }
+  .inspiration-page .edition-quiet-atlas .edition-sample-title {
+    left: 16px !important;
+    right: 16px;
+    bottom: 16px !important;
+    font-size: 30px !important;
+  }
+  .inspiration-page .edition-after-hours .edition-sample-title {
+    left: 20px !important;
+    bottom: 20px !important;
+    font-size: 38px !important;
+  }
+  .inspiration-page .edition-copy {
+    padding: 24px;
+  }
+  .inspiration-page .edition-copy h2 {
+    font-size: 36px;
+  }
+  .inspiration-page .edition-mobile-switch button {
+    min-height: 44px;
+  }
+}

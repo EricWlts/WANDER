@@ -1484,3 +1484,22 @@ body {
     min-height: calc(100svh - 79px);
   }
 }
+
+/* Image status overlays reserve the existing crop/frame geometry. */
+.picture[data-image-status="loading"] > img,
+.picture[data-image-status="error"] > img {
+  visibility: hidden;
+}
+.picture-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: var(--canvas-paper, var(--paper, #ecedeb));
+  color: var(--canvas-ink, var(--ink, #20241f));
+  font: 500 12px/1.5 Manrope, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}

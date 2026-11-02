@@ -3,6 +3,7 @@ import {
   cloneElement,
   isValidElement,
   useEffect,
+  useLayoutEffect,
   useId,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import { ArrowUpRight, X } from "lucide-react";
 import type { Photo, RevealConfig } from "./types";
 import { t, getLocale } from "./I18n";
 import { imageMotion, useReveal } from "./Reveal";
+import { observePicture, type PictureStatus } from "./pictureLoading";
 import { mergeIdRefs } from "./ariaIdRefs";
 export function Compass({ className = "" }: { className?: string }) {
   return (
@@ -54,10 +56,28 @@ export function Picture({
   motion?: RevealConfig;
 }) {
   const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
-  const [loaded, setLoaded] = useState(false);
-  const reveal = useReveal(ref, motion, animate, loaded || !photo);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const source = JSON.stringify([photo?.url, photo?.srcset, sizes]);
+  const [load, setLoad] = useState<{ source: string; status: PictureStatus }>({
+    source,
+    status: "loading",
+  });
+  const status = load.source === source ? load.status : "loading";
+  const clickable = !!onClick;
+  useLayoutEffect(() => {
+    const image = imageRef.current;
+    if (!image) return;
+    return observePicture(image, (status) => setLoad({ source, status }));
+  }, [source, clickable]);
+  const reveal = useReveal(
+    ref,
+    motion,
+    animate && (!photo || status === "ready"),
+  );
   const img = photo ? (
     <img
+      key={source}
+      ref={imageRef}
       src={photo.url}
       srcSet={photo.srcset}
       sizes={sizes}
@@ -78,12 +98,6 @@ export function Picture({
       loading={eager ? "eager" : "lazy"}
       fetchPriority={eager ? "high" : "auto"}
       decoding="async"
-      onLoad={async (event) => {
-        const image = event.currentTarget;
-        await image.decode().catch(() => {});
-        setLoaded(true);
-      }}
-      onError={() => setLoaded(true)}
     />
   ) : (
     <div className="photo-placeholder">
@@ -91,6 +105,14 @@ export function Picture({
       <span>{tr("A story waiting for its first photograph.")}</span>
     </div>
   );
+  const indicator =
+    photo && status !== "ready" ? (
+      <span className="picture-status" role="status">
+        {status === "error"
+          ? t("Could not load photograph", "Foto konnte nicht geladen werden")
+          : t("Loading photograph", "Foto wird geladen")}
+      </span>
+    ) : null;
   const ratio = photo ? photo.edits?.ratio || "original" : undefined;
   const frameStyle = ratio
     ? ({
@@ -110,6 +132,8 @@ export function Picture({
     <button
       ref={ref}
       {...reveal}
+      data-image-status={photo ? status : undefined}
+      aria-busy={!!photo && status === "loading"}
       className={`picture picture-button ${className}`}
       style={{ ...reveal.style, ...frameStyle }}
       onClick={onClick}
@@ -119,6 +143,7 @@ export function Picture({
       }
     >
       {img}
+      {indicator}
       <span className="image-expand">
         <ArrowUpRight size={19} />
       </span>
@@ -127,10 +152,13 @@ export function Picture({
     <div
       ref={ref}
       {...reveal}
+      data-image-status={photo ? status : undefined}
+      aria-busy={!!photo && status === "loading"}
       style={{ ...reveal.style, ...frameStyle }}
       className={`picture ${className}`}
     >
       {img}
+      {indicator}
     </div>
   );
 }

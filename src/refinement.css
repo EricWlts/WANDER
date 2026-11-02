@@ -179,10 +179,8 @@ body {
   width: min(calc(58svh * var(--frame-ratio)), 78vw);
   max-width: 78vw;
 }
-.free-rail .picture,
-.free-rail .picture[style*="aspect-ratio"] {
+.free-rail .picture {
   height: clamp(240px, 58svh, 700px) !important;
-  aspect-ratio: auto !important;
 }
 .free-rail .picture img {
   height: 100%;
@@ -1789,5 +1787,93 @@ body {
   }
   .inspiration-page .edition-mobile-switch button {
     min-height: 44px;
+  }
+}
+
+/* D03: automatic walls fill each row while explicit author layouts stay intact. */
+.photo-wall[data-auto-composition="true"] {
+  --active-columns: 12;
+}
+.photo-wall[data-auto-composition="true"] .wall-group {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.photo-wall[data-auto-composition="true"] .wall-group > figure {
+  grid-column: span var(--wall-desktop-span, 12);
+}
+
+/* D03: rail frames follow Picture's effective ratio within the existing bounds. */
+.free-rail > figure {
+  width: min(calc(var(--rail-max-height, 58svh) * var(--frame-ratio)), 78vw);
+  max-width: 78vw;
+}
+.free-rail .picture,
+.free-rail .picture[style*="aspect-ratio"] {
+  width: 100%;
+  height: auto !important;
+  max-height: none;
+}
+.free-rail .picture img {
+  width: 100%;
+  height: 100%;
+}
+
+/* D03: captions share one quiet, conditional treatment in walls and rails. */
+.wall-group figcaption,
+.free-rail figcaption {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding-top: 10px;
+  color: var(--canvas-ink);
+  font: 400 13px / 1.6 Manrope, sans-serif;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* D03: chapter defaults share the heading/image edge without overriding authored values. */
+.module-chapter .module-day-heading > .module-prose {
+  font-family: var(--module-font, var(--serif));
+  font-weight: var(--module-font-weight, 400);
+  font-size: var(--module-text-size, 17px);
+  max-width: var(--module-text-width, 56ch);
+  text-align: var(--module-text-align, left);
+}
+.chapter-prose-default-font .module-day-heading .module-prose {
+  font-family: Manrope, sans-serif;
+}
+.chapter-prose-default-size .module-day-heading .module-prose {
+  font-size: 20px;
+  line-height: 1.65;
+}
+.chapter-prose-default-width .module-day-heading .module-prose {
+  width: min(100%, 60ch);
+  max-width: 60ch;
+}
+
+@media (min-width: 761px) and (max-width: 1023px) {
+  .photo-wall[data-auto-composition="true"] .wall-group > figure {
+    grid-column: span var(--wall-tablet-span, 12);
+  }
+}
+
+@media (max-width: 760px) {
+  .photo-wall[data-auto-composition="true"] {
+    --active-columns: 12;
+  }
+  .photo-wall[data-auto-composition="true"] .wall-group > figure {
+    grid-column: span var(--wall-mobile-span, 12);
+  }
+  .free-rail > figure {
+    --rail-max-height: 54svh;
+    width: min(calc(54svh * var(--frame-ratio)), 80vw);
+    max-width: 80vw;
+  }
+  .chapter-prose-default-size .module-day-heading .module-prose {
+    font-size: 18px;
+  }
+  .wall-group figcaption,
+  .free-rail figcaption {
+    font-size: 12px;
   }
 }

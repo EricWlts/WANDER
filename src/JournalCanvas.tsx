@@ -13,6 +13,7 @@ import {
   typePresets,
 } from "./journalModel";
 import { PhotoWall } from "./PhotoWall";
+import { desktopWallColumns, usesAutomaticWallComposition } from "./storyLayout";
 export { modulePhotos } from "./journalModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 export type Selection =
@@ -54,8 +55,8 @@ function layoutStyle(
       l.hover_zoom === undefined ? undefined : 1 + l.hover_zoom / 100,
     "--module-font":
       l.font === "sans" ? "Manrope, Arial, sans-serif" : "var(--serif)",
-    "--module-text-size": `${l.text_size || typePresets[l.text_preset || "medium"]}px`,
-    "--module-text-width": `${l.text_width || 56}ch`,
+    "--module-text-size": `${l.text_size || (kind === "text" && !l.text_preset ? 16 : typePresets[l.text_preset || "medium"])}px`,
+    "--module-text-width": `${l.text_width || (chapter ? 60 : 56)}ch`,
     "--module-font-weight": l.font_weight || 400,
     "--module-text-align": l.text_align || "left",
     "--module-inset": `${l.inset ?? 0}px`,
@@ -65,7 +66,7 @@ function layoutStyle(
     "--module-offset": `${l.offset ?? 50}px`,
     "--module-mobile-cols": l.mobile_columns ?? Math.min(columns, 2),
     "--module-mobile-gap": `${l.mobile_gap ?? l.gap ?? defaultGap}px`,
-    "--module-mobile-padding": `${l.mobile_padding ?? l.padding ?? (chapter ? (edition === "after-hours" ? 24 : 32) : 36)}px`,
+    "--module-mobile-padding": `${l.mobile_padding ?? l.padding ?? (chapter ? (edition === "after-hours" ? 12 : 32) : 36)}px`,
     "--module-title-size": `${l.title_size || 72}px`,
     "--module-ratio":
       l.ratio && l.ratio !== "original" ? l.ratio.replace(":", "/") : "auto",
@@ -290,7 +291,7 @@ export function JournalCanvas({
         active={selected?.type === "module" && selected.id === module.id}
         label={t(...moduleNames[kind])}
         onSelect={() => onSelect({ type: "module", id: module.id })}
-        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-${layout.title_style || "overlay"} text-position-${layout.text_position || "center"}`}
+        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-${layout.title_style || "overlay"} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""}`}
       >
         <Reveal
           key={`${replay}-${module.id}-${motion.effect}`}
@@ -370,8 +371,13 @@ export function JournalCanvas({
                   ...layout,
                   columns: single
                     ? 1
-                    : layout.columns || (kind === "pair" ? 2 : 4),
+                    : desktopWallColumns(layout, kind, photos.length),
                 }}
+                autoComposition={
+                  !single &&
+                  ["chapter", "pair", "wall", "gallery"].includes(kind) &&
+                  usesAutomaticWallComposition(layout)
+                }
                 onPhoto={pick}
                 selectedId={
                   selected?.type === "photo" ? selected.placementId : undefined

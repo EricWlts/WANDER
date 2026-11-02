@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Picture } from "./components";
 import type { Layout, Photo } from "./types";
 import { offsetsFor } from "./journalModel";
+import { automaticWallSpans } from "./storyLayout";
 /** The inspector miniature and published wall share this exact layout. */
 export function PhotoWall({
   photos,
@@ -9,26 +10,35 @@ export function PhotoWall({
   onPhoto,
   selectedId,
   mini = false,
+  autoComposition = false,
 }: {
   photos: Photo[];
   layout: Layout;
   onPhoto?: (p: Photo) => void;
   selectedId?: string;
   mini?: boolean;
+  autoComposition?: boolean;
 }) {
-  const columns = layout.columns || 4,
-    capacity = columns * (layout.rows || 4),
+  const columns = autoComposition ? 12 : layout.columns || 4,
+    capacity = autoComposition ? photos.length : columns * (layout.rows || 4),
     offsets = offsetsFor(layout, columns);
+  const spans = autoComposition ? automaticWallSpans(photos.length) : null;
   const style = {
     "--wall-columns": columns,
-    "--wall-mobile-columns": layout.mobile_columns ?? Math.min(columns, 2),
+    "--wall-mobile-columns": autoComposition
+      ? 12
+      : layout.mobile_columns ?? Math.min(columns, 2),
     "--wall-gap": `${layout.gap ?? 18}px`,
     "--wall-mobile-gap": `${layout.mobile_gap ?? layout.gap ?? 18}px`,
     "--wall-top": `${Math.max(0, -Math.min(...offsets))}px`,
     "--wall-bottom": `${Math.max(0, ...offsets)}px`,
   } as CSSProperties;
   return (
-    <div className={`photo-wall ${mini ? "wall-miniature" : ""}`} style={style}>
+    <div
+      className={`photo-wall ${mini ? "wall-miniature" : ""}`}
+      data-auto-composition={autoComposition || undefined}
+      style={style}
+    >
       {Array.from(
         { length: Math.ceil(photos.length / capacity) },
         (_, group) => (
@@ -44,6 +54,13 @@ export function PhotoWall({
                   style={
                     {
                       "--wall-shift": `${offsets[i % columns]}px`,
+                      ...(spans
+                        ? {
+                            "--wall-desktop-span": spans.desktop[group * capacity + i],
+                            "--wall-tablet-span": spans.tablet[group * capacity + i],
+                            "--wall-mobile-span": spans.mobile[group * capacity + i],
+                          }
+                        : {}),
                       zIndex: i + 1,
                     } as CSSProperties
                   }
@@ -65,7 +82,7 @@ export function PhotoWall({
                     sizes={mini ? "160px" : "(max-width:760px) 95vw, 75vw"}
                     onClick={onPhoto ? () => onPhoto(p) : undefined}
                   />
-                  {p.edits?.show_title && p.title && !mini && (
+                  {p.edits?.show_title && p.title?.trim() && !mini && (
                     <figcaption>{p.title}</figcaption>
                   )}
                 </figure>

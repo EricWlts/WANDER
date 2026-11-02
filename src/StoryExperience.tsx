@@ -22,6 +22,7 @@ import {
   Share2,
 } from "lucide-react";
 import { sequenceIndex } from "./journalModel";
+import { effectivePhotoRatio } from "./storyLayout";
 import {
   PhotoViewerModel,
   decodedImageRequest,
@@ -443,10 +444,7 @@ export function PhotoRail({
             key={photo.placement_id || `${photo.id}:${index}`}
             style={
               {
-                "--frame-ratio": Math.min(
-                  1.65,
-                  Math.max(0.65, photo.width / photo.height),
-                ),
+                "--frame-ratio": effectivePhotoRatio(photo),
               } as CSSProperties
             }
           >
@@ -456,7 +454,9 @@ export function PhotoRail({
               onClick={() => onPhoto(photo)}
               sizes="90vw"
             />
-            {photo.edits?.show_title && <figcaption>{photo.title}</figcaption>}
+            {photo.edits?.show_title && photo.title?.trim() && (
+              <figcaption>{photo.title}</figcaption>
+            )}
           </figure>
         ))}
       </div>

@@ -175,6 +175,14 @@ export function ModularEditor() {
     [replaceCover, setReplaceCover] = useState(false),
     [deletingPhoto, setDeletingPhoto] = useState<Photo | null>(null),
     [deleteError, setDeleteError] = useState("");
+  const [publishReview, setPublishReview] = useState<{
+      content: string;
+      revision: number;
+    } | null>(null),
+    [publishResult, setPublishResult] = useState<{
+      title: string;
+      slug: string;
+    } | null>(null);
   const revision = useRef(0),
     saving = useRef(false);
   const saved = useRef<Journey | null>(null),
@@ -444,10 +452,22 @@ export function ModularEditor() {
           /* Optional recovery. */
         }
       }
+      if (publish) {
+        setPublishReview(null);
+        setPublishResult({ title: current.title, slug: next.slug });
+      }
       if (!silent)
         notify(
           publish
-            ? t("Journey published.", "Reise veröffentlicht.")
+            ? changed
+              ? t(
+                  "Reviewed version published. Newer changes remain in your draft.",
+                  "Geprüfte Fassung veröffentlicht. Neuere Änderungen bleiben im Entwurf.",
+                )
+              : t(
+                  "Reviewed version published.",
+                  "Geprüfte Fassung veröffentlicht.",
+                )
             : t("Draft saved.", "Entwurf gespeichert."),
         );
       return next;
@@ -843,6 +863,23 @@ export function ModularEditor() {
       setBusy(false);
     }
   }
+  const imageUses =
+    (j.photos.some((p) => p.id === j.cover_id) || j.cover ? 1 : 0) +
+    rootPhotos(j, "loose").length +
+    rootPhotos(j, "filmstrip").length +
+    j.chapters.reduce((total, chapter) => {
+      const count = modulePhotos(chapter, j).length;
+      return (
+        total +
+        (chapter.kind === "hero" || chapter.kind === "image"
+          ? Math.min(1, count)
+          : count)
+      );
+    }, 0);
+  const reviewChanged =
+    publishReview !== null &&
+    (publishReview.content !== JSON.stringify(j) ||
+      publishReview.revision !== revision.current);
   const status = autoError
     ? t("Save failed · retry", "Speichern fehlgeschlagen · erneut versuchen")
     : backgroundSaving
@@ -968,7 +1005,14 @@ export function ModularEditor() {
             aria-label={t("Publish journey", "Reise veröffentlichen")}
             className="button"
             disabled={busy || backgroundSaving || uploadBusy}
-            onClick={() => void save(true)}
+            onClick={() => {
+              if (saving.current || busy || backgroundSaving || uploadBusy)
+                return;
+              setPublishReview({
+                content: JSON.stringify(draftRef.current),
+                revision: revision.current,
+              });
+            }}
           >
             <Globe size={16} />
             <span>{t("Publish", "Veröffentlichen")}</span>
@@ -2239,6 +2283,160 @@ export function ModularEditor() {
               {t("Permanently delete photograph", "Foto endgültig löschen")}
             </button>
           </div>
+        </Modal>
+      )}
+      {(publishReview || publishResult) && (
+        <Modal
+          key={publishResult ? "published" : "review"}
+          title={
+            publishResult
+              ? t("Version published", "Fassung veröffentlicht")
+              : t("Review before publishing", "Vor Veröffentlichung prüfen")
+          }
+          className="publish-review"
+          onClose={() => {
+            if (saving.current || busy) return;
+            setPublishReview(null);
+            setPublishResult(null);
+          }}
+        >
+          <span className="eyebrow">
+            {publishResult
+              ? t("VISITOR VERSION", "BESUCHERVERSION")
+              : t("CURRENT LOCAL DRAFT", "AKTUELLER LOKALER ENTWURF")}
+          </span>
+          <h2>{publishResult ? publishResult.title : j.title}</h2>
+          {publishResult ? (
+            <>
+              <p role="status">
+                {t(
+                  "The reviewed version is now available to visitors.",
+                  "Die geprüfte Fassung ist jetzt für Besucher verfügbar.",
+                )}
+                {(dirty || j.has_unpublished_changes) && (
+                  <>
+                    {" "}
+                    {t(
+                      "Newer changes remain in your draft and are not published.",
+                      "Neuere Änderungen bleiben im Entwurf und sind unveröffentlicht.",
+                    )}
+                  </>
+                )}
+              </p>
+              <div className="confirm-actions">
+                <button
+                  className="button button-outline"
+                  onClick={() => setPublishResult(null)}
+                >
+                  {t("Continue editing", "Weiter bearbeiten")}
+                </button>
+                <Link
+                  className="button"
+                  to={`/journeys/${publishResult.slug}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  {t("Open visitor version", "Besucherversion öffnen")}
+                  <Eye size={17} />
+                </Link>
+              </div>
+            </>
+          ) : (
+            publishReview && (
+              <>
+                <dl className="publish-summary">
+                  <div>
+                    <dt>{t("Photo sources", "Fotoquellen")}</dt>
+                    <dd>{j.photos.length}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("Image uses", "Bildverwendungen")}</dt>
+                    <dd>{imageUses}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("Modules", "Module")}</dt>
+                    <dd>{j.chapters.length}</dd>
+                  </div>
+                </dl>
+                <p>
+                  {t(
+                    "Photo sources form your collection. Image uses include the cover, modules and filmstrip; one source can appear more than once with its own crop.",
+                    "Fotoquellen bilden deine Sammlung. Bildverwendungen zählen Titelbild, Module und Fotostreifen; eine Quelle kann mehrfach mit eigenem Zuschnitt vorkommen.",
+                  )}
+                </p>
+                <p>
+                  {t(
+                    "Saving keeps your working draft private. Publishing replaces the visitor version with this reviewed draft. Later edits stay in the draft until you publish again.",
+                    "Speichern hält deinen Arbeitsentwurf privat. Veröffentlichen ersetzt die Besucherversion durch diesen geprüften Entwurf. Spätere Änderungen bleiben bis zur nächsten Veröffentlichung im Entwurf.",
+                  )}
+                </p>
+                {reviewChanged && (
+                  <p className="publish-review-update" role="status">
+                    {t(
+                      "Your draft changed during review. The summary is up to date. Review this version again before publishing.",
+                      "Dein Entwurf hat sich während der Kontrolle geändert. Die Übersicht ist aktuell. Prüfe diese Fassung erneut vor dem Veröffentlichen.",
+                    )}
+                  </p>
+                )}
+                {(busy || backgroundSaving || uploadBusy) && (
+                  <p role="status">
+                    {t(
+                      "Wait until saving or uploading has finished.",
+                      "Warte, bis Speichern oder Hochladen abgeschlossen ist.",
+                    )}
+                  </p>
+                )}
+                {error && (
+                  <p className="form-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="confirm-actions">
+                  <button
+                    className="button button-outline"
+                    disabled={busy}
+                    onClick={() => setPublishReview(null)}
+                  >
+                    {t("Cancel", "Abbrechen")}
+                  </button>
+                  <button
+                    className="button"
+                    disabled={busy || backgroundSaving || uploadBusy}
+                    onClick={() => {
+                      if (
+                        saving.current ||
+                        busy ||
+                        backgroundSaving ||
+                        uploadBusy
+                      )
+                        return;
+                      const content = JSON.stringify(draftRef.current);
+                      if (
+                        publishReview.content !== content ||
+                        publishReview.revision !== revision.current
+                      ) {
+                        setPublishReview({
+                          content,
+                          revision: revision.current,
+                        });
+                        return;
+                      }
+                      void save(true);
+                    }}
+                  >
+                    {busy
+                      ? t("Publishing…", "Wird veröffentlicht…")
+                      : reviewChanged
+                        ? t("Review updated version", "Aktuelle Fassung prüfen")
+                        : t(
+                            "Publish this version",
+                            "Diese Fassung veröffentlichen",
+                          )}
+                  </button>
+                </div>
+              </>
+            )
+          )}
         </Modal>
       )}
       {viewer !== null && (

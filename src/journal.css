@@ -2393,3 +2393,27 @@ textarea:focus-visible,
     min-width: 44px;
   }
 }
+
+/* Publication review uses the existing native dialog and editorial palette. */
+.publish-review p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.publish-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 24px 0;
+}
+.publish-summary dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.publish-summary dd {
+  margin: 4px 0 0;
+  font-size: 24px;
+}
+.publish-review .publish-review-update {
+  border-left: 2px solid currentColor;
+  padding-left: 12px;
+}

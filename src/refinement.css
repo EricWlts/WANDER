@@ -1463,3 +1463,18 @@ body {
     gap: var(--ui-field-gap);
   }
 }
+
+/* Keep the footer below the initial studio viewport through chunk, auth and
+   data loading (including errors). Header heights match styles.css. Content
+   remains free to grow; no fixed height, clipping or motion override. */
+.studio-route {
+  display: flow-root;
+  min-height: calc(100vh - 99px);
+  min-height: calc(100svh - 99px);
+}
+@media (max-width: 760px) {
+  .studio-route {
+    min-height: calc(100vh - 79px);
+    min-height: calc(100svh - 79px);
+  }
+}

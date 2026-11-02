@@ -726,7 +726,12 @@ export function ModularEditor() {
   if (!journey)
     return (
       <PageState
-        title={error || t("Opening the editor…", "Editor wird geöffnet…")}
+        title={
+          error
+            ? t("This journey is out of reach.")
+            : t("Opening the editor…", "Editor wird geöffnet…")
+        }
+        text={error || undefined}
       />
     );
   const j = journey;

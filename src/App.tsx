@@ -180,11 +180,13 @@ function StudioRoute({ page }: { page: StudioPageName }) {
   const { pathname } = useLocation();
   // Moving to another studio URL clears a previous route failure.
   return (
-    <StudioErrorBoundary key={pathname}>
-      <Suspense fallback={<PageState title={tr("Opening the studio…")} />}>
-        <StudioPage page={page} />
-      </Suspense>
-    </StudioErrorBoundary>
+    <div className="studio-route">
+      <StudioErrorBoundary key={pathname}>
+        <Suspense fallback={<PageState title={tr("Opening the studio…")} />}>
+          <StudioPage page={page} />
+        </Suspense>
+      </StudioErrorBoundary>
+    </div>
   );
 }
 function Header() {

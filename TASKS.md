@@ -14,6 +14,14 @@
 
 - Nachtrag auf Nutzerauftrag: lokaler Commit ausschließlich der vier geprüften W13-Dokumente freigegeben; Veröffentlichung ebenfalls angefordert. Kein Git-Remote oder Hostingziel eingerichtet, deshalb Veröffentlichungsziel beim Nutzer erfragt. Historische scripts-Änderungen bleiben ungesichert und unverändert außerhalb dieses Commits. G6 wird durch die Commitfreigabe nicht freigegeben.
 
+### F01 — Mobile Archivtitel korrigieren (02.11.2026)
+
+- Status: F01 auf dem nach W13 aktuellen Stand umgesetzt, geprüft und lokal integriert; gezielter Commit. W13-Dokumentation erhalten, G6 bleibt ein separates Qualitätsziel. Kein Push/Deployment.
+- Basis/Scope: geprüfter Draft ausgehend von `89a04da783b6f2f76e5934fc86834bf0a0666eaa`; der aktuelle Stand `b35e62055491407506b9f37574b3959244b571d0` ergänzt ausschließlich W13-Dokumentation. Nur `src/styles.css` (Archivindex) und dieser F01-Abschlussvermerk.
+- Ursache/Änderung: intrinsische Mindestbreiten verschachtelter Index-Grids verhinderten das Schrumpfen der Titelspalte. `minmax(0, …)` für Indextracks, `min-width: 0` für die Kopie, natürliche Wortumbrüche sowie ein angepasstes Indexraster bis 1100 px korrigieren den Überlauf, ohne andere Designbereiche anzufassen.
+- Prüfungen: Frontendtests 43/43 bestanden; Produktionsbuild erfolgreich (2070 Module); `git diff --check` sauber. Native Browserprüfung mit langen DE-/EN-Titeln bei 320, 390 und 768 px: `document.scrollWidth` jeweils gleich dem Viewport, Titel vollständig und lesbar, natürliche mehrzeilige Umbrüche. Sprache in beide Richtungen gewechselt; Archivbeschriftungen korrekt übersetzt.
+- Daten/Änderungen: zehn vorher ungesicherte Dateien unter `scripts/` bytegleich erhalten (Diff-SHA256 `faf039f684b3ee7122c41a8f0c9a836c6683bd997120fee3955d7e576fae92bf`); produktive Nutzerdaten nicht verwendet.
+
 ### W12 — Studiocode bedarfsgerecht laden (02.11.2026)
 
 - Status: W12 umgesetzt und abgenommen; lokale Integration und gezielter Commit durch Nutzerauftrag autorisiert. G4 laut Nutzer freigegeben. G5 ist laut Entwicklungsplan ein technischer Nachweis, kein zusätzliches Design-Gate; Nachweise unten erfüllt. W13 nicht gestartet.

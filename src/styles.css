@@ -2430,14 +2430,16 @@ input[type="radio"] {
     padding: 23px 0;
   }
   .archive-entries.index .picture {
+    width: 100%;
     height: 80px;
+    min-width: 0;
   }
   .index .archive-entry-copy {
     display: block;
     min-width: 0;
   }
   .index .archive-entry-copy > .eyebrow {
-    font-size: 6px;
+    font-size: 12px;
   }
   .index .archive-entry-copy h2 {
     font-size: 27px;
@@ -2445,7 +2447,7 @@ input[type="radio"] {
     overflow-wrap: break-word;
   }
   .index .entry-foot {
-    font-size: 7px;
+    font-size: 12px;
     gap: 5px;
   }
   .index .entry-foot svg {

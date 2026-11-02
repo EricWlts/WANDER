@@ -1266,6 +1266,12 @@ body {
 }
 .archive-entries.index .archive-entry-copy > .eyebrow {
   font-size: inherit;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .archive-entries.index .archive-entry-copy > .eyebrow {
+    font-size: 12px;
+  }
 }
 .archive-entries.index .entry-foot {
   margin-top: 0;

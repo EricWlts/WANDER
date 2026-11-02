@@ -97,3 +97,12 @@ Der Worker schlägt keine eigene Freigabe vor, startet keine nächste Aufgabe un
 Mehrbenutzerkonten, Cloudhosting, private Freigabelinks, Export/PDF, AI-Kuration, Kollaboration und umfassendes Undo/Versionssystem. Diese Funktionen sind nicht nötig, um die bestehende lokale Lese-/Gestaltungserfahrung deutlich zu verbessern. Sie sind auch nicht durch eine visuelle 9/10 abgedeckt. Auch zuverlässig gleichzeitiges Bearbeiten in zwei lokalen Tabs ist nicht zugesichert und löst bei ausdrücklichem Auftrag A1 aus. Vor einem öffentlich nutzbaren eigenständigen Produkt ist A1 mit separater Implementierungsplanung erforderlich; dafür reicht ein Redesign nicht aus.
 
 Der erste konkrete Auftrag ist **W01 an `gpt-6-luna` mit low**. Den vollständigen W01-Block aus `AGENT_TASKS.md` kopieren; keine anderen Aufgaben in demselben Lauf starten.
+
+
+## W13-/G6-Ergebnis — 02.11.2026
+
+W13-Auditbericht für den lokal integrierten Stand `89a04da783b6f2f76e5934fc86834bf0a0666eaa` abgeschlossen; ausführliche Belege im neuen datierten Abschnitt von `PRODUCT_AUDIT.md`. W01–W12 und G0–G5 sind anhand der Aufgaben-/Integrationsbelege nachvollziehbar. Es wurden ausschließlich die vier W13-Dokumente ergänzt, keine Anwendung geändert und kein Commit/Push/Deployment ausgeführt.
+
+**G6 nicht freigegeben; 9/10-Ziel verfehlt.** Fachliche, subjektive Noten mit den ursprünglichen sechs Gewichten: 8,345 ≈ 8,3/10. Mobiler Archivindex schneidet einen gültigen langen Titel ab; mehrere Bereiche liegen unter 8,5. Intermittierender Studio-CLS 0,150 überschreitet den Zielwert. Neue Labormessungen ersetzen weder reale Geräte/Screenreader/Leistungsprofil noch die qualitative Nutzerbeurteilung. Offene Pflichtfälle bleiben offen, keine Umdeutung fertiger W-Aufgaben in eine Produktfreigabe.
+
+Priorisierte Empfehlung (keine neue Aufgabe gestartet): zuerst begrenzter Archivindex-/Langtitelfix, danach Studio-Ladegeometrie mit CLS-Nachweis, danach gemeinsamer Picture-Lade-/Fehler-/Quellenwechsel. Reale Abnahmematrix und Nutzerurteil vor G6 nachholen. Kein Architekturwechsel empfohlen.

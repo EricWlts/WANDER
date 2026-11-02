@@ -1,6 +1,6 @@
 # WANDER — geprüfte Projektübersicht
 
-Stand: 01.11.2026. Einstieg für spätere Worker; Befunde und Grenzen: [PRODUCT_AUDIT.md](PRODUCT_AUDIT.md), Reihenfolge: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). Diese Übersicht ersetzt weder `AGENTS.md` noch `ARCHITECTURE.md`.
+Stand: 02.11.2026 (W13 ergänzt; Ausgangsaudit vom 01.11.2026 unten erhalten). Einstieg für spätere Worker; Befunde und Grenzen: [PRODUCT_AUDIT.md](PRODUCT_AUDIT.md), Reihenfolge: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). Diese Übersicht ersetzt weder `AGENTS.md` noch `ARCHITECTURE.md`.
 
 ## Geprüfte Ausgangslage
 
@@ -17,7 +17,7 @@ Stand: 01.11.2026. Einstieg für spätere Worker; Befunde und Grenzen: [PRODUCT_
 | --- | --- |
 | Frontend | React 19, TypeScript mit `strict`/Unused-Prüfungen, React Router 7, Vite 8; genaue deklarierten Versionen in `package.json`, Auflösung in `package-lock.json` |
 | Einstieg | `src/main.tsx`: StrictMode → Sprache → Bewegung → BrowserRouter → App |
-| App | `src/App.tsx`: Routen, Authzustand, Benachrichtigungen, Header/Footer, Scroll-Rücksetzung; alle großen Routenbereiche werden bisher statisch importiert |
+| App | `src/App.tsx`: Routen, Authzustand, Benachrichtigungen, Header/Footer, Scroll-Rücksetzung; öffentliche Bereiche direkt geladen, Studioexporte seit W12 über gemeinsame React.lazy-Grenze mit lokalem Lade-/Fehlerzustand |
 | Öffentlich | `src/Public.tsx`: Start, Archiv, About; `src/StoryExperience.tsx`: Editionen, StoryLoader, Tagesgalerie, PhotoRail, Filmstrip, PhotoViewer |
 | Studio | `src/Studio.tsx`: Guard, Login, Bibliothek; `src/NewJournal.tsx`: Edition und Upload vor dem Editor |
 | Gestaltung | `src/ModularEditor.tsx`: lokaler Entwurf, Auswahl, Autosave, Recovery, Veröffentlichung, iframe-Vorschau und UI-Orchestrierung |
@@ -59,7 +59,7 @@ Instrument Serif/Italic für redaktionelle Akzente, Manrope für UI. Quiet Atlas
 
 ## Verifikation und sichere Wiederholung
 
-`npm run test:frontend`: 26 reine Logiktests erfolgreich. `npm test`: 77 Backendtests erfolgreich. `npm run build`: TypeScript + Vite erfolgreich. Kein Lint-Script. `tests/` liegt außerhalb des TS-Builds; Node-Testlauf ersetzt dort keinen Typecheck. Browser/Assistenztechnik werden durch die Logiktests nicht abgedeckt.
+W13 auf `89a04da…`: `npm run test:frontend`: 43 reine Logiktests erfolgreich. `npm test`: 77 Backendtests erfolgreich. `npm run build`: TypeScript + Vite erfolgreich. Kein Lint-Script. `tests/` liegt außerhalb des TS-Builds; Node-Testlauf ersetzt dort keinen Typecheck. Browser/Assistenztechnik werden durch die Logiktests nicht abgedeckt.
 
 Für spätere Abnahmen:
 
@@ -71,3 +71,13 @@ Für spätere Abnahmen:
 6. Nur eigene Prozesse beenden, keine fremden Ports freiräumen. Ergebnis mit genauer URL, Revision, Screenshots und offenen Fällen übergeben. Freigabe/Integration nach `docs/DEVELOPMENT.md`.
 
 Im Audit wurde statt einer Vite-UI-Änderungsabnahme der frisch gebaute, unveränderte Produktionsstand direkt vom isolierten Flask-Backend auf 5184 ausgeliefert. Das genügt zur Bestandsinspektion, ersetzt später aber nicht den vereinbarten Vite-Entwurfsworkflow.
+
+
+## W13-Nachtrag — 02.11.2026
+
+- Tatsächlich geprüfter Produktstand: `89a04da783b6f2f76e5934fc86834bf0a0666eaa`, W01–W12 lokal integriert. G0–G5 durch die Aufgabenbelege dokumentiert; G6 bleibt offen. Der Abschnitt „Geprüfte Ausgangslage“ beschreibt ausdrücklich das historische P1-Audit.
+- Reine Dokumentationsprüfung: keine neue Anwendungsversion, kein Commit/Push/Deployment. Tests/Build aus `/private/tmp/wander-w13-audit-20261102`; eigene SQLite-Testdaten und Uploadablage. Originaldaten/Secrets sowie zehn scripts-Änderungen erhalten.
+- Aktuell 43 Frontend- und 77 Backendtests bestanden, Produktionsbuild erfolgreich. Öffentliches JS 354.722 Byte, Studiochunk 114.398 Byte erst bei Studioaufruf.
+- Native Browser: 1280×900 / 390×844 Chrome sowie tatsächliche 319×674 CSS-px im Codex-Browser. Neue LCP-/INP-/CLS-Laborstichproben im Abschlussabschnitt von `PRODUCT_AUDIT.md`; kein Feld-/Geräteversprechen.
+- Belegt offen: Langtitel sprengt mobilen Archivindex (319→507 px), Indexdatum 7 px, intermittierender Studio-CLS 0,150; gemeinsamer Picture-Quellenwechsel bleibt Code-Risiko. Editorhashes entsprechen W11, gezieltes Save/Reload/Publish erneut bestätigt; Crop/Upload/Recovery aus unveränderten W10/W11-Nachweisen übernommen.
+- Fachliche Neubewertung 8,345 ≈ 8,3/10, 9/10 nicht erreicht. Vollständige Ergebnisse, fünf Lücken, Messgrenzen, Screenshots und maximal drei nächste Einzelaufträge: [W13-Abschlussaudit](PRODUCT_AUDIT.md#w13--abschlussaudit-vom-02112026). Echte Geräte, Screenreader und abschließendes G6-Nutzerurteil offen.

@@ -370,21 +370,30 @@ export function MediaLayoutSettings({
           </option>
         </select>
       </Field>
-      <Field
-        label={`${t("Side outer spacing", "Seitlicher Außenabstand")} · ${layout.media_spacing ?? 0} px`}
-      >
-        <input
-          type="range"
-          min={0}
-          max={160}
-          value={layout.media_spacing ?? 0}
-          onChange={(e) => onChange({ media_spacing: Number(e.target.value) })}
-        />
-      </Field>
+      {(
+        [
+          ["media_spacing_top", t("Top outer spacing", "Außenabstand oben")],
+          [
+            "media_spacing_bottom",
+            t("Bottom outer spacing", "Außenabstand unten"),
+          ],
+          ["media_spacing", t("Side outer spacing", "Seitlicher Außenabstand")],
+        ] as const
+      ).map(([key, label]) => (
+        <Field key={key} label={`${label} · ${layout[key] ?? 0} px`}>
+          <input
+            type="range"
+            min={0}
+            max={160}
+            value={layout[key] ?? 0}
+            onChange={(e) => onChange({ [key]: Number(e.target.value) })}
+          />
+        </Field>
+      ))}
       <p className="inspector-note">
         {t(
-          "Spacing is added inside the selected image area. Module spacing above and below stays independent.",
-          "Der Abstand liegt innerhalb des gewählten Bildbereichs. Modulabstände oben und unten bleiben unabhängig.",
+          "Top, bottom and side spacing are independent. Side spacing is added inside the selected image width.",
+          "Oben, unten und seitlich sind unabhängig steuerbar. Seitlicher Abstand liegt innerhalb der gewählten Bildbreite.",
         )}
       </p>
     </>

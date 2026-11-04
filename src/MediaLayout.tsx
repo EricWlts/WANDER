@@ -26,7 +26,10 @@ export function MediaLayout({
   const host = useRef<HTMLDivElement>(null);
   const active =
     enabled &&
-    (layout.media_width !== undefined || layout.media_spacing !== undefined);
+    (layout.media_width !== undefined ||
+      layout.media_spacing !== undefined ||
+      layout.media_spacing_top !== undefined ||
+      layout.media_spacing_bottom !== undefined);
   useLayoutEffect(() => {
     const element = host.current;
     if (!active || !element) return;
@@ -67,8 +70,21 @@ export function MediaLayout({
     };
   });
   return active ? (
-    <div ref={host} className="module-media-layout">
-      <div className="module-media-content">{children}</div>
+    <div
+      ref={host}
+      className="module-media-layout"
+      style={{
+        // Reserve both vertical spaces without changing existing child-margin collapse.
+        paddingBottom:
+          (layout.media_spacing_top ?? 0) + (layout.media_spacing_bottom ?? 0),
+      }}
+    >
+      <div
+        className="module-media-content"
+        style={{ position: "relative", top: layout.media_spacing_top ?? 0 }}
+      >
+        {children}
+      </div>
     </div>
   ) : (
     children

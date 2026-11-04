@@ -713,3 +713,39 @@ def test_invalid_media_layout_rejected_atomically(client, layout):
     ])
     assert response.status_code == 400, response.json
     assert client.get(f"/api/journeys/{journey['slug']}").json == before
+
+
+@pytest.mark.parametrize("axis", ["media_spacing_top", "media_spacing_bottom"])
+@pytest.mark.parametrize("spacing", [0, 24, 160])
+def test_vertical_media_spacing_independent_roundtrip_and_public_snapshot(client, axis, spacing):
+    headers = auth(client)
+    journey = create(client, headers)
+    other = "media_spacing_bottom" if axis == "media_spacing_top" else "media_spacing_top"
+    previous = {"media_spacing": 32, "media_width": "cover-image", "padding": 72, "inset": 13, other: 8}
+    layout = {**previous, axis: spacing}
+    response = composition(client, headers, journey, [
+        {"id": -1, "kind": "rail", "title": "Independent spacing", "layout": layout}
+    ])
+    assert response.status_code == 200, response.json
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    assert saved['chapters'][0]['layout'] == layout
+    assert composition(client, headers, saved, saved['chapters'], publish=True).status_code == 200
+    public = client.application.test_client()
+    assert public.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
+    reset = {**saved['chapters'][0], "layout": previous}
+    assert composition(client, headers, saved, [reset]).status_code == 200
+    assert client.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == previous
+    assert public.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
+
+
+@pytest.mark.parametrize("axis", ["media_spacing_top", "media_spacing_bottom"])
+@pytest.mark.parametrize("invalid", [-1, 161, True, "24", None, float("nan"), float("inf")])
+def test_invalid_vertical_media_spacing_rejected_atomically(client, axis, invalid):
+    headers = auth(client)
+    journey = create(client, headers)
+    before = client.get(f"/api/journeys/{journey['slug']}").json
+    response = composition(client, headers, journey, [
+        {"id": -1, "kind": "pair", "title": "Invalid", "layout": {axis: invalid}}
+    ])
+    assert response.status_code == 400, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json == before

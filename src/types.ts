@@ -35,6 +35,8 @@ export interface Layout {
   inset?: number;
   media_width?: "cover-image" | "cover-frame";
   media_spacing?: number;
+  media_spacing_top?: number;
+  media_spacing_bottom?: number;
   edition?: "inherit" | "quiet-atlas" | "after-hours";
   photo_ids?: number[];
   parent_id?: number;

@@ -154,6 +154,7 @@ export function JournalCanvas({
   selected,
   onSelect = () => {},
   onPhoto = () => {},
+  onEmptyModule,
   replay = 0,
   dayId,
 }: {
@@ -162,6 +163,7 @@ export function JournalCanvas({
   selected?: Selection;
   onSelect?: (s: Selection) => void;
   onPhoto?: (p: Photo, sequence?: Photo[]) => void;
+  onEmptyModule?: (id: number) => void;
   replay?: number;
   dayId?: number;
 }) {
@@ -291,7 +293,15 @@ export function JournalCanvas({
         editing={editing}
         active={selected?.type === "module" && selected.id === module.id}
         label={t(...moduleNames[kind])}
-        onSelect={() => onSelect({ type: "module", id: module.id })}
+        onSelect={() => {
+          if (
+            !photos.length &&
+            !["text", "quote", "chapter"].includes(kind) &&
+            onEmptyModule
+          )
+            onEmptyModule(module.id);
+          else onSelect({ type: "module", id: module.id });
+        }}
         className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-${layout.title_style || "overlay"} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""}`}
       >
         <Reveal
@@ -391,10 +401,7 @@ export function JournalCanvas({
             editing && (
               <div className="module-empty">
                 <Camera />
-                {t(
-                  "Select photographs in the inspector",
-                  "Bilder in den Einstellungen auswählen",
-                )}
+                {t("Choose / upload image", "Bild auswählen / hochladen")}
               </div>
             )}
           {kind === "chapter" &&

@@ -19,6 +19,7 @@ import {
   Settings2,
   Play,
   Globe,
+  GripVertical,
 } from "lucide-react";
 import { api, json } from "./api";
 import { useApp, PageState } from "./App";
@@ -50,6 +51,7 @@ import { useMotionOff } from "./Motion";
 import { MotionControl } from "./MotionControl";
 import { PhotoViewer } from "./StoryExperience";
 import { t, useLocale } from "./I18n";
+import { moveModule } from "./moduleOrder";
 import { isRecoveryJourney } from "./recoveryModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 
@@ -182,6 +184,16 @@ export function ModularEditor() {
       title: string;
       slug: string;
     } | null>(null);
+  const [addTarget, setAddTarget] = useState<number | null>(null),
+    [chosenPhotos, setChosenPhotos] = useState<number[]>([]),
+    [drag, setDrag] = useState<{
+      id: number;
+      target: number;
+      after: boolean;
+    } | null>(null);
+  const dragStart = useRef<{ id: number; y: number; active: boolean } | null>(
+    null,
+  );
   const revision = useRef(0),
     saving = useRef(false);
   const saved = useRef<Journey | null>(null),
@@ -434,6 +446,37 @@ export function ModularEditor() {
               }
             : active,
       );
+      setAddTarget((target) =>
+        target === null ? null : (idMap.get(target) ?? target),
+      );
+      // Saving a new module replaces its keyed row. Cancel an in-flight gesture
+      // before that replacement and return keyboard focus to the same module.
+      const focusedHandle = document.activeElement;
+      const focusedId = focusedHandle?.classList.contains("module-drag-handle")
+        ? Number(
+            (focusedHandle.closest("[data-module-id]") as HTMLElement)?.dataset
+              .moduleId,
+          )
+        : null;
+      if (
+        dragStart.current &&
+        idMap.get(dragStart.current.id) !== dragStart.current.id
+      ) {
+        dragStart.current = null;
+        setDrag(null);
+      }
+      if (
+        focusedId !== null &&
+        idMap.has(focusedId) &&
+        idMap.get(focusedId) !== focusedId
+      )
+        requestAnimationFrame(() =>
+          document
+            .querySelector<HTMLButtonElement>(
+              `[data-module-id="${idMap.get(focusedId)}"] > .module-drag-handle`,
+            )
+            ?.focus({ preventScroll: true }),
+        );
       if (imageReturn.current)
         imageReturn.current.moduleId =
           idMap.get(imageReturn.current.moduleId) ??
@@ -592,21 +635,45 @@ export function ModularEditor() {
   }
   function reorder(id: number, dir: number) {
     if (!journey) return;
-    const list = [...journey.chapters],
-      i = list.findIndex((c) => c.id === id),
-      sibling = list
-        .map((c, index) => ({ c, index }))
-        .filter(
-          ({ c }) =>
-            (c.layout?.parent_id || null) ===
-            (list[i].layout?.parent_id || null),
-        ),
-      at = sibling.findIndex((x) => x.c.id === id),
-      other = sibling[at + dir];
-    if (other) {
-      [list[i], list[other.index]] = [list[other.index], list[i]];
-      change({ chapters: list });
-    }
+    const source = journey.chapters.find((c) => c.id === id);
+    if (!source) return;
+    const siblings = journey.chapters.filter(
+      (c) =>
+        (c.layout?.parent_id || null) === (source.layout?.parent_id || null),
+    );
+    const target = siblings[siblings.indexOf(source) + dir];
+    if (target)
+      change({
+        chapters: moveModule(journey.chapters, id, target.id, dir > 0),
+      });
+  }
+
+  function dropAt(id: number, y: number) {
+    const current = draftRef.current;
+    const source = current?.chapters.find((c) => c.id === id);
+    if (!current || !source) return null;
+    const rows = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".module-navigator [data-module-id]",
+      ),
+    ).filter((row) =>
+      current.chapters.some(
+        (m) =>
+          m.id === Number(row.dataset.moduleId) &&
+          (m.layout?.parent_id || null) === (source.layout?.parent_id || null),
+      ),
+    );
+    const target =
+      rows.find((row) => y < row.getBoundingClientRect().bottom) || rows.at(-1);
+    if (!target) return null;
+    const rect = target
+      .querySelector<HTMLElement>(".module-nav-select")!
+      .getBoundingClientRect();
+    return {
+      id,
+      target: Number(target.dataset.moduleId),
+      after: y > rect.top + rect.height / 2,
+    };
   }
   function uploaded(value: Journey) {
     setJourney((j) =>
@@ -902,11 +969,88 @@ export function ModularEditor() {
     j.chapters
       .filter((c) => (c.layout?.parent_id || undefined) === parent)
       .map((c) => (
-        <div key={c.id} className="module-nav-item">
+        <div
+          key={c.id}
+          data-module-id={c.id}
+          className={`module-nav-item ${drag?.id === c.id ? "module-dragging" : ""} ${drag?.target === c.id ? (drag.after ? "module-drop-after" : "module-drop-before") : ""}`}
+        >
           <button
-            className={
-              selected.type === "module" && selected.id === c.id ? "active" : ""
-            }
+            type="button"
+            className="module-drag-handle"
+            aria-label={`${t("Move module", "Modul verschieben")}: ${c.title}`}
+            title={t(
+              "Drag to reorder; use Up/Down keys",
+              "Zum Verschieben ziehen; Pfeiltasten oben/unten verwenden",
+            )}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                e.preventDefault();
+                reorder(c.id, e.key === "ArrowUp" ? -1 : 1);
+              }
+              if (e.key === "Escape") {
+                dragStart.current = null;
+                setDrag(null);
+              }
+            }}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              e.currentTarget.focus({ preventScroll: true });
+              dragStart.current = { id: c.id, y: e.clientY, active: false };
+            }}
+            onPointerMove={(e) => {
+              const start = dragStart.current;
+              if (!start || start.id !== c.id) return;
+              if (!start.active && Math.abs(e.clientY - start.y) < 5) return;
+              start.active = true;
+              const panel =
+                e.currentTarget.closest<HTMLElement>(".module-navigator");
+              if (!panel) return;
+              const bounds = panel.getBoundingClientRect();
+              if (e.clientY < bounds.top + 40) panel.scrollTop -= 16;
+              if (e.clientY > bounds.bottom - 40) panel.scrollTop += 16;
+              const target = dropAt(c.id, e.clientY);
+              if (target) setDrag(target);
+            }}
+            onPointerUp={(e) => {
+              const start = dragStart.current;
+              // Some touch input streams coalesce movement until release.
+              const target =
+                start && Math.abs(e.clientY - start.y) >= 5
+                  ? dropAt(c.id, e.clientY)
+                  : drag;
+              if (
+                target &&
+                start &&
+                (start.active || Math.abs(e.clientY - start.y) >= 5) &&
+                draftRef.current
+              ) {
+                const chapters = moveModule(
+                  draftRef.current.chapters,
+                  target.id,
+                  target.target,
+                  target.after,
+                );
+                if (chapters !== draftRef.current.chapters)
+                  change({ chapters });
+              }
+              dragStart.current = null;
+              setDrag(null);
+            }}
+            onPointerCancel={() => {
+              dragStart.current = null;
+              setDrag(null);
+            }}
+            onLostPointerCapture={() => {
+              dragStart.current = null;
+              setDrag(null);
+            }}
+          >
+            <GripVertical size={16} />
+          </button>
+          <button
+            className={`module-nav-select ${selected.type === "module" && selected.id === c.id ? "active" : ""}`}
             onClick={() => {
               select({ type: "module", id: c.id });
               setTab("settings");
@@ -1150,6 +1294,11 @@ export function ModularEditor() {
                 editing={mode === "edit"}
                 selected={selected}
                 onSelect={selectCanvas}
+                onEmptyModule={(id) => {
+                  selectCanvas({ type: "module", id });
+                  setAddTarget(id);
+                  setChosenPhotos([]);
+                }}
                 onPhoto={(p, sequence = j.photos) => {
                   setViewerPhotos(sequence);
                   setViewer(sequenceIndex(sequence, p));
@@ -2142,6 +2291,92 @@ export function ModularEditor() {
           </div>
         </Modal>
       )}
+      {addTarget !== null &&
+        (() => {
+          const target = j.chapters.find((c) => c.id === addTarget);
+          if (!target) return null;
+          const single = ["image", "hero"].includes(target.kind);
+          return (
+            <Modal
+              title={t("Choose / upload image", "Bild auswählen / hochladen")}
+              className="collection-modal"
+              onClose={() => {
+                if (!uploadBusy) {
+                  setAddTarget(null);
+                  setChosenPhotos([]);
+                }
+              }}
+            >
+              <h2>{target.title}</h2>
+              <Upload
+                journeyId={j.id}
+                multiple={!single}
+                disabled={backgroundSaving}
+                onBusy={setUploadBusy}
+                onSave={(next) => {
+                  const added = next.photos.filter(
+                    (p) =>
+                      !draftRef.current?.photos.some((old) => old.id === p.id),
+                  );
+                  uploaded(next);
+                  setChosenPhotos((ids) =>
+                    single
+                      ? added.slice(-1).map((p) => p.id)
+                      : [...ids, ...added.map((p) => p.id)],
+                  );
+                }}
+              />
+              <div className="collection-grid">
+                {j.photos.map((p, i) => (
+                  <button
+                    key={p.id}
+                    aria-label={`${t("Use photograph", "Foto verwenden")} ${i + 1}`}
+                    aria-pressed={chosenPhotos.includes(p.id)}
+                    className={chosenPhotos.includes(p.id) ? "selected" : ""}
+                    onClick={() =>
+                      setChosenPhotos((ids) =>
+                        ids.includes(p.id)
+                          ? ids.filter((id) => id !== p.id)
+                          : single
+                            ? [p.id]
+                            : [...ids, p.id],
+                      )
+                    }
+                  >
+                    <Picture photo={p} sizes="240px" />
+                    {chosenPhotos.includes(p.id) && (
+                      <span>{chosenPhotos.indexOf(p.id) + 1}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="button"
+                disabled={!chosenPhotos.length || uploadBusy}
+                onClick={() => {
+                  const current = draftRef.current;
+                  const module = current?.chapters.find(
+                    (c) => c.id === addTarget,
+                  );
+                  if (module && current)
+                    layoutChange(module.id, {
+                      placements: [
+                        ...(single ? [] : placementsFor(module, current)),
+                        ...chosenPhotos.map((photo_id) => ({
+                          id: crypto.randomUUID(),
+                          photo_id,
+                        })),
+                      ],
+                    });
+                  setAddTarget(null);
+                  setChosenPhotos([]);
+                }}
+              >
+                {t("Use selected photographs", "Ausgewählte Fotos verwenden")}
+              </button>
+            </Modal>
+          );
+        })()}
       {replaceOpen && (
         <Modal
           title={t("Choose / upload image", "Bild auswählen / hochladen")}

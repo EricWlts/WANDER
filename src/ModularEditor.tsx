@@ -19,7 +19,6 @@ import {
   Settings2,
   Play,
   Globe,
-  ChevronDown,
 } from "lucide-react";
 import { api, json } from "./api";
 import { useApp, PageState } from "./App";
@@ -1182,14 +1181,14 @@ export function ModularEditor() {
             </div>
             <div className="inspector-body">
               <div className="inspector-selection">
-                <span>
-                  {photo
-                    ? t("This image placement", "Diese Bildverwendung")
-                    : module
-                      ? t("This module", "Dieses Modul")
-                      : t("Journey", "Reise")}
-                </span>
-                <strong>{selectionLabel}</strong>
+                {photo && (
+                  <>
+                    <span>
+                      {t("This image placement", "Diese Bildverwendung")}
+                    </span>
+                    <strong>{selectionLabel}</strong>
+                  </>
+                )}
                 <button
                   type="button"
                   className="text-link"
@@ -1205,7 +1204,9 @@ export function ModularEditor() {
                 </button>
               </div>
               <h3 className="inspector-group-title">
-                {t("Content", "Inhalt")}
+                {module && !["text", "quote"].includes(module.kind)
+                  ? t("Image content", "Bildinhalt")
+                  : t("Content", "Inhalt")}
               </h3>
               {photo ? (
                 <>
@@ -1320,170 +1321,10 @@ export function ModularEditor() {
                 </Field>
               ) : (
                 <>
-                  {!module && (
-                    <button
-                      className="button button-outline cover-replace-button"
-                      onClick={() => {
-                        setReplaceCover(true);
-                        setReplaceOpen(true);
-                      }}
-                    >
-                      <Images size={16} />
-                      {t(
-                        "Choose / upload cover image",
-                        "Titelbild auswählen / hochladen",
-                      )}
-                    </button>
-                  )}
-                  <Field label={t("Title", "Titel")}>
-                    <input
-                      maxLength={160}
-                      value={module?.title ?? j.title}
-                      onChange={(e) =>
-                        module
-                          ? moduleChange(module.id, { title: e.target.value })
-                          : change({ title: e.target.value })
-                      }
-                    />
-                  </Field>
-                  {module ? (
-                    <>
-                      {!["text", "quote"].includes(module.kind) && (
-                        <label className="check-field">
-                          <input
-                            type="checkbox"
-                            checked={
-                              module.layout?.show_title ??
-                              ["chapter", "hero"].includes(module.kind)
-                            }
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                show_title: e.target.checked,
-                              })
-                            }
-                          />
-                          {t("Show heading", "Überschrift anzeigen")}
-                        </label>
-                      )}
-                      {["chapter", "text", "hero"].includes(module.kind) && (
-                        <Field label={t("Text", "Text")}>
-                          <textarea
-                            rows={4}
-                            maxLength={20000}
-                            value={module.story}
-                            onChange={(e) =>
-                              moduleChange(module.id, { story: e.target.value })
-                            }
-                          />
-                        </Field>
-                      )}
-                      {module.kind === "quote" && (
-                        <Field label={t("Quote", "Zitat")}>
-                          <textarea
-                            rows={5}
-                            maxLength={1000}
-                            value={module.quote}
-                            onChange={(e) =>
-                              moduleChange(module.id, { quote: e.target.value })
-                            }
-                          />
-                        </Field>
-                      )}
-                      {module.kind === "chapter" && (
-                        <Field label={t("Date", "Datum")}>
-                          <input
-                            type="date"
-                            value={module.date}
-                            onChange={(e) =>
-                              moduleChange(module.id, { date: e.target.value })
-                            }
-                          />
-                        </Field>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Field label={t("Subtitle", "Untertitel")}>
-                        <textarea
-                          rows={2}
-                          maxLength={300}
-                          value={j.subtitle}
-                          onChange={(e) => change({ subtitle: e.target.value })}
-                        />
-                      </Field>
-                      <Field label={t("Place", "Ort")}>
-                        <input
-                          maxLength={160}
-                          value={j.location}
-                          onChange={(e) => change({ location: e.target.value })}
-                        />
-                      </Field>
-                      <div className="field-pair">
-                        <Field label={t("From", "Von")}>
-                          <input
-                            type="date"
-                            value={j.start_date}
-                            onChange={(e) =>
-                              change({ start_date: e.target.value })
-                            }
-                          />
-                        </Field>
-                        <Field label={t("Until", "Bis")}>
-                          <input
-                            type="date"
-                            value={j.end_date}
-                            onChange={(e) =>
-                              change({ end_date: e.target.value })
-                            }
-                          />
-                        </Field>
-                      </div>
-                      <Field label={t("Starting edition", "Startedition")}>
-                        <select
-                          value={j.story_template}
-                          onChange={(e) =>
-                            change({
-                              story_template: e.target
-                                .value as Journey["story_template"],
-                            })
-                          }
-                        >
-                          <option value="quiet-atlas">Quiet Atlas</option>
-                          <option value="after-hours">After Hours</option>
-                        </select>
-                      </Field>
-                      <p className="inspector-note">
-                        {t(
-                          "A starting point. Each module can use either edition.",
-                          "Ein Startpunkt. Jedes Modul kann eine andere Edition verwenden.",
-                        )}
-                      </p>
-                      <Field label={t("Cover photograph", "Titelbild")}>
-                        <select
-                          value={j.cover_id || ""}
-                          onChange={(e) => {
-                            const p = j.photos.find(
-                              (p) => p.id === Number(e.target.value),
-                            );
-                            change({
-                              cover_id: p?.id || null,
-                              cover: p || null,
-                            });
-                          }}
-                        >
-                          {j.photos.map((p, i) => (
-                            <option key={p.id} value={p.id}>
-                              {t("Photograph", "Foto")} {i + 1}
-                              {p.edits?.show_title ? ` · ${p.title}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </>
-                  )}
                   {module && !["text", "quote"].includes(module.kind) && (
                     <>
                       <ModulePhotographs
+                        key={module.id}
                         module={module}
                         journey={j}
                         onDelete={setDeletingPhoto}
@@ -1535,6 +1376,190 @@ export function ModularEditor() {
                     </>
                   )}
                   {!module && (
+                    <button
+                      className="button button-outline cover-replace-button"
+                      onClick={() => {
+                        setReplaceCover(true);
+                        setReplaceOpen(true);
+                      }}
+                    >
+                      <Images size={16} />
+                      {t(
+                        "Choose / upload cover image",
+                        "Titelbild auswählen / hochladen",
+                      )}
+                    </button>
+                  )}
+                  <details
+                    className="inspector-section"
+                    open={
+                      !module ||
+                      ["chapter", "text", "quote", "hero"].includes(module.kind)
+                    }
+                  >
+                    <summary>
+                      {module
+                        ? t("Heading & text", "Überschrift & Text")
+                        : t("Journey details", "Reisedetails")}
+                    </summary>
+                    <Field label={t("Title", "Titel")}>
+                      <input
+                        maxLength={160}
+                        value={module?.title ?? j.title}
+                        onChange={(e) =>
+                          module
+                            ? moduleChange(module.id, { title: e.target.value })
+                            : change({ title: e.target.value })
+                        }
+                      />
+                    </Field>
+                    {module ? (
+                      <>
+                        {!["text", "quote"].includes(module.kind) && (
+                          <label className="check-field">
+                            <input
+                              type="checkbox"
+                              checked={
+                                module.layout?.show_title ??
+                                ["chapter", "hero"].includes(module.kind)
+                              }
+                              onChange={(e) =>
+                                layoutChange(module.id, {
+                                  show_title: e.target.checked,
+                                })
+                              }
+                            />
+                            {t("Show heading", "Überschrift anzeigen")}
+                          </label>
+                        )}
+                        {["chapter", "text", "hero"].includes(module.kind) && (
+                          <Field label={t("Text", "Text")}>
+                            <textarea
+                              rows={4}
+                              maxLength={20000}
+                              value={module.story}
+                              onChange={(e) =>
+                                moduleChange(module.id, {
+                                  story: e.target.value,
+                                })
+                              }
+                            />
+                          </Field>
+                        )}
+                        {module.kind === "quote" && (
+                          <Field label={t("Quote", "Zitat")}>
+                            <textarea
+                              rows={5}
+                              maxLength={1000}
+                              value={module.quote}
+                              onChange={(e) =>
+                                moduleChange(module.id, {
+                                  quote: e.target.value,
+                                })
+                              }
+                            />
+                          </Field>
+                        )}
+                        {module.kind === "chapter" && (
+                          <Field label={t("Date", "Datum")}>
+                            <input
+                              type="date"
+                              value={module.date}
+                              onChange={(e) =>
+                                moduleChange(module.id, {
+                                  date: e.target.value,
+                                })
+                              }
+                            />
+                          </Field>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Field label={t("Subtitle", "Untertitel")}>
+                          <textarea
+                            rows={2}
+                            maxLength={300}
+                            value={j.subtitle}
+                            onChange={(e) =>
+                              change({ subtitle: e.target.value })
+                            }
+                          />
+                        </Field>
+                        <Field label={t("Place", "Ort")}>
+                          <input
+                            maxLength={160}
+                            value={j.location}
+                            onChange={(e) =>
+                              change({ location: e.target.value })
+                            }
+                          />
+                        </Field>
+                        <div className="field-pair">
+                          <Field label={t("From", "Von")}>
+                            <input
+                              type="date"
+                              value={j.start_date}
+                              onChange={(e) =>
+                                change({ start_date: e.target.value })
+                              }
+                            />
+                          </Field>
+                          <Field label={t("Until", "Bis")}>
+                            <input
+                              type="date"
+                              value={j.end_date}
+                              onChange={(e) =>
+                                change({ end_date: e.target.value })
+                              }
+                            />
+                          </Field>
+                        </div>
+                        <Field label={t("Starting edition", "Startedition")}>
+                          <select
+                            value={j.story_template}
+                            onChange={(e) =>
+                              change({
+                                story_template: e.target
+                                  .value as Journey["story_template"],
+                              })
+                            }
+                          >
+                            <option value="quiet-atlas">Quiet Atlas</option>
+                            <option value="after-hours">After Hours</option>
+                          </select>
+                        </Field>
+                        <p className="inspector-note">
+                          {t(
+                            "A starting point. Each module can use either edition.",
+                            "Ein Startpunkt. Jedes Modul kann eine andere Edition verwenden.",
+                          )}
+                        </p>
+                        <Field label={t("Cover photograph", "Titelbild")}>
+                          <select
+                            value={j.cover_id || ""}
+                            onChange={(e) => {
+                              const p = j.photos.find(
+                                (p) => p.id === Number(e.target.value),
+                              );
+                              change({
+                                cover_id: p?.id || null,
+                                cover: p || null,
+                              });
+                            }}
+                          >
+                            {j.photos.map((p, i) => (
+                              <option key={p.id} value={p.id}>
+                                {t("Photograph", "Foto")} {i + 1}
+                                {p.edits?.show_title ? ` · ${p.title}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </>
+                    )}
+                  </details>
+                  {!module && (
                     <details className="inspector-section">
                       <summary>{t("Story text", "Reisetexte")}</summary>
                       {(
@@ -1575,8 +1600,111 @@ export function ModularEditor() {
                       ))}
                     </details>
                   )}
+                  {module && !["text", "quote"].includes(module.kind) && (
+                    <>
+                      <details className="inspector-section" open>
+                        <summary>
+                          {t("Layout & dimensions", "Layout & Abmessungen")}
+                        </summary>
+                        {["gallery", "wall", "pair", "chapter"].includes(
+                          module.kind,
+                        ) && (
+                          <>
+                            <WallSettings
+                              module={module}
+                              onChange={(p) => layoutChange(module.id, p)}
+                            />
+                          </>
+                        )}
+                        <Field label={t("Image format", "Bildformat")}>
+                          <select
+                            value={layout.ratio || "original"}
+                            onChange={(e) =>
+                              layoutChange(module.id, {
+                                ratio: e.target.value as Layout["ratio"],
+                              })
+                            }
+                          >
+                            {ratios
+                              .filter((r) => r !== "free")
+                              .map((r) => (
+                                <option key={r} value={r}>
+                                  {r === "original"
+                                    ? t("Per photograph", "Pro Foto")
+                                    : r}
+                                </option>
+                              ))}
+                          </select>
+                        </Field>
+                        <Field
+                          label={`${t("Outer spacing", "Außenabstand")} · ${layout.padding ?? 36} px`}
+                        >
+                          <input
+                            type="range"
+                            min={0}
+                            max={160}
+                            value={layout.padding ?? 36}
+                            onChange={(e) =>
+                              layoutChange(module.id, {
+                                padding: Number(e.target.value),
+                              })
+                            }
+                          />
+                        </Field>
+                      </details>
+                      <details className="inspector-section">
+                        <summary>
+                          {t("Mobile overrides", "Eigene Mobilwerte")}
+                          <Smartphone size={14} />
+                        </summary>
+                        <p className="inspector-note">
+                          {t(
+                            "Empty values inherit desktop spacing. Columns inherit up to two for a readable mobile layout.",
+                            "Leere Werte übernehmen die Desktopabstände. Spalten werden für lesbare Mobilansichten auf maximal zwei begrenzt.",
+                          )}
+                        </p>
+                        {(
+                          [
+                            "mobile_columns",
+                            "mobile_gap",
+                            "mobile_padding",
+                          ] as const
+                        ).map((key, i) => (
+                          <Field
+                            key={key}
+                            label={
+                              [
+                                t("Mobile columns", "Mobile Spalten"),
+                                t("Mobile image gap", "Mobiler Bildabstand"),
+                                t(
+                                  "Mobile outer spacing",
+                                  "Mobiler Außenabstand",
+                                ),
+                              ][i]
+                            }
+                          >
+                            <input
+                              type="number"
+                              min={i === 0 ? 1 : 0}
+                              max={i === 0 ? 4 : i === 1 ? 40 : 80}
+                              placeholder={t("Inherit", "Übernehmen")}
+                              value={layout[key] ?? ""}
+                              onChange={(e) =>
+                                layoutChange(module.id, {
+                                  [key]:
+                                    e.target.value === ""
+                                      ? undefined
+                                      : Number(e.target.value),
+                                })
+                              }
+                            />
+                          </Field>
+                        ))}
+                      </details>
+                    </>
+                  )}
                   <h3 className="inspector-group-title">
-                    {t("Layout & typography", "Layout & Typografie")}
+                    {t("Appearance & typography", "Darstellung & Typografie")}
                   </h3>
                   {module && (
                     <details className="inspector-section">
@@ -1690,139 +1818,6 @@ export function ModularEditor() {
                       </Field>
                     </>
                   )}
-                  {module && !["text", "quote"].includes(module.kind) && (
-                    <>
-                      <details className="inspector-section" open>
-                        <summary>
-                          {t("Layout & spacing", "Layout & Abstände")}
-                          <ChevronDown size={14} />
-                        </summary>
-                        {["gallery", "wall", "pair", "chapter"].includes(
-                          module.kind,
-                        ) && (
-                          <>
-                            <WallSettings
-                              module={module}
-                              journey={j}
-                              onChange={(p) => layoutChange(module.id, p)}
-                              onPhoto={(p) =>
-                                selectCanvas({
-                                  type: "photo",
-                                  id: p.id,
-                                  moduleId: module.id,
-                                  placementId: p.placement_id,
-                                })
-                              }
-                            />
-                          </>
-                        )}
-                        <Field label={t("Image format", "Bildformat")}>
-                          <select
-                            value={layout.ratio || "original"}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                ratio: e.target.value as Layout["ratio"],
-                              })
-                            }
-                          >
-                            {ratios
-                              .filter((r) => r !== "free")
-                              .map((r) => (
-                                <option key={r} value={r}>
-                                  {r === "original"
-                                    ? t("Per photograph", "Pro Foto")
-                                    : r}
-                                </option>
-                              ))}
-                          </select>
-                        </Field>
-                        <Field
-                          label={`${t("Outer spacing", "Außenabstand")} · ${layout.padding ?? 36} px`}
-                        >
-                          <input
-                            type="range"
-                            min={0}
-                            max={160}
-                            value={layout.padding ?? 36}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                padding: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </Field>
-                        {module.kind === "filmstrip" && (
-                          <Field
-                            label={t(
-                              "Loop duration (seconds)",
-                              "Durchlaufdauer (Sekunden)",
-                            )}
-                          >
-                            <input
-                              type="range"
-                              min={10}
-                              max={180}
-                              value={layout.speed || 45}
-                              onChange={(e) =>
-                                layoutChange(module.id, {
-                                  speed: Number(e.target.value),
-                                })
-                              }
-                            />
-                          </Field>
-                        )}
-                      </details>
-                      <details className="inspector-section">
-                        <summary>
-                          {t("Mobile overrides", "Eigene Mobilwerte")}
-                          <Smartphone size={14} />
-                        </summary>
-                        <p className="inspector-note">
-                          {t(
-                            "Empty values inherit desktop spacing. Columns inherit up to two for a readable mobile layout.",
-                            "Leere Werte übernehmen die Desktopabstände. Spalten werden für lesbare Mobilansichten auf maximal zwei begrenzt.",
-                          )}
-                        </p>
-                        {(
-                          [
-                            "mobile_columns",
-                            "mobile_gap",
-                            "mobile_padding",
-                          ] as const
-                        ).map((key, i) => (
-                          <Field
-                            key={key}
-                            label={
-                              [
-                                t("Mobile columns", "Mobile Spalten"),
-                                t("Mobile image gap", "Mobiler Bildabstand"),
-                                t(
-                                  "Mobile outer spacing",
-                                  "Mobiler Außenabstand",
-                                ),
-                              ][i]
-                            }
-                          >
-                            <input
-                              type="number"
-                              min={i === 0 ? 1 : 0}
-                              max={i === 0 ? 4 : i === 1 ? 40 : 80}
-                              placeholder={t("Inherit", "Übernehmen")}
-                              value={layout[key] ?? ""}
-                              onChange={(e) =>
-                                layoutChange(module.id, {
-                                  [key]:
-                                    e.target.value === ""
-                                      ? undefined
-                                      : Number(e.target.value),
-                                })
-                              }
-                            />
-                          </Field>
-                        ))}
-                      </details>
-                    </>
-                  )}
                   {module &&
                     (["text", "quote", "chapter", "hero"].includes(
                       module.kind,
@@ -1845,6 +1840,26 @@ export function ModularEditor() {
                     <summary>
                       {t("Movement & details", "Bewegung & Details")}
                     </summary>
+                    {module?.kind === "filmstrip" && (
+                      <Field
+                        label={t(
+                          "Loop duration (seconds)",
+                          "Durchlaufdauer (Sekunden)",
+                        )}
+                      >
+                        <input
+                          type="range"
+                          min={10}
+                          max={180}
+                          value={layout.speed || 45}
+                          onChange={(e) =>
+                            layoutChange(module.id, {
+                              speed: Number(e.target.value),
+                            })
+                          }
+                        />
+                      </Field>
+                    )}
                     {!module && (
                       <label className="check-field">
                         <input

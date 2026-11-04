@@ -1,16 +1,14 @@
 import { Field } from "./components";
 import { ColorControl, NumberStepper } from "./EditorControls";
-import { PhotoWall } from "./PhotoWall";
 import { t } from "./I18n";
 import {
   editionColors,
   contrastRatio,
   surfaceColors,
-  modulePhotos,
   offsetsFor,
   typePresets,
 } from "./journalModel";
-import type { Chapter, Journey, Layout, Photo } from "./types";
+import type { Chapter, Journey, Layout } from "./types";
 export function AppearanceSettings({
   layout,
   edition,
@@ -27,17 +25,6 @@ export function AppearanceSettings({
   return (
     <details className="inspector-section">
       <summary>{t("Surface colour", "Hintergrundfarbe")}</summary>
-      <p className="inspector-note">
-        {moduleScope
-          ? t(
-              "This module: empty colour follows the journey or its own edition.",
-              "Dieses Modul: Eine leere Farbe folgt der Reise oder seiner eigenen Edition.",
-            )
-          : t(
-              "Journey default: modules inherit this surface unless they choose their own colour or edition.",
-              "Reisevorgabe: Module übernehmen diese Fläche, sofern sie keine eigene Farbe oder Edition wählen.",
-            )}
-      </p>
       <ColorControl
         label={t("Background", "Hintergrund")}
         resetLabel={
@@ -49,6 +36,17 @@ export function AppearanceSettings({
         fallback={inherited || editionColors[edition]}
         onChange={(background) => onChange({ background })}
       />
+      <p className="inspector-note">
+        {moduleScope
+          ? t(
+              "This module: empty colour follows the journey or its own edition.",
+              "Dieses Modul: Eine leere Farbe folgt der Reise oder seiner eigenen Edition.",
+            )
+          : t(
+              "Journey default: modules inherit this surface unless they choose their own colour or edition.",
+              "Reisevorgabe: Module übernehmen diese Fläche, sofern sie keine eigene Farbe oder Edition wählen.",
+            )}
+      </p>
     </details>
   );
 }
@@ -223,43 +221,16 @@ export function TypographySettings({
 }
 export function WallSettings({
   module,
-  journey,
   onChange,
-  onPhoto,
 }: {
   module: Chapter;
-  journey: Journey;
   onChange: (p: Partial<Layout>) => void;
-  onPhoto: (p: Photo) => void;
 }) {
   const layout = module.layout || {},
     columns = layout.columns || 4,
-    photos = modulePhotos(module, journey),
     offsets = offsetsFor(layout, columns);
   return (
     <>
-      <div
-        className="wall-live-preview"
-        aria-label={t("Live photo wall layout", "Live-Vorschau der Fotowand")}
-      >
-        <span>{t("Your wall, live", "Deine Fotowand, live")}</span>
-        {photos.length ? (
-          <div className="wall-preview-canvas">
-            <PhotoWall mini photos={photos} layout={layout} onPhoto={onPhoto} />
-          </div>
-        ) : (
-          <p>
-            {t(
-              "Add photographs to preview this layout.",
-              "Füge Fotos hinzu, um das Layout zu sehen.",
-            )}
-          </p>
-        )}
-        <small>
-          {columns} × {layout.rows || 4} · {photos.length}{" "}
-          {t("image placements", "Bildverwendungen")}
-        </small>
-      </div>
       <div className="field-pair">
         <NumberStepper
           label={t("Columns", "Spalten")}
@@ -276,86 +247,93 @@ export function WallSettings({
           onChange={(rows) => onChange({ rows })}
         />
       </div>
-      <p className="inspector-note">
-        {t(
-          "More images form the next group. The final row may remain incomplete.",
-          "Weitere Bilder bilden eine neue Gruppe. Die letzte Zeile darf unvollständig bleiben.",
-        )}
-      </p>
-      <Field
-        label={`${t("Image gap / overlap", "Bildabstand / Überlagerung")} · ${layout.gap ?? 18} px`}
-      >
-        <input
-          type="range"
-          min={-64}
-          max={80}
-          value={layout.gap ?? 18}
-          onChange={(e) => onChange({ gap: Number(e.target.value) })}
-        />
-      </Field>
-      <p className="inspector-note">
-        {t(
-          "Negative values overlap images. Focused photographs move to the foreground.",
-          "Negative Werte überlagern die Bilder. Fokussierte Fotos rücken nach vorne.",
-        )}
-      </p>
-      <Field label={t("Middle column offset", "Versatz der mittleren Spalten")}>
-        <input
-          type="range"
-          min={-160}
-          max={160}
-          value={layout.offset ?? 0}
-          onChange={(e) =>
-            onChange({
-              offset: Number(e.target.value),
-              align: "staggered",
-              column_offsets: undefined,
-            })
-          }
-        />
-      </Field>
-      <p className="inspector-note">
-        {t(
-          "Positive values raise the middle columns; negative values lower them.",
-          "Positive Werte heben die mittleren Spalten an, negative senken sie ab.",
-        )}
-      </p>
       <details className="column-fine">
         <summary>
-          {t("Adjust each column", "Spalten einzeln versetzen")}
+          {t("Spacing & column offsets", "Abstände & Spaltenversatz")}
         </summary>
-        {offsets.map((value, i) => (
-          <NumberStepper
-            key={i}
-            label={`${t("Column", "Spalte")} ${i + 1}`}
+        <p className="inspector-note">
+          {t(
+            "More images form the next group. The final row may remain incomplete.",
+            "Weitere Bilder bilden eine neue Gruppe. Die letzte Zeile darf unvollständig bleiben.",
+          )}
+        </p>
+        <Field
+          label={`${t("Image gap / overlap", "Bildabstand / Überlagerung")} · ${layout.gap ?? 18} px`}
+        >
+          <input
+            type="range"
+            min={-64}
+            max={80}
+            value={layout.gap ?? 18}
+            onChange={(e) => onChange({ gap: Number(e.target.value) })}
+          />
+        </Field>
+        <p className="inspector-note">
+          {t(
+            "Negative values overlap images. Focused photographs move to the foreground.",
+            "Negative Werte überlagern die Bilder. Fokussierte Fotos rücken nach vorne.",
+          )}
+        </p>
+        <Field
+          label={t("Middle column offset", "Versatz der mittleren Spalten")}
+        >
+          <input
+            type="range"
             min={-160}
             max={160}
-            value={value}
-            step={8}
-            onChange={(v) =>
+            value={layout.offset ?? 0}
+            onChange={(e) =>
               onChange({
-                column_offsets: offsets.map((old, index) =>
-                  i === index ? v : old,
-                ),
+                offset: Number(e.target.value),
+                align: "staggered",
+                column_offsets: undefined,
               })
             }
           />
-        ))}
+        </Field>
+        <p className="inspector-note">
+          {t(
+            "Positive values raise the middle columns; negative values lower them.",
+            "Positive Werte heben die mittleren Spalten an, negative senken sie ab.",
+          )}
+        </p>
+        <details className="column-fine">
+          <summary>
+            {t("Adjust each column", "Spalten einzeln versetzen")}
+          </summary>
+          {offsets.map((value, i) => (
+            <NumberStepper
+              key={i}
+              label={`${t("Column", "Spalte")} ${i + 1}`}
+              min={-160}
+              max={160}
+              value={value}
+              step={8}
+              onChange={(v) =>
+                onChange({
+                  column_offsets: offsets.map((old, index) =>
+                    i === index ? v : old,
+                  ),
+                })
+              }
+            />
+          ))}
+        </details>
+        <button
+          className="text-link"
+          type="button"
+          onClick={() =>
+            onChange({
+              offset: 0,
+              column_offsets: undefined,
+              align: "flush",
+              gap: 18,
+            })
+          }
+        >
+          {t("Reset arrangement", "Anordnung zurücksetzen")}
+        </button>
       </details>
-      <button
-        className="text-link"
-        type="button"
-        onClick={() =>
-          onChange({
-            offset: 0,
-            column_offsets: undefined,
-            align: "flush",
-            gap: 18,
-          })
-        }
-      >
-        {t("Reset arrangement", "Anordnung zurücksetzen")}
-      </button>
     </>
   );
 }

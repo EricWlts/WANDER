@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
 import { Picture } from "./components";
 import { modulePhotos, placementsFor } from "./journalModel";
@@ -21,51 +22,26 @@ export function ModulePhotographs({
   const frames = placementsFor(module, journey),
     photos = modulePhotos(module, journey),
     single = ["hero", "image"].includes(module.kind);
+  const [libraryOpen, setLibraryOpen] = useState(!photos.length);
   function commit(next: ImagePlacement[]) {
     onChange({ placements: next });
   }
   return (
-    <details className="inspector-section" open>
-      <summary>{t("Photographs", "Fotosammlung")}</summary>
-      <p className="inspector-note">
-        {t(
-          "Images can be reused. Each placement has its own crop.",
-          "Bilder dürfen mehrfach vorkommen. Jede Verwendung hat einen eigenen Zuschnitt.",
-        )}
-      </p>
-      <div className="inspector-photo-picker">
-        {journey.photos.map((p, i) => {
-          const count = frames.filter((f) => f.photo_id === p.id).length;
-          return (
-            <div className="inspector-source" key={p.id}>
-              <button
-                type="button"
-                aria-label={`${t("Add photograph", "Foto hinzufügen")} ${i + 1}`}
-                onClick={() =>
-                  commit([
-                    ...(single ? [] : frames),
-                    { id: crypto.randomUUID(), photo_id: p.id },
-                  ])
-                }
-                className={count ? "selected" : ""}
-              >
-                <Picture photo={p} sizes="120px" />
-                <span>{count || <Plus size={12} />}</span>
-              </button>
-              <button
-                className="source-delete danger-action"
-                type="button"
-                disabled={deleteDisabled}
-                aria-label={`${t("Delete photograph", "Foto löschen")} ${i + 1}`}
-                title={t("Delete from collection", "Aus Fotosammlung löschen")}
-                onClick={() => onDelete(p)}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+    <section
+      className="inspector-images"
+      aria-label={t("Image content", "Bildinhalt")}
+    >
+      <h4 className="inspector-images-title">
+        {t("In this module", "In diesem Modul")} · {photos.length}
+      </h4>
+      {!photos.length && (
+        <p className="inspector-note">
+          {t(
+            "Choose a photograph below or upload an image.",
+            "Wähle unten ein Foto oder lade ein Bild hoch.",
+          )}
+        </p>
+      )}
       <ol className="placement-list">
         {photos.map((p, i) => (
           <li key={p.placement_id}>
@@ -145,6 +121,58 @@ export function ModulePhotographs({
           </li>
         ))}
       </ol>
-    </details>
+      <details
+        className="inspector-library"
+        open={libraryOpen}
+        onToggle={(event) => setLibraryOpen(event.currentTarget.open)}
+      >
+        <summary>
+          {t("Choose from collection", "Aus Fotosammlung wählen")} ·{" "}
+          {journey.photos.length}
+        </summary>
+        <div className="inspector-photo-picker">
+          {journey.photos.map((p, i) => {
+            const count = frames.filter((f) => f.photo_id === p.id).length;
+            return (
+              <div className="inspector-source" key={p.id}>
+                <button
+                  type="button"
+                  aria-label={`${t("Add photograph", "Foto hinzufügen")} ${i + 1}`}
+                  onClick={() =>
+                    commit([
+                      ...(single ? [] : frames),
+                      { id: crypto.randomUUID(), photo_id: p.id },
+                    ])
+                  }
+                  className={count ? "selected" : ""}
+                >
+                  <Picture photo={p} sizes="120px" />
+                  <span>{count || <Plus size={12} />}</span>
+                </button>
+                <button
+                  className="source-delete danger-action"
+                  type="button"
+                  disabled={deleteDisabled}
+                  aria-label={`${t("Delete photograph", "Foto löschen")} ${i + 1}`}
+                  title={t(
+                    "Delete from collection",
+                    "Aus Fotosammlung löschen",
+                  )}
+                  onClick={() => onDelete(p)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <p className="inspector-note">
+          {t(
+            "Images can be reused. Each placement has its own crop.",
+            "Bilder dürfen mehrfach vorkommen. Jede Verwendung hat einen eigenen Zuschnitt.",
+          )}
+        </p>
+      </details>
+    </section>
   );
 }

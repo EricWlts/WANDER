@@ -1925,3 +1925,145 @@ body {
     font-size: 12px;
   }
 }
+
+/* D03: compact inspector rhythm, image content first, secondary settings disclosed. */
+.module-inspector {
+  --ui-field-gap: 12px;
+  --ui-group-gap: 16px;
+  --ui-section-gap: 16px;
+}
+.module-inspector .panel-heading {
+  padding-bottom: 14px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.module-inspector .inspector-selection {
+  gap: 4px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.module-inspector .inspector-selection .text-link {
+  text-align: left;
+  justify-self: start;
+}
+.module-inspector .inspector-group-title {
+  margin: 20px 0 12px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.module-inspector .inspector-selection + .inspector-group-title {
+  margin-top: 0;
+}
+.module-inspector .inspector-section {
+  padding: 4px 0 0;
+}
+.module-inspector .inspector-section > summary,
+.module-inspector .inspector-library > summary {
+  align-items: center;
+  margin-bottom: 0;
+  line-height: 1.5;
+  gap: 8px;
+}
+.module-inspector .inspector-section[open] > summary,
+.module-inspector .inspector-library[open] > summary {
+  margin-bottom: 12px;
+}
+.module-inspector .inspector-section > summary::after,
+.module-inspector .inspector-library > summary::after {
+  content: "+";
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.module-inspector .inspector-section[open] > summary::after,
+.module-inspector .inspector-library[open] > summary::after {
+  content: "−";
+}
+.module-inspector .inspector-section > summary > svg {
+  display: none;
+}
+.module-inspector .inspector-note {
+  margin-bottom: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.module-inspector .inspector-images-title {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.module-inspector .inspector-library {
+  border-top: 1px solid var(--line);
+  margin: 8px 0 12px;
+}
+.module-inspector .inspector-library > summary {
+  display: flex;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+}
+.module-inspector .placement-list {
+  max-height: 264px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 2px;
+  gap: 0;
+}
+.module-inspector .placement-list:empty {
+  display: none;
+}
+.module-inspector .placement-list li:first-child {
+  border-top: 0;
+}
+.module-inspector .inspector-photo-picker {
+  max-height: 252px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.module-inspector .color-input {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+.module-inspector .color-input input[type="color"] {
+  appearance: auto;
+  width: 48px;
+  padding: 3px;
+  border: 1px solid var(--muted);
+}
+.module-inspector .color-input input:not([type="color"]) {
+  font-size: 16px;
+}
+.module-inspector .color-swatches button {
+  min-width: 32px;
+  min-height: 32px;
+}
+@media (max-width: 760px) {
+  .module-inspector .placement-actions button,
+  .module-inspector .color-swatches button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .module-inspector .placement-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.module-inspector .upload-pick {
+  min-height: 80px;
+  padding: 12px;
+  gap: 4px;
+}
+.module-inspector .upload-pick > svg {
+  width: 18px;
+  height: 18px;
+}
+.module-inspector .inspector-selection .text-link {
+  border-bottom: 0;
+  font-size: 12px;
+}
+
+.module-inspector .upload-component > input[type="file"] {
+  width: 1px;
+}

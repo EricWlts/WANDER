@@ -225,7 +225,8 @@ p {
   transform: translateY(0);
 }
 .site-header {
-  margin: 0 var(--gutter);
+  margin: 0;
+  padding-inline: var(--gutter);
   height: 99px;
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -2003,7 +2004,9 @@ input[type="radio"] {
   }
 }
 @media (min-width: 1800px) {
-  .site-header,
+  .site-header {
+    padding-inline: calc(var(--gutter) + max(0px, (100vw - 1840px) / 2));
+  }
   .site-footer {
     padding-left: max(0px, calc((100vw - 1840px) / 2));
     padding-right: max(0px, calc((100vw - 1840px) / 2));
@@ -2088,8 +2091,8 @@ input[type="radio"] {
     display: none;
     position: absolute;
     top: 78px;
-    left: -22px;
-    right: -22px;
+    left: 0;
+    right: 0;
     padding: 30px 22px 35px;
     background: #26312c;
     color: #d1d9d2;

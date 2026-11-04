@@ -1,3 +1,12 @@
+# Aktueller Auftrag — Durchgehend dunkler Header (04.11.2026)
+
+- Scope: helle Seitenränder am Header entfernen; bestehende Headerfarbe #26312c über die gesamte Fensterbreite. Positionen, Höhe, Navigation und Animationen erhalten.
+- Draft: `/Users/ericwilts/.codex/worktrees/header-full-width/WANDER`, Branch `codex/header-full-width`, Ausgang `919cc9a`. Bestehender ungesicherter TASKS-Inhalt erhalten; übrige Originaländerungen nicht übernommen.
+- Abnahme: Header ohne helle Seitenränder auf Desktop, breitem Desktop und Mobil; kein horizontaler Überlauf; Mobilmenü, Sprachwahl und Navigation erhalten. Frontendtests, Build, Browserprüfung und gezielter Selbstreview. Keine Abhängigkeiten, Daten-/Secret-/Umgebungsänderungen, kein Push/Deployment.
+- Ergebnis: Header-Außenabstand in gleich großes Innenpadding verschoben; bisherige Inhaltspositionen auch über1800px erhalten. Mobiles Menü auf den jetzt vollständigen Headerrahmen ausgerichtet.
+- Checks:74/74 Frontendtests, TypeScript-/Vite-Produktionsbuild und `git diff --check` erfolgreich. Native Browserprüfung bei390/1440/2000px: Headerkanten0/Fensterbreite, Farbe rgb(38,49,44), Überlauf0; Menü öffnen/Escape und DE/EN erfolgreich. Produktionsvorschau zusätzlich Desktop/Mobil gesichtet. Gezielter Selbstreview und nativer Reviewbereich; ausschließlich CSS und dieser Aufgabenvermerk.
+- Status: geprüft; lokale Integration autorisiert. Keine offenen Befunde im Auftragsumfang.
+
 # Aktueller Auftrag D06b — Einheitlicher Bild-Parallax
 
 - Scope: genau ein Parallax-Schalter für technisch geeignete Bildmodule im gemeinsamen Editor-/Public-Renderer. Explizite Aktivierung nutzt feste bisherige Maximalstärke140; keine Parallax-Parameter. Unberührte Bestandscover behalten Standard90 bzw. gespeicherte Stärke und An/Aus.

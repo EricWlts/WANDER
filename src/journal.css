@@ -193,7 +193,7 @@ textarea:focus-visible,
   letter-spacing: 0.1em;
 }
 .journal-cover h1 {
-  font: 400 clamp(56px, 8vw, var(--cover-title-size, 100px))/0.97 var(--serif);
+  font: 400 clamp(28px, var(--cover-title-size, 100px), 160px)/0.97 var(--serif);
   letter-spacing: -0.035em;
   margin: 18px 0;
   overflow-wrap: anywhere;
@@ -210,7 +210,7 @@ textarea:focus-visible,
   bottom: -12px;
 }
 .cover-overlap h1 {
-  font-size: clamp(54px, 7vw, var(--cover-title-size, 100px));
+  font-size: clamp(28px, var(--cover-title-size, 100px), 160px);
 }
 .cover-overlay .journal-cover-copy {
   left: 5%;
@@ -515,7 +515,7 @@ textarea:focus-visible,
   padding-right: var(--module-padding, 36px);
 }
 .journal-module h2 {
-  font: 400 clamp(34px, 5vw, var(--module-title-size, 72px))/1.08 var(--serif);
+  font: 400 clamp(28px, var(--module-title-size, 72px), 160px)/1.08 var(--serif);
   letter-spacing: -0.025em;
   margin: 0 0 22px;
   overflow-wrap: anywhere;
@@ -631,7 +631,7 @@ textarea:focus-visible,
   pointer-events: none;
 }
 .module-cover-copy h2 {
-  font-size: clamp(36px, 6vw, var(--module-title-size, 72px));
+  font-size: clamp(28px, var(--module-title-size, 72px), 160px);
 }
 .module-cover-copy p {
   max-width: 520px;
@@ -1691,7 +1691,7 @@ textarea:focus-visible,
   }
   .journal-cover h1,
   .cover-overlap h1 {
-    font-size: clamp(48px, 12vw, 90px);
+    font-size: clamp(28px, calc(28px + (var(--cover-title-size, 100px) - 28px) * 0.2575758), 62px);
   }
   .journal-cover-copy .eyebrow {
     font-size: 11px;
@@ -1756,7 +1756,7 @@ textarea:focus-visible,
     grid-template-columns: 1fr;
   }
   .journal-module h2 {
-    font-size: clamp(34px, 9vw, 58px);
+    font-size: clamp(28px, calc(28px + (var(--module-title-size, 72px) - 28px) * 0.2575758), 62px);
   }
   .module-prose {
     font-size: 16px;
@@ -1769,7 +1769,7 @@ textarea:focus-visible,
     max-width: 90%;
   }
   .module-cover-copy h2 {
-    font-size: 40px;
+    font-size: clamp(28px, calc(28px + (var(--module-title-size, 72px) - 28px) * 0.2575758), 62px);
   }
   .module-cover-copy p {
     font-size: 14px;

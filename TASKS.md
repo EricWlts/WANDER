@@ -1,3 +1,10 @@
+### UI01 — Quiet Atlas in der Editionsübersicht einrahmen (04.11.2026)
+
+- Auftrag: Quiet-Atlas-Cover in der Editionsübersicht erhält eine zurückhaltende visuelle Begrenzung, damit der helle Bildabzug in der hellen Fläche klar verankert wirkt. Andere Editionen und bestehende Gestaltung bleiben unverändert.
+- Basis/Draft: `1d3ad3baa6614740d3cc513e168a30d47f5d7223`, `/Users/ericwilts/.codex/worktrees/quiet-atlas-frame/WANDER`; isolierter Codex-Worktree. Der Originalcheckout enthält bestehende, ungesicherte Dokument-/Orchestratoränderungen; sie wurden erhalten.
+- Scope: nur `.inspiration-page .edition-quiet-atlas .edition-cover` in `src/refinement.css` sowie dieser Aufgabenvermerk.
+- Ergebnis: dezente 1px-Innenkontur in `#c7cbc4` verankert die helle Quiet-Atlas-Coverfläche, ohne Maße oder Bildausschnitt zu ändern. Desktopvorschau auf `/inspiration` geprüft: Linie sichtbar, After Hours unverändert.
+- Checks: `npm run test:frontend` 55/55; `npm run build` erfolgreich (2072 Module); `git diff --check` sauber. Vorschau unter `http://127.0.0.1:5174/inspiration`. Kein Backend erforderlich, keine Daten geändert, kein Push/Deployment.
 ### F04 — Gemeinsame Bildzustände absichern (02.11.2026)
 
 - Auftrag/Abnahme: ausschließlich W13-Picture-Risiken für verzögertes/fehlgeschlagenes Laden, URL/srcset/sizes-Wechsel, späte Decode-Ereignisse und Cachefälle beheben. Lade-/Fehleranzeige und Bildflächen stabil; Zuschnitt, Zoom, Positionierung, Galerie-/Lightbox-Verträge und Designrichtung erhalten. Gezielte Regressionstests, vollständige Frontendtests, Produktionsbuild, Desktop-/Mobilbrowser DE/EN und unabhängiger Sol-Review. Nach vollständiger Abnahme lokal integrieren/committen; kein Push/Deployment.

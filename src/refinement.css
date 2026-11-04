@@ -1626,6 +1626,7 @@ body {
 }
 .inspiration-page .edition-quiet-atlas .edition-cover {
   background: #ecedeb;
+  box-shadow: inset 0 0 0 1px #c7cbc4;
 }
 .inspiration-page .edition-quiet-atlas .edition-cover > img {
   inset: 24px 24px 80px;

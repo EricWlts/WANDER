@@ -275,6 +275,67 @@ textarea:focus-visible,
   background: #f4f0e8;
   border-bottom: 1px solid #d3d7cf;
 }
+.chapter-overview-quiet {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-inline: 20px;
+  color: #26302b;
+  background: #e3e9e0;
+  border-bottom-color: #c9d2c6;
+}
+@media (min-width: 761px) {
+  .chapter-overview-quiet {
+    margin-inline: clamp(28px, 6vw, 96px);
+  }
+}
+.chapter-overview.chapter-overview-quiet .chapter-overview-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  list-style: none;
+  margin: 0;
+  padding: 7px 0;
+  scrollbar-width: thin;
+}
+.chapter-overview.chapter-overview-quiet li {
+  flex: 0 0 auto;
+}
+.chapter-overview.chapter-overview-quiet li + li {
+  border-top: 0;
+}
+.chapter-overview.chapter-overview-quiet a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chapter-overview.chapter-overview-quiet a:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chapter-overview.chapter-overview-quiet time {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.chapter-overview-quiet a.is-current {
+  color: #f7f8f4;
+  background: #52624d;
+}
+.chapter-overview-quiet a.is-current time {
+  color: #e5e9e1;
+}
+.canvas-theme-quiet-atlas .module-chapter {
+  scroll-margin-top: 72px;
+}
 .chapter-overview summary {
   min-height: 44px;
   display: flex;

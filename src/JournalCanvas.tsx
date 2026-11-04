@@ -1,15 +1,9 @@
-import {
-  type CSSProperties,
-  type MouseEvent,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { ArrowDown, Camera, Pencil } from "lucide-react";
 import { Picture, dateRange, dateLabel } from "./components";
 import { Reveal, resolveReveal, journeyReveal } from "./Reveal";
 import { Parallax } from "./Motion";
+import { QuietAtlasChapterCompass } from "./QuietAtlasChapterCompass";
 import { PhotoRail, Filmstrip } from "./StoryExperience";
 import { t } from "./I18n";
 import {
@@ -95,99 +89,6 @@ function followChapterLink(event: MouseEvent<HTMLAnchorElement>) {
       ? "instant"
       : "smooth",
   });
-}
-function QuietAtlasChapterNavigation({
-  chapters,
-}: {
-  chapters: Chapter[];
-}) {
-  const navigationRef = useRef<HTMLElement | null>(null);
-  const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id);
-  const chapterIds = chapters.map((chapter) => chapter.id);
-  const chapterKey = chapterIds.join(",");
-
-  useEffect(() => {
-    const navigation = navigationRef.current;
-    const document = navigation?.ownerDocument;
-    const view = document?.defaultView;
-    setActiveChapterId(chapterIds[0]);
-    if (!navigation || !document || !view?.IntersectionObserver) return;
-
-    const observer = new view.IntersectionObserver(
-      (entries) => {
-        const current = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
-          )[0];
-        if (!current) return;
-        const id = Number(current.target.id.replace("canvas-module-", ""));
-        if (Number.isInteger(id)) setActiveChapterId(id);
-      },
-      { rootMargin: "-80px 0px -75% 0px", threshold: 0 },
-    );
-
-    chapterIds.forEach((id) => {
-      const chapter = document.getElementById(`canvas-module-${id}`);
-      if (chapter) observer.observe(chapter);
-    });
-    return () => observer.disconnect();
-  }, [chapterKey]);
-
-  useEffect(() => {
-    const navigation = navigationRef.current;
-    const list = navigation?.querySelector<HTMLOListElement>(
-      ".chapter-overview-list",
-    );
-    const current = navigation?.querySelector<HTMLAnchorElement>(
-      `[data-chapter-id="${activeChapterId}"]`,
-    );
-    if (!list || !current) return;
-
-    const listBounds = list.getBoundingClientRect();
-    const currentBounds = current.getBoundingClientRect();
-    if (currentBounds.left < listBounds.left)
-      list.scrollLeft -= listBounds.left - currentBounds.left;
-    else if (currentBounds.right > listBounds.right)
-      list.scrollLeft += currentBounds.right - listBounds.right;
-  }, [activeChapterId]);
-
-  return (
-    <nav
-      ref={navigationRef}
-      className="chapter-overview chapter-overview-quiet"
-      aria-label={t("Chapters", "Kapitel")}
-    >
-      <ol className="chapter-overview-list">
-        {chapters.map((chapter) => (
-          <li key={chapter.id}>
-            <a
-              href={`#canvas-module-${chapter.id}`}
-              onClick={followChapterLink}
-              data-chapter-id={chapter.id}
-              className={
-                chapter.id === activeChapterId ? "is-current" : undefined
-              }
-              aria-current={
-                chapter.id === activeChapterId ? "location" : undefined
-              }
-            >
-              {chapter.date && (
-                <time dateTime={chapter.date}>
-                  {dateLabel(chapter.date, {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </time>
-              )}
-              <span>{chapter.title}</span>
-            </a>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
 }
 function Selectable({
   children,
@@ -593,9 +494,10 @@ export function JournalCanvas({
           <ArrowDown size={20} />
         </a>
       </Selectable>
-      {!editing && rootChapters.length > 1 && (
-        edition === "quiet-atlas" ? (
-          <QuietAtlasChapterNavigation chapters={rootChapters} />
+      {!editing &&
+        rootChapters.length > 1 &&
+        (edition === "quiet-atlas" ? (
+          <QuietAtlasChapterCompass chapters={rootChapters} />
         ) : (
           <details className="chapter-overview">
             <summary>
@@ -624,8 +526,7 @@ export function JournalCanvas({
               ))}
             </ol>
           </details>
-        )
-      )}
+        ))}
       <div id="journal-content" className="journal-content">
         {journey.introduction && (
           <Selectable

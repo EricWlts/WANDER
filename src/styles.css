@@ -233,6 +233,9 @@ p {
   gap: 40px;
   position: relative;
   z-index: 10;
+  background: #26312c;
+  color: #d1d9d2;
+  border-color: #3b4740;
 }
 .wordmark {
   display: flex;
@@ -259,7 +262,7 @@ p {
   display: flex;
   align-items: center;
   gap: 34px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .site-header nav > a {
   position: relative;
@@ -272,24 +275,27 @@ p {
   left: 0;
   width: 0;
   height: 1px;
-  background: var(--ink);
+  background: currentColor;
   transition: width 0.25s;
 }
 .site-header nav > a.active:after,
 .site-header nav > a:hover:after {
   width: 100%;
 }
-.site-header sup {
-  font-size: 7px;
-  margin-left: 3px;
-  vertical-align: super;
-}
 .site-header .studio-link {
   margin-left: 15px;
   display: flex;
   gap: 12px;
   align-items: center;
-  color: #646a5b;
+  color: #b1c0b5;
+}
+.site-header .header-caption {
+  color: #b1c0b5;
+}
+.site-header a:focus-visible,
+.site-header button:focus-visible,
+.site-header select:focus-visible {
+  outline-color: #d1d9d2;
 }
 .menu-toggle {
   display: none;
@@ -2085,8 +2091,9 @@ input[type="radio"] {
     left: -22px;
     right: -22px;
     padding: 30px 22px 35px;
-    background: var(--paper);
-    border-bottom: 1px solid var(--line);
+    background: #26312c;
+    color: #d1d9d2;
+    border-bottom: 1px solid #3b4740;
     font-size: 18px;
     box-shadow: 0 20px 25px #2222220d;
   }

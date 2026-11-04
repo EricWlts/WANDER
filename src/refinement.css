@@ -1709,6 +1709,17 @@ body {
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
+.inspiration-page .edition-copy h2::after {
+  content: "";
+  display: block;
+  width: 42px;
+  height: 1px;
+  margin-top: 14px;
+  background: #626d5c;
+}
+.inspiration-page .edition-after-hours .edition-copy h2::after {
+  background: #d6dabd;
+}
 .inspiration-page .edition-copy p {
   max-width: 42ch;
   min-height: 0;

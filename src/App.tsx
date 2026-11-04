@@ -217,7 +217,6 @@ function Header() {
       >
         <NavLink to="/" end>
           {tr("Journal")}
-          <sup>01</sup>
         </NavLink>
         <NavLink to="/archive">{tr("The archive")}</NavLink>
         <NavLink to="/inspiration">{tr("The editions")}</NavLink>

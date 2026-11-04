@@ -53,7 +53,8 @@ function layout(value: unknown): boolean {
     optional(value, "parent_id", id) &&
     optional(value, "background text_color", text) &&
     optional(value, "hover_zoom parallax_intensity text_width font_weight text_size inset columns rows gap padding offset mobile_columns mobile_gap mobile_padding title_size speed", number) &&
-    optional(value, "text_animations show_title parallax", boolean) &&
+    optional(value, "text_animations show_title parallax rail_loop", boolean) &&
+    optional(value, "rail_mode", oneOf("free", "single")) &&
     optional(value, "text_position", oneOf("left", "center", "right", "full")) &&
     optional(value, "text_align", oneOf("left", "center", "right")) &&
     optional(value, "text_preset", oneOf("small", "medium", "large", "display")) &&

@@ -34,6 +34,7 @@ import {
   AppearanceSettings,
   TypographySettings,
   WallSettings,
+  RailSettings,
   MediaLayoutSettings,
 } from "./ModuleSettings";
 import { ModulePhotographs } from "./ModulePhotographs";
@@ -1765,6 +1766,14 @@ export function ModularEditor() {
                               onChange={(p) => layoutChange(module.id, p)}
                             />
                           </>
+                        )}
+                        {(module.kind === "rail" ||
+                          (module.kind === "chapter" &&
+                            module.gallery_mode === "horizontal")) && (
+                          <RailSettings
+                            layout={layout}
+                            onChange={(p) => layoutChange(module.id, p)}
+                          />
                         )}
                         {module.kind !== "filmstrip" && (
                           <MediaLayoutSettings

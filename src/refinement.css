@@ -2086,3 +2086,59 @@ body {
 .module-drop-before::before { top: 0; }
 .module-drop-after::after { bottom: 0; }
 .collection-grid button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* D05b: opt-in manual pages; the automatic filmstrip remains independent. */
+.single-rail {
+  gap: 0;
+  scroll-snap-type: x mandatory !important;
+}
+.single-rail > figure {
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.single-rail .picture,
+.single-rail .picture[style*="aspect-ratio"] {
+  height: min(65svh, 720px) !important;
+  aspect-ratio: auto !important;
+  --active-hover: 1 !important;
+}
+.single-rail .picture img {
+  object-fit: contain;
+}
+.rail-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.rail-position {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  font-variant-numeric: tabular-nums;
+}
+.rail-navigation > div {
+  display: flex;
+  gap: 8px;
+}
+.rail-navigation button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  color: inherit;
+  background: transparent;
+}
+.rail-navigation button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.photo-rail-shell[data-rail-mode="free"][data-rail-loop="true"] .free-rail > figure:last-child {
+  margin-right: var(--rail-tail-space, 0px);
+}

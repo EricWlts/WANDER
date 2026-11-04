@@ -173,3 +173,17 @@ test("unknown fields and unresolved source references do not invalidate compatib
   value.chapters[1].layout!.placements!.push({ id: "missing", photo_id: 404 });
   assert.equal(isRecoveryJourney({ ...value, future_metadata: { version: 2 } }, 1), true);
 });
+
+
+test("manual rail modes survive recovery and malformed options are ignored", () => {
+  for (const rail_mode of ["free", "single"] as const) for (const rail_loop of [false, true]) {
+    const value = draft();
+    value.chapters[1].layout = { rail_mode, rail_loop };
+    assert.equal(isRecoveryJourney(JSON.parse(JSON.stringify(value)), 1), true);
+  }
+  for (const invalid of [{ rail_mode: "automatic" }, { rail_loop: "true" }]) {
+    const value = draft();
+    Object.assign(value.chapters[1].layout!, invalid);
+    assert.equal(isRecoveryJourney(value, 1), false);
+  }
+});

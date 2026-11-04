@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { sequenceIndex } from "./journalModel";
 import { effectivePhotoRatio } from "./storyLayout";
+import { railOptions, railDestination, railIndex, railPhoto, railTailSpace, railBoundaryDirection } from "./photoRailModel";
 import {
   PhotoViewerModel,
   decodedImageRequest,
@@ -40,6 +41,7 @@ import type {
   Chapter,
   Journey,
   Photo,
+  Layout,
   RevealConfig,
   StoryTemplate,
 } from "./types";
@@ -369,65 +371,238 @@ export function DayTeaser({
 export function PhotoRail({
   photos,
   onPhoto,
+  layout = {},
 }: {
   photos: Photo[];
   onPhoto: (photo: Photo) => void;
+  layout?: Layout;
 }) {
   const ref = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; left: number; active: boolean } | null>(null),
-    suppress = useRef(false);
+    drag = useRef<{
+      x: number;
+      y: number;
+      left: number;
+      end: boolean;
+      mouse: boolean;
+      active: boolean;
+    } | null>(null),
+    suppress = useRef(false),
+    touch = useRef<{
+      x: number;
+      y: number;
+      start: boolean;
+      end: boolean;
+    } | null>(null),
+    wheel = useRef({ time: 0, wrapped: false }),
+    activeIndex = useRef(0);
+  const [index, setIndex] = useState(0);
+  const { single, loop } = railOptions(layout);
+  const enhanced = single || loop;
+  const sequenceKey = photos
+    .map((photo, position) => photo.placement_id || `${photo.id}:${position}`)
+    .join("\0");
+  const starts = () => {
+    const rail = ref.current;
+    return rail
+      ? Array.from(
+          rail.children,
+          (child) =>
+            (child as HTMLElement).offsetLeft -
+            (rail.firstElementChild as HTMLElement).offsetLeft,
+        )
+      : [];
+  };
+  const currentIndex = () => {
+    const rail = ref.current;
+    if (!rail) return 0;
+    return railIndex(rail.scrollLeft, starts());
+  };
+  const updateIndex = (next: number) => {
+    activeIndex.current = next;
+    setIndex(next);
+  };
+  const go = (next: number) => {
+    const rail = ref.current;
+    if (!rail) return;
+    // Immediate scrolling also respects global pause and reduced motion; no timer
+    // or automatic movement is involved, including at the loop boundary.
+    rail.scrollLeft = starts()[next] || 0;
+    updateIndex(next);
+  };
+  const step = (direction: number) =>
+    go(railDestination(activeIndex.current, direction, photos.length, loop));
+  const wrap = (direction: number, atStart: boolean, atEnd: boolean) => {
+    if (!loop || photos.length < 2) return false;
+    if (direction < 0 && atStart) {
+      go(photos.length - 1);
+      return true;
+    }
+    if (direction > 0 && atEnd) {
+      go(0);
+      return true;
+    }
+    return false;
+  };
+  useLayoutEffect(() => {
+    const rail = ref.current;
+    if (!rail || !enhanced) return;
+    const last = rail.lastElementChild as HTMLElement | null;
+    const sync = () => {
+      rail.style.setProperty("--rail-tail-space", `${loop && !single && photos.length > 1 && last ? railTailSpace(rail.clientWidth, last.offsetWidth) : 0}px`);
+      if (single)
+        go(Math.max(0, Math.min(activeIndex.current, photos.length - 1)));
+      else updateIndex(currentIndex());
+    };
+    const observer = new ResizeObserver(sync);
+    observer.observe(rail);
+    if (last) observer.observe(last);
+    return () => {
+      observer.disconnect();
+      rail.style.removeProperty("--rail-tail-space");
+    };
+    // Reconfigure only when the sequence or mode changes, never on manual scroll.
+  }, [single, loop, enhanced, photos.length, sequenceKey]);
+  useEffect(() => {
+    const rail = ref.current;
+    if (!rail || !loop) return;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      const now = Date.now(),
+        fresh = now - wheel.current.time > 220;
+      if (fresh) wheel.current.wrapped = false;
+      wheel.current.time = now;
+      if (wheel.current.wrapped) {
+        event.preventDefault();
+        return;
+      }
+      // Momentum arriving at an edge never wraps. A fresh outward gesture does.
+      if (
+        fresh &&
+        wrap(
+          Math.sign(event.deltaX),
+          rail.scrollLeft <= 1,
+          rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1,
+        )
+      ) {
+        wheel.current.wrapped = true;
+        event.preventDefault();
+      }
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const gesture = touch.current, point = event.touches[0];
+      if (!gesture || !point || event.touches.length !== 1) return;
+      // Cancel the outward native drag before it creates momentum. Wrapping on
+      // touchend then cannot be undone by inertia from that same gesture.
+      if (railBoundaryDirection(gesture.x - point.clientX, gesture.y - point.clientY,
+        gesture.start, gesture.end, 6)) event.preventDefault();
+    };
+    rail.addEventListener("wheel", onWheel, { passive: false });
+    rail.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      rail.removeEventListener("wheel", onWheel);
+      rail.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [loop, photos.length]);
   if (!photos.length) return null;
   return (
-    <div className="photo-rail-shell">
+    <div
+      className="photo-rail-shell"
+      data-rail-mode={single ? "single" : "free"}
+      data-rail-loop={loop || undefined}
+    >
       <div
-        className="photo-rail free-rail"
+        className={`photo-rail free-rail${single ? " single-rail" : ""}`}
         ref={ref}
         tabIndex={0}
         role="region"
         aria-label={t("Horizontal photographs", "Horizontale Bildreihe")}
+        onScroll={() => enhanced && updateIndex(currentIndex())}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
           if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
             e.preventDefault();
-            e.currentTarget.scrollLeft +=
-              (e.key === "ArrowRight" ? 1 : -1) * 80;
+            if (enhanced) step(e.key === "ArrowRight" ? 1 : -1);
+            else
+              e.currentTarget.scrollLeft +=
+                (e.key === "ArrowRight" ? 1 : -1) * 80;
           }
-          if (e.key === "Home") {
+          if (e.key === "Home" || e.key === "End") {
             e.preventDefault();
-            e.currentTarget.scrollLeft = 0;
-          }
-          if (e.key === "End") {
-            e.preventDefault();
-            e.currentTarget.scrollLeft = e.currentTarget.scrollWidth;
+            if (enhanced) go(e.key === "Home" ? 0 : photos.length - 1);
+            else
+              e.currentTarget.scrollLeft =
+                e.key === "Home" ? 0 : e.currentTarget.scrollWidth;
           }
         }}
+        onTouchStart={(e) => {
+          const point = e.touches[0],
+            rail = e.currentTarget;
+          touch.current =
+            e.touches.length === 1
+              ? {
+                  x: point.clientX,
+                  y: point.clientY,
+                  start: rail.scrollLeft <= 1,
+                  end:
+                    rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1,
+                }
+              : null;
+        }}
+        onTouchEnd={(e) => {
+          const gesture = touch.current,
+            point = e.changedTouches[0];
+          touch.current = null;
+          if (!gesture || !point) return;
+          const dx = gesture.x - point.clientX,
+            dy = gesture.y - point.clientY;
+          const direction = railBoundaryDirection(dx, dy, gesture.start, gesture.end);
+          if (direction) wrap(direction, gesture.start, gesture.end);
+        }}
+        onTouchCancel={() => {
+          touch.current = null;
+        }}
         onPointerDown={(e) => {
-          if (e.pointerType === "mouse" && e.button === 0) {
-            drag.current = {
-              x: e.clientX,
-              left: e.currentTarget.scrollLeft,
-              active: false,
-            };
-            suppress.current = false;
-          }
+          if (e.button !== 0) return;
+          drag.current = {
+            x: e.clientX,
+            y: e.clientY,
+            left: e.currentTarget.scrollLeft,
+            end:
+              e.currentTarget.scrollLeft >=
+              e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 1,
+            mouse: e.pointerType === "mouse",
+            active: false,
+          };
+          suppress.current = false;
         }}
         onPointerMove={(e) => {
           const d = drag.current;
-          if (!d) return;
+          if (!d || !d.mouse) return;
           const distance = e.clientX - d.x;
           if (Math.abs(distance) > 6) {
             d.active = true;
             suppress.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
+            if (single) e.currentTarget.style.setProperty("scroll-snap-type", "none", "important");
             e.currentTarget.scrollLeft = d.left - distance;
           }
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          const d = drag.current;
           drag.current = null;
+          e.currentTarget.style.removeProperty("scroll-snap-type");
+          if (!d) return;
+          const dx = d.x - e.clientX,
+            dy = d.y - e.clientY;
+          const horizontal = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy);
+          if (d.mouse && horizontal && wrap(Math.sign(dx), d.left <= 1, d.end))
+            return;
+          if (single && d.mouse && d.active) go(currentIndex());
         }}
         onPointerCancel={() => {
           drag.current = null;
           suppress.current = false;
+          if (ref.current) ref.current.style.removeProperty("scroll-snap-type");
         }}
         onClickCapture={(e) => {
           if (suppress.current) {
@@ -443,13 +618,11 @@ export function PhotoRail({
             onClick={(e) => e.stopPropagation()}
             key={photo.placement_id || `${photo.id}:${index}`}
             style={
-              {
-                "--frame-ratio": effectivePhotoRatio(photo),
-              } as CSSProperties
+              { "--frame-ratio": effectivePhotoRatio(photo) } as CSSProperties
             }
           >
             <Picture
-              photo={photo}
+              photo={railPhoto(photo, single)}
               eager
               onClick={() => onPhoto(photo)}
               sizes="90vw"
@@ -460,9 +633,38 @@ export function PhotoRail({
           </figure>
         ))}
       </div>
+      {enhanced && (
+        <div className="rail-navigation" onClick={(e) => e.stopPropagation()}>
+          <span className="rail-position" aria-live="polite" aria-atomic="true">
+            {String(Math.min(index + 1, photos.length)).padStart(2, "0")} /{" "}
+            {String(photos.length).padStart(2, "0")}
+          </span>
+          {photos.length > 1 && (
+            <div>
+              <button
+                type="button"
+                aria-label={t("Previous photograph", "Vorheriges Foto")}
+                disabled={!loop && index === 0}
+                onClick={() => step(-1)}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label={t("Next photograph", "Nächstes Foto")}
+                disabled={!loop && index === photos.length - 1}
+                onClick={() => step(1)}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
 export function Filmstrip({
   photos,
   onExplore,
@@ -838,7 +1040,7 @@ export function DayGallery({
       {day && journey ? (
         <JournalCanvas journey={journey} dayId={day.id} onPhoto={open} />
       ) : day?.gallery_mode === "horizontal" ? (
-        <PhotoRail photos={photos} onPhoto={open} />
+        <PhotoRail photos={photos} onPhoto={open} layout={day.layout} />
       ) : (
         <div className="day-gallery-grid">
           {photos.map((photo) => (

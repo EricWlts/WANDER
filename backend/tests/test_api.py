@@ -749,3 +749,41 @@ def test_invalid_vertical_media_spacing_rejected_atomically(client, axis, invali
     ])
     assert response.status_code == 400, response.json
     assert client.get(f"/api/journeys/{journey['slug']}").json == before
+
+
+@pytest.mark.parametrize("mode", ["free", "single"])
+@pytest.mark.parametrize("loop", [False, True])
+def test_manual_rail_options_roundtrip_and_public_snapshot(client, mode, loop):
+    headers = auth(client)
+    journey = create(client, headers)
+    legacy = {"padding": 72, "gap": 18}
+    layout = {**legacy, "rail_mode": mode, "rail_loop": loop}
+    modules = [{"id": -1, "kind": "rail", "title": "Manual", "layout": layout},
+               {"id": -2, "kind": "filmstrip", "title": "Automatic", "layout": {"speed": 52}},
+               {"id": -3, "kind": "chapter", "title": "Legacy", "gallery_mode": "horizontal", "layout": legacy}]
+    response = composition(client, headers, journey, modules, publish=True)
+    assert response.status_code == 200, response.json
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    public = client.application.test_client().get(f"/api/journeys/{journey['slug']}").json
+    assert saved['chapters'][0]['layout'] == layout
+    assert public['chapters'][0]['layout'] == layout
+    assert saved['chapters'][1]['layout'] == {"speed": 52}
+    assert saved['chapters'][2]['layout'] == legacy
+    reset = [{**chapter, "layout": legacy} if chapter['kind'] == 'rail' else chapter for chapter in saved['chapters']]
+    response = composition(client, headers, saved, reset)
+    assert response.status_code == 200, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == legacy
+    assert client.application.test_client().get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
+
+
+@pytest.mark.parametrize("invalid", [
+    {"rail_mode": "automatic"}, {"rail_mode": None}, {"rail_mode": []},
+    {"rail_loop": "true"}, {"rail_loop": 1}, {"rail_loop": None},
+])
+def test_invalid_manual_rail_options_are_rejected_atomically(client, invalid):
+    headers = auth(client)
+    journey = create(client, headers)
+    before = client.get(f"/api/journeys/{journey['slug']}").json
+    response = composition(client, headers, journey, [{"id": -1, "kind": "rail", "title": "Invalid", "layout": invalid}], journey={"title": "Must not save"})
+    assert response.status_code == 400, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json == before

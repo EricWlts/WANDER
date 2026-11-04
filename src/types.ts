@@ -56,6 +56,8 @@ export interface Layout {
   show_title?: boolean;
   parallax?: boolean;
   speed?: number;
+  rail_mode?: "free" | "single";
+  rail_loop?: boolean;
 }
 export interface Photo {
   placement_id?: string;

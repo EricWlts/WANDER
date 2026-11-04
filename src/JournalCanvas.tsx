@@ -375,7 +375,7 @@ export function JournalCanvas({
               </div>
             ) : kind === "rail" ||
               (kind === "chapter" && module.gallery_mode === "horizontal") ? (
-              <PhotoRail photos={photos} onPhoto={pick} />
+              <PhotoRail photos={photos} onPhoto={pick} layout={layout} />
             ) : kind === "filmstrip" ? (
               photos.length > 0 ? (
                 <Filmstrip

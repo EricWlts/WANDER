@@ -162,9 +162,9 @@ def create_app(config=None):
     def validate_layout(value, journey):
         if not isinstance(value, dict):
             abort(400, description="Choose valid layout settings.")
-        choices = {"media_width": {"cover-image", "cover-frame"}, "font": {"serif", "sans"}, "text_align": {"left", "center", "right"}, "text_position": {"left", "center", "right", "full"}, "text_preset": {"small", "medium", "large", "display"}, "edition": {"inherit", "quiet-atlas", "after-hours"}, "ratio": {"original", "free", "1:1", "3:2", "4:3", "4:5", "16:9"}, "align": {"flush", "staggered"}, "title_style": {"overlay", "overlap", "below"}, "fit": {"cover", "contain"}}
+        choices = {"rail_mode": {"free", "single"}, "media_width": {"cover-image", "cover-frame"}, "font": {"serif", "sans"}, "text_align": {"left", "center", "right"}, "text_position": {"left", "center", "right", "full"}, "text_preset": {"small", "medium", "large", "display"}, "edition": {"inherit", "quiet-atlas", "after-hours"}, "ratio": {"original", "free", "1:1", "3:2", "4:3", "4:5", "16:9"}, "align": {"flush", "staggered"}, "title_style": {"overlay", "overlap", "below"}, "fit": {"cover", "contain"}}
         ranges = {"media_spacing_top": (0, 160), "media_spacing_bottom": (0, 160), "media_spacing": (0, 160), "hover_zoom": (0, 20), "parallax_intensity": (20, 140), "text_width": (24, 100), "font_weight": (400, 700), "text_size": (14, 64), "inset": (0, 120), "columns": (1, 8), "rows": (1, 12), "gap": (-64, 80), "padding": (0, 160), "offset": (-160, 160), "title_size": (28, 160), "speed": (10, 180), "mobile_columns": (1, 4), "mobile_gap": (-40, 40), "mobile_padding": (0, 80), "parent_id": (-10000000000000, 10000000000000)}
-        if set(value) - set(choices) - set(ranges) - {"photo_ids", "photo_edits", "placements", "filmstrip_placements", "background", "text_color", "column_offsets", "text_animations", "parallax", "show_title"}:
+        if set(value) - set(choices) - set(ranges) - {"photo_ids", "photo_edits", "placements", "filmstrip_placements", "background", "text_color", "column_offsets", "text_animations", "parallax", "show_title", "rail_loop"}:
             abort(400, description="Choose valid layout settings.")
         for key, allowed in choices.items():
             if key in value and (not isinstance(value[key], str) or value[key] not in allowed):
@@ -175,7 +175,7 @@ def create_app(config=None):
         for key, (low, high) in ranges.items():
             if key in value and (type(value[key]) not in (int, float) or not low <= value[key] <= high):
                 abort(400, description="Choose valid layout dimensions.")
-        for key in ("parallax", "show_title", "text_animations"):
+        for key in ("parallax", "show_title", "text_animations", "rail_loop"):
             if key in value and type(value[key]) is not bool:
                 abort(400, description="Choose valid layout settings.")
         if "photo_ids" in value:

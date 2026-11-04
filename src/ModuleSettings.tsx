@@ -399,3 +399,48 @@ export function MediaLayoutSettings({
     </>
   );
 }
+
+export function RailSettings({
+  layout,
+  onChange,
+}: {
+  layout: Layout;
+  onChange: (p: Partial<Layout>) => void;
+}) {
+  return (
+    <>
+      <Field label={t("Manual image row", "Manuelle Bildreihe")}>
+        <select
+          value={layout.rail_mode || "free"}
+          onChange={(e) =>
+            onChange({ rail_mode: e.target.value as Layout["rail_mode"] })
+          }
+        >
+          <option value="free">{t("Free scrolling", "Freies Scrollen")}</option>
+          <option value="single">
+            {t("One complete photograph", "Ein vollständiges Foto")}
+          </option>
+        </select>
+      </Field>
+      <Field label={t("Navigation", "Navigation")}>
+        <select
+          value={layout.rail_loop ? "loop" : "finite"}
+          onChange={(e) => onChange({ rail_loop: e.target.value === "loop" })}
+        >
+          <option value="finite">
+            {t("Stop at the ends", "An den Enden anhalten")}
+          </option>
+          <option value="loop">
+            {t("Continue in both directions", "In beide Richtungen fortsetzen")}
+          </option>
+        </select>
+      </Field>
+      <p className="inspector-note">
+        {t(
+          "Scroll sideways, drag, or use the arrow keys. Click a photograph to open it.",
+          "Seitlich scrollen, ziehen oder die Pfeiltasten nutzen. Ein Klick öffnet das Foto.",
+        )}
+      </p>
+    </>
+  );
+}

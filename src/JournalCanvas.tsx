@@ -2,6 +2,7 @@ import { type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { ArrowDown, Camera, Pencil } from "lucide-react";
 import { Picture, dateRange, dateLabel } from "./components";
 import { Reveal, resolveReveal, journeyReveal } from "./Reveal";
+import { imageParallax, canPanImage } from "./imageParallax";
 import { Parallax } from "./Motion";
 import { QuietAtlasChapterCompass } from "./QuietAtlasChapterCompass";
 import { PhotoRail, Filmstrip } from "./StoryExperience";
@@ -351,8 +352,15 @@ export function JournalCanvas({
             {isHero ? (
               <div className="module-cover">
                 <Parallax
-                  enabled={layout.parallax ?? true}
-                  intensity={layout.parallax_intensity ?? 90}
+                  {...imageParallax(layout, true)}
+                  enabled={
+                    imageParallax(layout, true).enabled &&
+                    (layout.image_parallax === undefined ||
+                      canPanImage(photos[0] ? {
+                        ...photos[0],
+                        edits: { ...photos[0].edits, fit: layout.fit || photos[0].edits?.fit },
+                      } : null))
+                  }
                 >
                   {photos[0]
                     ? image(photos[0])
@@ -458,8 +466,11 @@ export function JournalCanvas({
         }
       >
         <Parallax
-          enabled={l.parallax ?? true}
-          intensity={l.parallax_intensity ?? 90}
+          {...imageParallax(l, true)}
+          enabled={
+            imageParallax(l, true).enabled &&
+            (l.image_parallax === undefined || canPanImage(cover || null))
+          }
         >
           <div
             onClick={

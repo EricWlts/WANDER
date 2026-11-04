@@ -21,6 +21,7 @@ import {
   Globe,
   GripVertical,
 } from "lucide-react";
+import { imageParallax } from "./imageParallax";
 import { api, json } from "./api";
 import { useApp, PageState } from "./App";
 import { Field, Modal, Picture } from "./components";
@@ -2042,44 +2043,29 @@ export function ModularEditor() {
                         )}
                       </label>
                     )}
-                    {(!module || module.kind === "hero") && (
+                    {(!module ||
+                      !["text", "quote", "filmstrip"].includes(module.kind)) && (
                       <>
                         <label className="check-field">
                           <input
                             type="checkbox"
-                            checked={layout.parallax ?? true}
+                            checked={
+                              imageParallax(layout, !module || module.kind === "hero").enabled
+                            }
                             onChange={(e) =>
                               layoutChange(module?.id ?? null, {
-                                parallax: e.target.checked,
+                                image_parallax: e.target.checked,
                               })
                             }
                           />
-                          {t(
-                            "Subtle cover parallax",
-                            "Dezentes Titelbild-Parallax",
-                          )}
+                          {t("Parallax", "Parallax")}
                         </label>
-                        {(layout.parallax ?? true) && (
-                          <Field
-                            label={t(
-                              "Cover parallax strength",
-                              "Stärke des Titelbild-Parallax",
-                            )}
-                          >
-                            <input
-                              type="range"
-                              min="20"
-                              max="140"
-                              step="5"
-                              value={layout.parallax_intensity ?? 90}
-                              onChange={(e) =>
-                                layoutChange(module?.id ?? null, {
-                                  parallax_intensity: Number(e.target.value),
-                                })
-                              }
-                            />
-                          </Field>
-                        )}
+                        <p className="inspector-note">
+                          {t(
+                            "Contained photographs and single-image rail pages stay still to preserve the full image.",
+                            "Vollständig eingepasste Fotos und Einzelbildseiten bleiben unbewegt, damit das ganze Motiv erhalten bleibt.",
+                          )}
+                        </p>
                       </>
                     )}
                     {(!module || !["text", "quote"].includes(module.kind)) && (
@@ -2090,9 +2076,16 @@ export function ModularEditor() {
                         }
                       />
                     )}
+                    {module?.kind === "filmstrip" && (
+                      <p className="inspector-note">
+                        {t(
+                          "Parallax is unavailable for moving filmstrips to keep the automatic loop seamless.",
+                          "Parallax ist für laufende Fotostreifen nicht verfügbar, damit die automatische Schleife nahtlos bleibt.",
+                        )}
+                      </p>
+                    )}
                     {module && (
                       <MotionControl
-                        allowParallax={!["text", "quote"].includes(module.kind)}
                         inherit={false}
                         value={module.reveal || { effect: "none" }}
                         label={t("Module motion", "Modulbewegung")}

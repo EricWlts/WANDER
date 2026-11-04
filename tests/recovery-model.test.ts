@@ -187,3 +187,16 @@ test("manual rail modes survive recovery and malformed options are ignored", () 
     assert.equal(isRecoveryJourney(value, 1), false);
   }
 });
+
+
+test("explicit image parallax survives recovery with legacy cover settings and rejects non-booleans", () => {
+  const value = draft();
+  value.layout = { ...value.layout, parallax: false, parallax_intensity: 125, image_parallax: true };
+  value.chapters[1].layout = { ...value.chapters[1].layout, image_parallax: false };
+  assert.equal(isRecoveryJourney(JSON.parse(JSON.stringify(value)), 1), true);
+  for (const invalid of [1, "true", null]) {
+    const bad = structuredClone(value);
+    (bad.chapters[1].layout as Record<string, unknown>).image_parallax = invalid;
+    assert.equal(isRecoveryJourney(bad, 1), false);
+  }
+});

@@ -20,6 +20,7 @@ export interface Layout {
   filmstrip_placements?: ImagePlacement[];
   hover_zoom?: number;
   parallax_intensity?: number;
+  image_parallax?: boolean;
   background?: string;
   text_color?: string;
   text_position?: "left" | "center" | "right" | "full";

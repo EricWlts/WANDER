@@ -787,3 +787,49 @@ def test_invalid_manual_rail_options_are_rejected_atomically(client, invalid):
     response = composition(client, headers, journey, [{"id": -1, "kind": "rail", "title": "Invalid", "layout": invalid}], journey={"title": "Must not save"})
     assert response.status_code == 400, response.json
     assert client.get(f"/api/journeys/{journey['slug']}").json == before
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_image_parallax_roundtrips_all_modules_and_public_snapshot(client, enabled):
+    headers = auth(client)
+    journey = create(client, headers)
+    legacy = {"parallax": False, "parallax_intensity": 125}
+    layout = {**legacy, "image_parallax": enabled}
+    kinds = ["hero", "image", "pair", "wall", "gallery", "chapter", "rail", "filmstrip"]
+    chapters = [{"id": -i - 1, "kind": kind, "title": kind, "layout": layout,
+                 "reveal": {"effect": "parallax", "intensity": 17}}
+                for i, kind in enumerate(kinds)]
+    response = composition(client, headers, journey, chapters, journey={"layout": layout}, publish=True)
+    assert response.status_code == 200, response.json
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    public = client.application.test_client().get(f"/api/journeys/{journey['slug']}").json
+    for record in [saved, public]:
+        assert record['layout'] == layout
+        assert [c['kind'] for c in record['chapters']] == kinds
+        assert all(c['layout'] == layout for c in record['chapters'])
+        assert all(c['reveal'] == {"effect": "parallax", "intensity": 17} for c in record['chapters'])
+    response = composition(client, headers, saved,
+                           [{**c, 'layout': legacy} for c in saved['chapters']],
+                           journey={"layout": legacy})
+    assert response.status_code == 200, response.json
+    assert response.json['layout'] == legacy
+    assert all(c['layout'] == legacy for c in response.json['chapters'])
+    assert client.application.test_client().get(f"/api/journeys/{journey['slug']}").json['layout'] == layout
+
+
+@pytest.mark.parametrize("invalid", [None, 0, 1, "true", [], {}])
+@pytest.mark.parametrize("target", ["journey", "module"])
+def test_invalid_image_parallax_is_rejected_atomically(client, invalid, target):
+    headers = auth(client)
+    journey = create(client, headers)
+    chapters = [{"id": -1, "kind": "image", "title": "unchanged", "layout": {"image_parallax": True}}]
+    saved = composition(client, headers, journey, chapters, publish=True).json
+    patch = {"layout": {"image_parallax": invalid}}
+    response = composition(client, headers, saved,
+                           [{**saved['chapters'][0], **patch}] if target == "module" else saved['chapters'],
+                           journey={"title": "must not save", **(patch if target == "journey" else {})}, publish=True)
+    assert response.status_code == 400
+    for reader in [client, client.application.test_client()]:
+        record = reader.get(f"/api/journeys/{journey['slug']}").json
+        assert record['title'] == saved['title']
+        assert record['chapters'][0]['layout'] == {"image_parallax": True}

@@ -21,6 +21,7 @@ import {
   Play,
   Share2,
 } from "lucide-react";
+import { imageParallax } from "./imageParallax";
 import { sequenceIndex } from "./journalModel";
 import { effectivePhotoRatio } from "./storyLayout";
 import { railOptions, railDestination, railIndex, railPhoto, railTailSpace, railBoundaryDirection } from "./photoRailModel";
@@ -622,6 +623,7 @@ export function PhotoRail({
             }
           >
             <Picture
+              parallax={imageParallax(layout).enabled}
               photo={railPhoto(photo, single)}
               eager
               onClick={() => onPhoto(photo)}

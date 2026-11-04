@@ -61,55 +61,71 @@ export function MotionControl({
               .filter(
                 (o) =>
                   (inherit || o.value !== "inherit") &&
-                  (allowParallax || o.value !== "parallax"),
+                  (allowParallax ||
+                    o.value !== "parallax" ||
+                    selected === "parallax"),
               )
               .map((o) => (
                 <option key={o.value} value={o.value}>
-                  {t(...motionLabels[o.value])}
+                  {o.value === "parallax" && !allowParallax
+                    ? t("Parallax (legacy)", "Parallax (Bestand)")
+                    : t(...motionLabels[o.value])}
                 </option>
               ))}
           </select>
         </label>
       </div>
-      <p className="inspector-note">
-        {t(
-          "During scrolling, duration controls smoothing. Delay applies to playback previews.",
-          "Beim Scrollen steuert die Dauer die Glättung. Die Verzögerung gilt für Wiedergabevorschauen.",
-        )}
-      </p>
-      <details className="motion-advanced">
-        <summary>{t("Advanced settings", "Erweiterte Einstellungen")}</summary>
-        {(
-          [
-            [
-              "duration",
-              600,
-              4000,
-              100,
-              t("Duration / scroll smoothing", "Dauer / Scrollglättung"),
-            ],
-            ["delay", 0, 3000, 100, t("Preview delay", "Vorschauverzögerung")],
-            ["intensity", 0, 100, 1, t("Intensity", "Intensität")],
-          ] as const
-        ).map(([key, min, max, step, name]) => (
-          <label key={key}>
-            {name} ·{" "}
-            {key === "intensity"
-              ? resolved[key]
-              : `${(resolved[key] / 1000).toFixed(1)} s`}
-            <input
-              aria-label={name}
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={resolved[key]}
-              disabled={selected === "inherit" || selected === "none"}
-              onChange={(e) => change({ [key]: Number(e.target.value) })}
-            />
-          </label>
-        ))}
-      </details>
+      {selected !== "parallax" && (
+        <>
+          <p className="inspector-note">
+            {t(
+              "During scrolling, duration controls smoothing. Delay applies to playback previews.",
+              "Beim Scrollen steuert die Dauer die Glättung. Die Verzögerung gilt für Wiedergabevorschauen.",
+            )}
+          </p>
+          <details className="motion-advanced">
+            <summary>
+              {t("Advanced settings", "Erweiterte Einstellungen")}
+            </summary>
+            {(
+              [
+                [
+                  "duration",
+                  600,
+                  4000,
+                  100,
+                  t("Duration / scroll smoothing", "Dauer / Scrollglättung"),
+                ],
+                [
+                  "delay",
+                  0,
+                  3000,
+                  100,
+                  t("Preview delay", "Vorschauverzögerung"),
+                ],
+                ["intensity", 0, 100, 1, t("Intensity", "Intensität")],
+              ] as const
+            ).map(([key, min, max, step, name]) => (
+              <label key={key}>
+                {name} ·{" "}
+                {key === "intensity"
+                  ? resolved[key]
+                  : `${(resolved[key] / 1000).toFixed(1)} s`}
+                <input
+                  aria-label={name}
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={resolved[key]}
+                  disabled={selected === "inherit" || selected === "none"}
+                  onChange={(e) => change({ [key]: Number(e.target.value) })}
+                />
+              </label>
+            ))}
+          </details>
+        </>
+      )}
       <div className="motion-preview">
         <Reveal
           key={`${replay}-${resolved.effect}-${resolved.duration}`}

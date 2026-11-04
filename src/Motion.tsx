@@ -73,10 +73,12 @@ export function Parallax({
   children,
   enabled = true,
   intensity = 90,
+  image = false,
 }: {
   children: ReactNode;
   enabled?: boolean;
   intensity?: number;
+  image?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     off = useMotionOff();
@@ -86,11 +88,13 @@ export function Parallax({
       el?.style.setProperty("--parallax-y", "0px");
       return;
     }
+    const ownerWindow = el.ownerDocument.defaultView || window;
+    const media = ownerWindow.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0,
       visible = false;
     const draw = () => {
       frame = 0;
-      if (!visible) return;
+      if (!visible || media.matches) return;
       const r = el.getBoundingClientRect();
       const viewportHeight =
         el.ownerDocument.defaultView?.innerHeight || innerHeight;
@@ -104,31 +108,38 @@ export function Parallax({
       el.style.setProperty("--parallax-y", `${y * intensity * 0.5}px`);
     };
     const scroll = () => {
-      if (!frame) frame = requestAnimationFrame(draw);
+      if (!frame) frame = ownerWindow.requestAnimationFrame(draw);
     };
-    const observer = new IntersectionObserver(([e]) => {
+    const observer = new ownerWindow.IntersectionObserver(([e]) => {
       visible = e.isIntersecting;
       scroll();
     });
     observer.observe(el);
-    const ownerWindow = el.ownerDocument.defaultView;
+    const reduced = () => {
+      el.classList.toggle("parallax-active", !media.matches);
+      if (media.matches) el.style.setProperty("--parallax-y", "0px");
+      else scroll();
+    };
+    media.addEventListener("change", reduced);
+    reduced();
     if (ownerWindow && ownerWindow !== window)
       ownerWindow.addEventListener("scroll", scroll, { passive: true });
     window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("resize", scroll);
+    ownerWindow.addEventListener("resize", scroll);
     return () => {
       observer.disconnect();
       if (ownerWindow && ownerWindow !== window)
         ownerWindow.removeEventListener("scroll", scroll);
-      cancelAnimationFrame(frame);
+      media.removeEventListener("change", reduced);
+      ownerWindow.cancelAnimationFrame(frame);
       window.removeEventListener("scroll", scroll);
-      window.removeEventListener("resize", scroll);
+      ownerWindow.removeEventListener("resize", scroll);
     };
   }, [enabled, intensity, off]);
   return (
     <div
       ref={ref}
-      className={`parallax-frame ${enabled && !off ? "parallax-active" : ""}`}
+      className={`parallax-frame ${image ? "image-parallax" : ""} ${enabled && !off ? "parallax-active" : ""}`}
       style={
         {
           "--parallax-overscan": `${intensity * 0.5 + 8}px`,

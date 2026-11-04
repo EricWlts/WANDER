@@ -15,6 +15,8 @@ import type { Photo, RevealConfig } from "./types";
 import { t, getLocale } from "./I18n";
 import { imageMotion, useReveal } from "./Reveal";
 import { observePicture, type PictureStatus } from "./pictureLoading";
+import { Parallax } from "./Motion";
+import { canPanImage } from "./imageParallax";
 import { mergeIdRefs } from "./ariaIdRefs";
 export function Compass({ className = "" }: { className?: string }) {
   return (
@@ -45,6 +47,7 @@ export function Picture({
   actionLabel,
   animate = false,
   motion = imageMotion,
+  parallax = false,
 }: {
   photo: Photo | null;
   className?: string;
@@ -54,6 +57,7 @@ export function Picture({
   actionLabel?: string;
   animate?: boolean;
   motion?: RevealConfig;
+  parallax?: boolean;
 }) {
   const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -64,11 +68,12 @@ export function Picture({
   });
   const status = load.source === source ? load.status : "loading";
   const clickable = !!onClick;
+  const pan = parallax && canPanImage(photo);
   useLayoutEffect(() => {
     const image = imageRef.current;
     if (!image) return;
     return observePicture(image, (status) => setLoad({ source, status }));
-  }, [source, clickable]);
+  }, [source, clickable, pan]);
   const reveal = useReveal(
     ref,
     motion,
@@ -142,7 +147,9 @@ export function Picture({
         t("View photograph full size", "Foto in voller Größe ansehen")
       }
     >
-      {img}
+      {pan ? (
+        <Parallax image intensity={140}>{img}</Parallax>
+      ) : img}
       {indicator}
       <span className="image-expand">
         <ArrowUpRight size={19} />
@@ -157,7 +164,9 @@ export function Picture({
       style={{ ...reveal.style, ...frameStyle }}
       className={`picture ${className}`}
     >
-      {img}
+      {pan ? (
+        <Parallax image intensity={140}>{img}</Parallax>
+      ) : img}
       {indicator}
     </div>
   );

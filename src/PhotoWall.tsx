@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Picture } from "./components";
 import type { Layout, Photo } from "./types";
 import { offsetsFor } from "./journalModel";
+import { imageParallax } from "./imageParallax";
 import { automaticWallSpans } from "./storyLayout";
 /** The inspector miniature and published wall share this exact layout. */
 export function PhotoWall({
@@ -67,6 +68,7 @@ export function PhotoWall({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Picture
+                    parallax={!mini && imageParallax(layout).enabled}
                     photo={
                       layout.ratio && layout.ratio !== "original"
                         ? {

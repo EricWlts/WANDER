@@ -34,6 +34,7 @@ import {
   AppearanceSettings,
   TypographySettings,
   WallSettings,
+  MediaLayoutSettings,
 } from "./ModuleSettings";
 import { ModulePhotographs } from "./ModulePhotographs";
 import {
@@ -1765,6 +1766,12 @@ export function ModularEditor() {
                             />
                           </>
                         )}
+                        {module.kind !== "filmstrip" && (
+                          <MediaLayoutSettings
+                            layout={layout}
+                            onChange={(p) => layoutChange(module.id, p)}
+                          />
+                        )}
                         <Field label={t("Image format", "Bildformat")}>
                           <select
                             value={layout.ratio || "original"}
@@ -1786,7 +1793,7 @@ export function ModularEditor() {
                           </select>
                         </Field>
                         <Field
-                          label={`${t("Outer spacing", "Außenabstand")} · ${layout.padding ?? 36} px`}
+                          label={`${t("Module spacing", "Modulabstand")} · ${layout.padding ?? 36} px`}
                         >
                           <input
                             type="range"

@@ -337,3 +337,56 @@ export function WallSettings({
     </>
   );
 }
+
+/** Shared image-content dimensions; legacy module padding remains independent. */
+export function MediaLayoutSettings({
+  layout,
+  onChange,
+}: {
+  layout: Layout;
+  onChange: (p: Partial<Layout>) => void;
+}) {
+  return (
+    <>
+      <Field label={t("Image area width", "Breite des Bildbereichs")}>
+        <select
+          value={layout.media_width || ""}
+          onChange={(e) =>
+            onChange({
+              media_width: (e.target.value ||
+                undefined) as Layout["media_width"],
+            })
+          }
+        >
+          <option value="">{t("Module default", "Modulvorgabe")}</option>
+          <option value="cover-image">
+            {t("Match cover photograph", "An Titelbild anpassen")}
+          </option>
+          <option value="cover-frame">
+            {t(
+              "Match cover including frame",
+              "An Titelbild inklusive Rahmen anpassen",
+            )}
+          </option>
+        </select>
+      </Field>
+      <Field
+        label={`${t("Side outer spacing", "Seitlicher Außenabstand")} · ${layout.media_spacing ?? 0} px`}
+      >
+        <input
+          type="range"
+          min={0}
+          max={160}
+          value={layout.media_spacing ?? 0}
+          onChange={(e) => onChange({ media_spacing: Number(e.target.value) })}
+        />
+      </Field>
+      <p className="inspector-note">
+        {t(
+          "Spacing is added inside the selected image area. Module spacing above and below stays independent.",
+          "Der Abstand liegt innerhalb des gewählten Bildbereichs. Modulabstände oben und unten bleiben unabhängig.",
+        )}
+      </p>
+    </>
+  );
+}

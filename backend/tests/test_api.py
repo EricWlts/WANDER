@@ -671,3 +671,45 @@ def test_hover_and_cover_motion_and_root_occurrences_persist(client):
     assert record['layout'] == layout
     assert record['photos'][0]['edits']['hover_zoom'] == 2.5
     assert client.get(f"/api/journeys/{record['slug']}?public=1").json['layout'] == layout
+
+
+@pytest.mark.parametrize("width", ["cover-image", "cover-frame"])
+@pytest.mark.parametrize("spacing", [0, 24, 160])
+def test_media_layout_persists_publishes_and_resets_without_changing_legacy(client, width, spacing):
+    headers = auth(client)
+    journey = create(client, headers)
+    legacy = {"padding": 72, "mobile_padding": 12, "inset": 13, "gap": -8}
+    layout = {**legacy, "media_width": width, "media_spacing": spacing}
+    response = composition(client, headers, journey, [
+        {"id": -1, "kind": "pair", "title": "Images", "layout": layout}
+    ])
+    assert response.status_code == 200, response.json
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    assert saved['chapters'][0]['layout'] == layout
+    response = composition(client, headers, saved, saved['chapters'], publish=True)
+    assert response.status_code == 200, response.json
+    public = client.application.test_client().get(f"/api/journeys/{journey['slug']}").json
+    assert public['chapters'][0]['layout'] == layout
+    reset = {**saved['chapters'][0], "layout": legacy}
+    response = composition(client, headers, saved, [reset])
+    assert response.status_code == 200, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == legacy
+    # An unpublished reset must not alter the last public snapshot.
+    assert client.application.test_client().get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
+
+
+@pytest.mark.parametrize("layout", [
+    {"media_width": "unknown"}, {"media_width": None}, {"media_width": []},
+    {"media_spacing": -1}, {"media_spacing": 161}, {"media_spacing": True},
+    {"media_spacing": "24"}, {"media_spacing": None},
+    {"media_spacing": float("nan")}, {"media_spacing": float("inf")},
+])
+def test_invalid_media_layout_rejected_atomically(client, layout):
+    headers = auth(client)
+    journey = create(client, headers)
+    before = client.get(f"/api/journeys/{journey['slug']}").json
+    response = composition(client, headers, journey, [
+        {"id": -1, "kind": "wall", "title": "Invalid", "layout": layout}
+    ])
+    assert response.status_code == 400, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json == before

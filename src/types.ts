@@ -33,6 +33,8 @@ export interface Layout {
   text_size?: number;
   text_align?: "left" | "center" | "right";
   inset?: number;
+  media_width?: "cover-image" | "cover-frame";
+  media_spacing?: number;
   edition?: "inherit" | "quiet-atlas" | "after-hours";
   photo_ids?: number[];
   parent_id?: number;

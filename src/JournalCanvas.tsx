@@ -14,7 +14,11 @@ import {
   typePresets,
 } from "./journalModel";
 import { PhotoWall } from "./PhotoWall";
-import { desktopWallColumns, usesAutomaticWallComposition } from "./storyLayout";
+import { MediaLayout } from "./MediaLayout";
+import {
+  desktopWallColumns,
+  usesAutomaticWallComposition,
+} from "./storyLayout";
 export { modulePhotos } from "./journalModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 export type Selection =
@@ -340,62 +344,72 @@ export function JournalCanvas({
           )}
           {!["text", "quote", "chapter", "hero"].includes(kind) &&
             layout.show_title && <h2>{module.title}</h2>}
-          {isHero ? (
-            <div className="module-cover">
-              <Parallax
-                enabled={layout.parallax ?? true}
-                intensity={layout.parallax_intensity ?? 90}
-              >
-                {photos[0]
-                  ? image(photos[0])
-                  : editing && (
-                      <div className="module-empty">
-                        <Camera />
-                        {t("Choose a cover photograph", "Titelbild auswählen")}
-                      </div>
-                    )}
-              </Parallax>
-              {showTitle && (
-                <div className="module-cover-copy">
-                  <h2>{module.title}</h2>
-                  {module.story && <p>{module.story}</p>}
-                </div>
-              )}
-            </div>
-          ) : kind === "rail" ||
-            (kind === "chapter" && module.gallery_mode === "horizontal") ? (
-            <PhotoRail photos={photos} onPhoto={pick} />
-          ) : kind === "filmstrip" ? (
-            photos.length > 0 ? (
-              <Filmstrip
-                photos={photos}
-                onExplore={() => photos[0] && pick(photos[0])}
-                onPhoto={pick}
-                speed={layout.speed}
-              />
-            ) : null
-          ) : (
-            photos.length > 0 && (
-              <PhotoWall
-                photos={single ? photos.slice(0, 1) : photos}
-                layout={{
-                  ...layout,
-                  columns: single
-                    ? 1
-                    : desktopWallColumns(layout, kind, photos.length),
-                }}
-                autoComposition={
-                  !single &&
-                  ["chapter", "pair", "wall", "gallery"].includes(kind) &&
-                  usesAutomaticWallComposition(layout)
-                }
-                onPhoto={pick}
-                selectedId={
-                  selected?.type === "photo" ? selected.placementId : undefined
-                }
-              />
-            )
-          )}
+          <MediaLayout
+            layout={layout}
+            enabled={!isText && kind !== "filmstrip"}
+          >
+            {isHero ? (
+              <div className="module-cover">
+                <Parallax
+                  enabled={layout.parallax ?? true}
+                  intensity={layout.parallax_intensity ?? 90}
+                >
+                  {photos[0]
+                    ? image(photos[0])
+                    : editing && (
+                        <div className="module-empty">
+                          <Camera />
+                          {t(
+                            "Choose a cover photograph",
+                            "Titelbild auswählen",
+                          )}
+                        </div>
+                      )}
+                </Parallax>
+                {showTitle && (
+                  <div className="module-cover-copy">
+                    <h2>{module.title}</h2>
+                    {module.story && <p>{module.story}</p>}
+                  </div>
+                )}
+              </div>
+            ) : kind === "rail" ||
+              (kind === "chapter" && module.gallery_mode === "horizontal") ? (
+              <PhotoRail photos={photos} onPhoto={pick} />
+            ) : kind === "filmstrip" ? (
+              photos.length > 0 ? (
+                <Filmstrip
+                  photos={photos}
+                  onExplore={() => photos[0] && pick(photos[0])}
+                  onPhoto={pick}
+                  speed={layout.speed}
+                />
+              ) : null
+            ) : (
+              photos.length > 0 && (
+                <PhotoWall
+                  photos={single ? photos.slice(0, 1) : photos}
+                  layout={{
+                    ...layout,
+                    columns: single
+                      ? 1
+                      : desktopWallColumns(layout, kind, photos.length),
+                  }}
+                  autoComposition={
+                    !single &&
+                    ["chapter", "pair", "wall", "gallery"].includes(kind) &&
+                    usesAutomaticWallComposition(layout)
+                  }
+                  onPhoto={pick}
+                  selectedId={
+                    selected?.type === "photo"
+                      ? selected.placementId
+                      : undefined
+                  }
+                />
+              )
+            )}
+          </MediaLayout>
           {!photos.length &&
             !["text", "quote", "chapter", "hero"].includes(kind) &&
             editing && (

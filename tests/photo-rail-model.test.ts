@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  railIndicators,
+  railVisibleIndex,
   railOptions,
   railDestination,
   railIndex,
@@ -115,4 +117,54 @@ test("only deliberate outward horizontal boundary gestures cancel native inertia
   assert.equal(railBoundaryDirection(-105, 120, true, false), 0);
   assert.equal(railBoundaryDirection(-20, 0, true, false), 0);
   assert.equal(railBoundaryDirection(-20, 0, true, false, 6), -1);
+});
+
+
+test("indicator geometry covers all requested counts and shrinks continuously on resize", () => {
+  for (const count of [0, 1, 2, 3, 4, 8, 12]) {
+    for (const available of [288, 320, 390, 768, 1280, 1440]) {
+      const { width, compact } = railIndicators(count, available);
+      assert.ok(width <= available && width <= 320);
+      assert.equal(compact, false);
+      if (count > 1) {
+        const bar = width / count - 8;
+        assert.ok(bar >= 16 && bar <= 48);
+        assert.ok(bar + 8 >= 24); // pointer target, not merely a 2px line
+        assert.ok(Math.abs(count * (bar + 8) - width) < 1e-9);
+      }
+    }
+  }
+  assert.equal(railIndicators(12, 288).width, 288);
+  assert.equal(railIndicators(12, 287).compact, true);
+  assert.equal(railIndicators(1000, 1440).compact, true);
+  assert.equal(railIndicators(2, 0).compact, true);
+});
+
+test("free active image uses real visible fractions, gaps, and deterministic ties", () => {
+  const frames = [{ start: 0, width: 200 }, { start: 220, width: 400 }, { start: 640, width: 100 }];
+  assert.equal(railVisibleIndex(0, 300, frames), 0);
+  assert.equal(railVisibleIndex(180, 300, frames), 1);
+  assert.equal(railVisibleIndex(600, 200, frames), 2);
+  assert.equal(railVisibleIndex(0, 100, [{ start: 0, width: 200 }, { start: 50, width: 100 }]), 0);
+  assert.equal(railVisibleIndex(100, 200, [{ start: 0, width: 200 }, { start: 200, width: 200 }]), 0);
+  assert.equal(railVisibleIndex(0, 300, []), 0);
+  assert.equal(railVisibleIndex(99, 300, [{ start: 0, width: 0 }]), 0);
+  assert.equal(railVisibleIndex(0, 1000, frames), 0);
+  // A changed sequence/viewport is evaluated from geometry, without a stale index.
+  assert.equal(railVisibleIndex(180, 30, frames), 0);
+  assert.equal(railVisibleIndex(180, 300, frames.slice(1)), 0);
+});
+
+test("compact fallback navigation can reach every logical original without skips", () => {
+  const count = 1000;
+  assert.equal(railIndicators(count, 320).compact, true);
+  let index = 0;
+  const visited = new Set<number>();
+  for (let i = 0; i < count; i++) {
+    visited.add(index);
+    index = railDestination(index, 1, count, true);
+  }
+  assert.equal(visited.size, count);
+  assert.equal(index, 0);
+  assert.equal(railDestination(0, -1, count, true), count - 1);
 });

@@ -24,7 +24,7 @@ import {
 import { imageParallax } from "./imageParallax";
 import { sequenceIndex } from "./journalModel";
 import { effectivePhotoRatio } from "./storyLayout";
-import { railOptions, railDestination, railIndex, railPhoto, railTailSpace, railBoundaryDirection } from "./photoRailModel";
+import { railOptions, railDestination, railIndex, railPhoto, railTailSpace, railBoundaryDirection, railVisibleIndex, railIndicators } from "./photoRailModel";
 import {
   PhotoViewerModel,
   decodedImageRequest,
@@ -397,6 +397,9 @@ export function PhotoRail({
     wheel = useRef({ time: 0, wrapped: false }),
     activeIndex = useRef(0);
   const [index, setIndex] = useState(0);
+  const [indicatorWidth, setIndicatorWidth] = useState(0);
+  const scrollFrame = useRef<number | null>(null);
+  useLocale();
   const { single, loop } = railOptions(layout);
   const enhanced = single || loop;
   const sequenceKey = photos
@@ -416,11 +419,14 @@ export function PhotoRail({
   const currentIndex = () => {
     const rail = ref.current;
     if (!rail) return 0;
-    return railIndex(rail.scrollLeft, starts());
+    if (enhanced) return railIndex(rail.scrollLeft, starts());
+    const offsets = starts();
+    return railVisibleIndex(rail.scrollLeft, rail.clientWidth,
+      Array.from(rail.children, (child, i) => ({ start: offsets[i], width: (child as HTMLElement).offsetWidth })));
   };
   const updateIndex = (next: number) => {
     activeIndex.current = next;
-    setIndex(next);
+    setIndex((previous) => previous === next ? previous : next);
   };
   const go = (next: number) => {
     const rail = ref.current;
@@ -428,7 +434,7 @@ export function PhotoRail({
     // Immediate scrolling also respects global pause and reduced motion; no timer
     // or automatic movement is involved, including at the loop boundary.
     rail.scrollLeft = starts()[next] || 0;
-    updateIndex(next);
+    updateIndex(currentIndex());
   };
   const step = (direction: number) =>
     go(railDestination(activeIndex.current, direction, photos.length, loop));
@@ -446,9 +452,10 @@ export function PhotoRail({
   };
   useLayoutEffect(() => {
     const rail = ref.current;
-    if (!rail || !enhanced) return;
+    if (!rail) return;
     const last = rail.lastElementChild as HTMLElement | null;
     const sync = () => {
+      setIndicatorWidth(rail.clientWidth);
       rail.style.setProperty("--rail-tail-space", `${loop && !single && photos.length > 1 && last ? railTailSpace(rail.clientWidth, last.offsetWidth) : 0}px`);
       if (single)
         go(Math.max(0, Math.min(activeIndex.current, photos.length - 1)));
@@ -456,9 +463,12 @@ export function PhotoRail({
     };
     const observer = new ResizeObserver(sync);
     observer.observe(rail);
-    if (last) observer.observe(last);
+    Array.from(rail.children).forEach((child) => observer.observe(child));
+    sync();
     return () => {
       observer.disconnect();
+      if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = null;
       rail.style.removeProperty("--rail-tail-space");
     };
     // Reconfigure only when the sequence or mode changes, never on manual scroll.
@@ -504,6 +514,8 @@ export function PhotoRail({
       rail.removeEventListener("touchmove", onTouchMove);
     };
   }, [loop, photos.length]);
+  const indicators = railIndicators(photos.length, indicatorWidth);
+  const shownIndex = Math.min(index, Math.max(0, photos.length - 1));
   if (!photos.length) return null;
   return (
     <div
@@ -517,7 +529,14 @@ export function PhotoRail({
         tabIndex={0}
         role="region"
         aria-label={t("Horizontal photographs", "Horizontale Bildreihe")}
-        onScroll={() => enhanced && updateIndex(currentIndex())}
+        onScroll={() => {
+          if (scrollFrame.current !== null) return;
+          scrollFrame.current = requestAnimationFrame(() => {
+            scrollFrame.current = null;
+            // Position observation must never navigate or snap a free rail.
+            updateIndex(currentIndex());
+          });
+        }}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
           if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -635,28 +654,43 @@ export function PhotoRail({
           </figure>
         ))}
       </div>
-      {enhanced && (
-        <div className="rail-navigation" onClick={(e) => e.stopPropagation()}>
-          <span className="rail-position" aria-live="polite" aria-atomic="true">
-            {String(Math.min(index + 1, photos.length)).padStart(2, "0")} /{" "}
-            {String(photos.length).padStart(2, "0")}
-          </span>
-          {photos.length > 1 && (
-            <div>
-              <button
-                type="button"
-                aria-label={t("Previous photograph", "Vorheriges Foto")}
-                disabled={!loop && index === 0}
-                onClick={() => step(-1)}
-              >
+      {photos.length > 1 && (
+        <div className="rail-indicators" onClick={(e) => e.stopPropagation()}>
+          {indicators.compact ? (
+            <select
+              className="rail-position-select"
+              aria-label={t("Photograph position", "Bildposition")}
+              value={shownIndex}
+              onChange={(e) => go(Number(e.target.value))}
+            >
+              {photos.map((_, position) => (
+                <option key={position} value={position}>
+                  {t(`Image ${position + 1} of ${photos.length}`, `Bild ${position + 1} von ${photos.length}`)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="rail-segments" style={{ width: indicators.width }}
+              role="group" aria-label={t("Photograph position", "Bildposition")}>
+              {photos.map((_, position) => (
+                <button
+                  key={position}
+                  type="button"
+                  aria-label={t(`Show image ${position + 1} of ${photos.length}`, `Bild ${position + 1} von ${photos.length} anzeigen`)}
+                  aria-current={position === shownIndex ? "true" : undefined}
+                  onClick={() => go(position)}
+                ><span /></button>
+              ))}
+            </div>
+          )}
+          {enhanced && (
+            <div className="rail-navigation">
+              <button type="button" aria-label={t("Previous photograph", "Vorheriges Foto")}
+                disabled={!loop && shownIndex === 0} onClick={() => step(-1)}>
                 <ChevronLeft size={18} />
               </button>
-              <button
-                type="button"
-                aria-label={t("Next photograph", "Nächstes Foto")}
-                disabled={!loop && index === photos.length - 1}
-                onClick={() => step(1)}
-              >
+              <button type="button" aria-label={t("Next photograph", "Nächstes Foto")}
+                disabled={!loop && shownIndex === photos.length - 1} onClick={() => step(1)}>
                 <ChevronRight size={18} />
               </button>
             </div>

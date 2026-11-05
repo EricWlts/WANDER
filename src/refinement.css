@@ -2211,20 +2211,57 @@ body {
 .single-rail .picture img {
   object-fit: contain;
 }
-.rail-navigation {
+/* Shared Studio/Public manual rail position controls; automatic strips stay unchanged. */
+.rail-indicators {
+  color: var(--canvas-ink, inherit);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin-top: 8px;
+  min-width: 0;
 }
-.rail-position {
+.rail-segments {
+  display: flex;
+  max-width: 100%;
+}
+.rail-segments button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  align-items: center;
+}
+.rail-segments button span {
+  height: 2px;
+  width: 100%;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.24;
+}
+.rail-segments button[aria-current="true"] span { opacity: 0.85; }
+.rail-segments button:focus-visible,
+.rail-position-select:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+.rail-position-select {
+  max-width: 100%;
+  min-height: 28px;
+  margin-top: 6px;
+  background: var(--module-bg, var(--canvas-paper, var(--paper)));
+  color: inherit;
+  border: 0;
+  font: inherit;
   font-size: 11px;
-  letter-spacing: 0.09em;
   font-variant-numeric: tabular-nums;
 }
-.rail-navigation > div {
+.rail-navigation {
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 8px;
 }
 .rail-navigation button {

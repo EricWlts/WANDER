@@ -6,7 +6,33 @@ import pytest
 from PIL import Image
 
 from backend.app import create_app
+import backend.app as app_module
 from backend.models import Admin, Journey, db
+
+
+def test_explicit_test_paths_do_not_touch_default_instance(tmp_path, monkeypatch):
+    default_instance = tmp_path / "default-instance"
+    monkeypatch.setattr(app_module, "ROOT", tmp_path)
+    monkeypatch.setenv("WANDER_SECRET_KEY", "environment-secret-must-not-win")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:////environment-must-not-win.db")
+    test_instance = tmp_path / "test-instance"
+    config = {
+        "TESTING": True,
+        "SECRET_KEY": "isolated-test-secret",
+        "SQLALCHEMY_DATABASE_URI": f"sqlite:///{test_instance / 'test.db'}",
+        "UPLOAD_FOLDER": str(test_instance / "uploads"),
+    }
+
+    create_app(config)
+    assert not default_instance.exists()
+
+    default_instance.mkdir()
+    key = default_instance / "session.key"
+    key.write_text("synthetic-existing-key")
+    before = (key.stat().st_mode, key.stat().st_mtime_ns, key.stat().st_size, key.read_bytes())
+    create_app(config)
+    after = (key.stat().st_mode, key.stat().st_mtime_ns, key.stat().st_size, key.read_bytes())
+    assert after == before
 
 
 @pytest.fixture()

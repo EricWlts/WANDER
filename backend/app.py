@@ -29,17 +29,12 @@ REVEAL_EFFECTS = {"none", "fade", "up", "down", "left", "right", "zoom", "parall
 
 
 def create_app(config=None):
+    config = config or {}
     instance = ROOT / ".instance"
-    instance.mkdir(mode=0o700, exist_ok=True)
-    instance.chmod(0o700)
-    secret_path = instance / "session.key"
-    if not secret_path.exists():
-        secret_path.write_text(secrets.token_hex(32))
-        secret_path.chmod(0o600)
     app = Flask(__name__, static_folder=None)
     app.config.update(
-        SECRET_KEY=os.environ.get("WANDER_SECRET_KEY", secret_path.read_text().strip()),
-        SQLALCHEMY_DATABASE_URI=os.environ.get("DATABASE_URL", f"sqlite:///{instance / 'wander.db'}"),
+        SECRET_KEY=None,
+        SQLALCHEMY_DATABASE_URI=None,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         UPLOAD_FOLDER=str(instance / "uploads"),
         MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES + 1024 * 1024,
@@ -47,8 +42,26 @@ def create_app(config=None):
         SESSION_COOKIE_SECURE=os.environ.get("WANDER_HTTPS") == "1",
         PERMANENT_SESSION_LIFETIME=timedelta(hours=8), SEED_DEMO=True,
     )
-    if config:
-        app.config.update(config)
+    app.config.update(config)
+    explicit_secret = "SECRET_KEY" in config and config["SECRET_KEY"] is not None
+    explicit_database = "SQLALCHEMY_DATABASE_URI" in config and config["SQLALCHEMY_DATABASE_URI"] is not None
+    explicit_upload = "UPLOAD_FOLDER" in config and config["UPLOAD_FOLDER"] is not None
+    if not explicit_secret:
+        app.config["SECRET_KEY"] = os.environ.get("WANDER_SECRET_KEY")
+    if not explicit_database:
+        app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+    if not explicit_secret and not app.config["SECRET_KEY"]:
+        instance.mkdir(mode=0o700, exist_ok=True)
+        instance.chmod(0o700)
+        secret_path = instance / "session.key"
+        if not secret_path.exists():
+            secret_path.write_text(secrets.token_hex(32))
+            secret_path.chmod(0o600)
+        app.config["SECRET_KEY"] = secret_path.read_text().strip()
+    if not explicit_database and not app.config["SQLALCHEMY_DATABASE_URI"]:
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{instance / 'wander.db'}"
+    if not explicit_upload:
+        app.config["UPLOAD_FOLDER"] = str(instance / "uploads")
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
     db.init_app(app)
     attempts = defaultdict(list)

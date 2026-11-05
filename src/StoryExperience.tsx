@@ -93,11 +93,19 @@ export function Inspiration() {
       </div>
       <div className="edition-grid" data-active={edition}>
         {templates.map((template) => (
-          <article
+          <Link
             key={template.id}
+            to={`/inspiration/${template.id}`}
             className={`edition-card edition-${template.id}`}
+            aria-labelledby={`edition-title-${template.id}`}
+            onClick={(event) => {
+              const selection = window.getSelection();
+              if (event.detail > 0 && selection && !selection.isCollapsed &&
+                  (event.currentTarget.contains(selection.anchorNode) || event.currentTarget.contains(selection.focusNode)))
+                event.preventDefault();
+            }}
           >
-            <Link to={`/inspiration/${template.id}`} className="edition-cover">
+            <div className="edition-cover">
               <img
                 src={template.cover}
                 width={1280}
@@ -118,17 +126,17 @@ export function Inspiration() {
                     ? "When the light stays"
                     : template.name}
               </span>
-            </Link>
+            </div>
             <div className="edition-copy">
               <span className="eyebrow">{t(template.kicker)}</span>
-              <h2>{template.name}</h2>
+              <h2 id={`edition-title-${template.id}`}>{template.name}</h2>
               <p>{t(template.description)}</p>
-              <Link to={`/inspiration/${template.id}`} className="text-link">
+              <span className="text-link" aria-hidden="true">
                 {tr("Read the photo essay")}
                 <ArrowUpRight size={17} />
-              </Link>
+              </span>
             </div>
-          </article>
+          </Link>
         ))}
       </div>
       <p className="reference-note">

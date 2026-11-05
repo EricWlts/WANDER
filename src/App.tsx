@@ -18,7 +18,7 @@ import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
 import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
 import { closeNavigationOnEscape } from "./mobileNavigation";
-import { initialHeaderScroll, updateHeaderScroll } from "./adaptiveHeader";
+import { initialHeaderScroll, updateHeaderScroll, resetHeaderGesture, headerScrollThresholds, headerIsCompact, initialHeaderWheel, updateHeaderWheel } from "./adaptiveHeader";
 import { BrandMonogram, SignatureWordmark } from "./SignatureBrand";
 
 type StudioPageName =
@@ -198,48 +198,110 @@ function Header() {
   const scrollState = useRef(initialHeaderScroll);
   const [compact, setCompact] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [menuCompact, setMenuCompact] = useState<boolean | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const brandRef = useRef<HTMLAnchorElement>(null);
+  const cancelHoverClose = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+  };
+  const closeHover = () => {
+    cancelHoverClose();
+    hoverTimer.current = setTimeout(() => setHovered(false), 160);
+  };
+  const closeMenu = () => { setMenu(false); setMenuCompact(null); };
   const location = useLocation();
   const publicHeader = !location.pathname.startsWith("/studio");
-  const visualCompact = !publicHeader || compact;
+  const visualCompact = headerIsCompact(compact, publicHeader, hovered, focused, menu ? menuCompact : null);
   useEffect(() => {
-    scrollState.current = { ...initialHeaderScroll, lastY: window.scrollY };
+    scrollState.current = resetHeaderGesture(initialHeaderScroll, window.scrollY, performance.now());
     setCompact(false);
+    setHovered(false);
+    setFocused(false);
+    closeMenu();
+    cancelHoverClose();
   }, [location.pathname]);
+  useEffect(() => () => cancelHoverClose(), []);
   useEffect(() => {
-    // Both edges of a menu interaction start a fresh scroll gesture.
-    scrollState.current = { ...scrollState.current, lastY: window.scrollY, travel: 0 };
-  }, [menu]);
+    scrollState.current = resetHeaderGesture(scrollState.current, window.scrollY, performance.now());
+  }, [menu, hovered, focused]);
   useEffect(() => {
     if (!publicHeader) return;
     let frame = 0;
+    let intentUntil = 0;
+    let blockedUntil = 0;
+    let touchY = 0;
+    let wheelState = initialHeaderWheel;
+    const t = headerScrollThresholds;
+    const noteIntent = (upward: boolean) => {
+      intentUntil = upward ? performance.now() + t.inputWindow : 0;
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (!event.isTrusted) return;
+      if (event.ctrlKey) { intentUntil = 0; return; }
+      const now = performance.now();
+      wheelState = updateHeaderWheel(wheelState, event.deltaY, event.deltaMode, now);
+      intentUntil = wheelState.upward ? Math.min(now + t.inputWindow, wheelState.start + t.wheelBurst) : 0;
+    };
+    const onTouchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY || 0; };
+    const onTouchMove = (event: TouchEvent) => {
+      const next = event.touches[0]?.clientY ?? touchY;
+      if (event.isTrusted) noteIntent(next - touchY > t.jitter);
+      touchY = next;
+    };
+    const clearIntent = () => { intentUntil = 0; wheelState = initialHeaderWheel; };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.isTrusted && ["ArrowUp", "PageUp", "Home", "ArrowDown", "PageDown", "End", " "].includes(event.key))
+        noteIntent(["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey));
+    };
+    const resetLayout = () => {
+      blockedUntil = performance.now() + t.layoutCooldown;
+      clearIntent();
+      scrollState.current = resetHeaderGesture(scrollState.current, window.scrollY, performance.now());
+    };
     const update = () => {
       frame = 0;
-      scrollState.current = updateHeaderScroll(
-        scrollState.current,
-        window.scrollY,
-        focused,
-        publicHeader,
-        menu,
-      );
+      const now = performance.now();
+      scrollState.current = updateHeaderScroll(scrollState.current, window.scrollY, {
+        now, upwardIntent: now <= intentUntil && now >= blockedUntil,
+        protectedInteraction: focused || hovered, menuOpen: menu,
+      });
       setCompact(scrollState.current.compact);
     };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    update();
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    // Observe content geometry, not the animated fixed header itself.
+    const observer = new ResizeObserver(resetLayout);
+    const content = document.getElementById("main");
+    if (content) observer.observe(content);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", clearIntent, { passive: true });
+    window.addEventListener("touchcancel", clearIntent, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", clearIntent, { passive: true });
+    window.addEventListener("resize", resetLayout);
     return () => {
+      observer.disconnect();
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", clearIntent);
+      window.removeEventListener("touchcancel", clearIntent);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", clearIntent);
+      window.removeEventListener("resize", resetLayout);
       cancelAnimationFrame(frame);
     };
-  }, [menu, focused, publicHeader]);
-  useEffect(() => {
-    setMenu(false);
-  }, [location.pathname]);
+  }, [menu, focused, hovered, publicHeader, location.pathname]);
   useEffect(() => {
     if (!menu) return;
     const onKeyDown = (event: KeyboardEvent) =>
-      closeNavigationOnEscape(event, () => setMenu(false), toggleRef.current);
+      closeNavigationOnEscape(event, closeMenu, toggleRef.current);
     const onPointerDown = (event: PointerEvent) => {
       if (
         // Language and other header controls stay usable without dismissing
@@ -248,7 +310,7 @@ function Header() {
       ) return;
       if (navigationRef.current?.contains(document.activeElement))
         (document.activeElement as HTMLElement)?.blur();
-      setMenu(false);
+      closeMenu();
     };
     // Only an explicit open moves focus; scroll expansion never changes it.
     navigationRef.current
@@ -269,27 +331,36 @@ function Header() {
       />
       <header
         className={`site-header ${publicHeader ? "public-header" : "studio-header"}${visualCompact ? " is-compact" : ""}${menu ? " has-open-menu" : ""}`}
+        onPointerEnter={cancelHoverClose}
+        onPointerLeave={closeHover}
+        onPointerCancel={() => { cancelHoverClose(); setHovered(false); }}
         onFocusCapture={(event) => {
-          // The toggle receives focus before its click; it must never unfold the
-          // masthead. Focus inside the open panel also keeps the existing state.
-          setFocused(!menu && !toggleRef.current?.contains(event.target as Node));
+          // Only the brand consciously opens navigation. Retain it while tabbing
+          // within the header; language and burger alone never trigger expansion.
+          if (!menu && ((brandRef.current === event.target && event.target.matches(":focus-visible")) || navigationRef.current?.contains(event.target as Node))) setFocused(true);
         }}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) {
             setFocused(false);
-            setMenu(false);
+            closeMenu();
           }
         }}
       >
         <Link
           to="/"
+          ref={brandRef}
           className="editorial-brand"
+          onPointerEnter={(event) => {
+            if (event.pointerType === "mouse" && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+              cancelHoverClose();
+              setHovered(true);
+            }
+          }}
           aria-label={tr("WANDER home")}
         >
-          {publicHeader && (
-            <OriginalBrand part="monogram" className="header-monogram" />
-          )}
-          <OriginalBrand part="wordmark" className="header-wordmark" />
+          <OriginalBrand part="monogram" className="header-monogram" />
+          <OriginalBrand part="initial" className="header-initial" />
+          <OriginalBrand part="remainder" className="header-remainder" />
         </Link>
         <nav
           ref={navigationRef}
@@ -299,7 +370,7 @@ function Header() {
           inert={visualCompact && !menu}
           onClick={(event) => {
             if (menu && (event.target as Element).closest("a")) {
-              setMenu(false);
+              closeMenu();
               toggleRef.current?.focus({ preventScroll: true });
             }
           }}
@@ -322,7 +393,10 @@ function Header() {
           aria-label={menu ? tr("Close navigation") : tr("Open navigation")}
           aria-expanded={menu}
           aria-controls="main-navigation"
-          onClick={() => setMenu(!menu)}
+          onClick={() => {
+            if (menu) closeMenu();
+            else { setMenuCompact(visualCompact); setMenu(true); }
+          }}
         >
           {menu ? <X strokeWidth={1.25} /> : <Menu strokeWidth={1.25} />}
         </button>
@@ -335,13 +409,13 @@ function OriginalBrand({
   part,
   className,
 }: {
-  part: "wordmark" | "monogram";
+  part: "initial" | "remainder" | "monogram";
   className?: string;
 }) {
   return (
     <svg
       className={className}
-      viewBox={part === "wordmark" ? "432 195 696 83" : "65 74 279 145"}
+      viewBox={part === "initial" ? "432 195 144 83" : part === "remainder" ? "576 195 556 83" : "65 74 279 145"}
       aria-hidden="true"
       focusable="false"
     >

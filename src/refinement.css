@@ -1,4 +1,5 @@
 :root {
+  --brand-frame: #202b26;
   --ui-duration-feedback: 140ms;
   --ui-duration-compact: 200ms;
   --ui-ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -902,7 +903,7 @@ body {
 /* A quiet closing note, with the photographs remaining the visual focus. */
 .site-footer {
   padding: 32px var(--gutter) 24px;
-  background: #26312c;
+  background: var(--brand-frame);
   color: #d1d9d2;
   border-color: #3b4740;
 }
@@ -2421,6 +2422,7 @@ body {
   height: 164px;
 }
 .site-header:is(.public-header, .studio-header) {
+  background: var(--brand-frame);
   position: fixed;
   inset: 0 0 auto;
   z-index: 40;
@@ -2434,27 +2436,40 @@ body {
 }
 :is(.public-header, .studio-header) .editorial-brand {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 12px;
+  width: 268px;
+  height: 84px;
+  transform: translateX(-50%);
   pointer-events: none;
 }
 :is(.public-header, .studio-header) .editorial-brand svg {
   display: block;
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  transform-origin: top left;
   pointer-events: auto;
+  transition: transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 :is(.public-header, .studio-header) .header-monogram {
   width: 78px;
-  height: 41px;
-  top: 12px;
-  transition: opacity 400ms cubic-bezier(0.22, 0.61, 0.36, 1), transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1), visibility 400ms;
+  height: 40.54px;
+  left: 0;
+  top: 0;
+  transform: translate(95px, 0);
 }
-:is(.public-header, .studio-header) .header-wordmark {
-  width: 268px;
-  height: 32px;
-  top: 64px;
-  transition: width 400ms cubic-bezier(0.22, 0.61, 0.36, 1), height 400ms cubic-bezier(0.22, 0.61, 0.36, 1), top 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+:is(.public-header, .studio-header) .header-initial {
+  width: 55.448px;
+  height: 31.96px;
+  left: 0;
+  top: 52px;
+  opacity: 1;
+  transition: opacity 0s 400ms;
+}
+:is(.public-header, .studio-header) .header-remainder {
+  width: 214.092px;
+  height: 31.96px;
+  left: 55.448px;
+  top: 52px;
 }
 .site-header:is(.public-header, .studio-header) nav {
   position: absolute;
@@ -2496,7 +2511,7 @@ body {
   overscroll-behavior: contain;
   transform: none;
   padding: 24px;
-  background: #26312c;
+  background: var(--brand-frame);
   color: #d1d9d2;
   border: 1px solid #3b4740;
   border-top: 0;
@@ -2529,16 +2544,16 @@ body {
   margin-top: 4px;
   padding-top: 14px;
 }
-:is(.public-header, .studio-header).is-compact .header-wordmark {
-  top: 23px;
-  width: 146px;
-  height: 18px;
-}
 :is(.public-header, .studio-header).is-compact .header-monogram {
+  transform: translate(61px, 11.2px) scale(0.39165);
+}
+:is(.public-header, .studio-header).is-compact .header-initial {
   opacity: 0;
-  transform: translate(-50%, -56px);
   pointer-events: none;
-  visibility: hidden;
+  transition-delay: 0s;
+}
+:is(.public-header, .studio-header).is-compact .header-remainder {
+  transform: translate(42.052px, -41px) scale(0.51516);
 }
 .site-header:is(.public-header, .studio-header).is-compact nav:not(.nav-open) {
   opacity: 0;
@@ -2546,7 +2561,17 @@ body {
   pointer-events: none;
 }
 :is(.public-header, .studio-header) .editorial-brand:focus-visible {
-  outline-offset: -8px;
+  outline: none;
+}
+:is(.public-header, .studio-header) .editorial-brand:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+:is(.public-header, .studio-header).is-compact .editorial-brand:focus-visible::after {
+  inset: 7px calc(50% - 77px) 62px;
 }
 /* Compass sits below the current masthead, including during an upward reveal. */
 body:has(.public-header) .chapter-compass {
@@ -2583,15 +2608,25 @@ html:has(.public-header) {
   .site-header.public-header {
     height: 136px;
   }
-  :is(.public-header, .studio-header) .header-monogram {
-    width: 66px;
-    height: 35px;
-    top: 12px;
-  }
-  :is(.public-header, .studio-header) .header-wordmark {
+  .site-header.studio-header { height: 136px; }
+  :is(.public-header, .studio-header) .editorial-brand {
     width: 218px;
-    height: 26px;
-    top: 66px;
+    height: 80px;
+  }
+  :is(.public-header, .studio-header) .header-monogram {
+    transform: translate(76px, 0) scale(0.84615);
+  }
+  :is(.public-header, .studio-header) .header-initial {
+    transform: translate(0, 2px) scale(0.81343);
+  }
+  :is(.public-header, .studio-header) .header-remainder {
+    transform: translate(-10.345px, 2px) scale(0.81343);
+  }
+  :is(.public-header, .studio-header).is-compact .header-monogram {
+    transform: translate(36px, 11.2px) scale(0.39165);
+  }
+  :is(.public-header, .studio-header).is-compact .header-remainder {
+    transform: translate(17.052px, -41px) scale(0.51516);
   }
   :is(.public-header, .studio-header) .language-switch {
     top: 10px;
@@ -2712,6 +2747,26 @@ html:has(.public-header) {
   .site-header .nav-label::after {
     transition: none;
   }
+}
+/* The card itself is the single native link; its text and image remain selectable. */
+.inspiration-page .edition-card { position: relative; display: block; }
+.inspiration-page .edition-card:focus-visible { outline: 2px solid var(--ink); outline-offset: 5px; }
+.inspiration-page .edition-card:hover .edition-cover > img { transform: scale(1.025); }
+/* The terminal credit paragraph's 45px margin used to collapse past the dark
+   story wrapper onto the pale body. Contain it without altering its spacing. */
+.story-experience.template-after-hours { display: flow-root; }
+@media (max-width: 760px) {
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) {
+    display: flex;
+    top: 102px;
+    left: 10px;
+    right: 10px;
+    gap: 16px;
+    justify-content: center;
+    overflow: visible;
+    font-size: 10px;
+  }
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) .studio-link { display: none; }
 }
 [data-motion="off"] .site-header .nav-label::after {
   transition: none;

@@ -24,7 +24,7 @@ export function Home() {
   const journey = journeys[0];
   const otherJourneys = journeys.slice(1, 4);
   return (
-    <main id="main">
+    <main id="main" className="home-page">
       <section className="home-intro page-width">
         <div className="intro-composition">
           <h1>
@@ -92,7 +92,7 @@ export function Home() {
                 photo={journey.cover}
                 eager
                 className="home-feature-image"
-                sizes="(max-width: 760px) 100vw, 58vw"
+                sizes="(max-width: 760px) calc(100vw - 44px), (min-width: 1455px) 616px, calc(50vw - 4.2vw - 24px)"
               />
               <span className="home-feature-image-label">
                 {tr("THE LATEST JOURNEY")}
@@ -157,14 +157,16 @@ export function Home() {
               >
                 <Picture
                   photo={item.cover}
-                  sizes="(max-width: 760px) 100vw, 30vw"
+                  sizes="(max-width: 760px) calc(100vw - 44px), (min-width: 1455px) 616px, calc(50vw - 4.2vw - 24px)"
                 />
-                <span className="eyebrow">
-                  {item.country} /{" "}
-                  {dateLabel(item.start_date, { year: "numeric" })}
-                </span>
-                <h3>{item.title}</h3>
-                {item.subtitle && <p>{item.subtitle}</p>}
+                <div className="home-more-copy">
+                  <span className="eyebrow">
+                    {item.country} /{" "}
+                    {dateLabel(item.start_date, { year: "numeric" })}
+                  </span>
+                  <h3>{item.title}</h3>
+                  {item.subtitle && <p>{item.subtitle}</p>}
+                </div>
               </Link>
             ))}
           </div>

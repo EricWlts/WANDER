@@ -2245,3 +2245,117 @@ body {
     will-change: auto;
   }
 }
+
+/* V02: a bounded photographic spread, with shared axes and an alternating rhythm. */
+.home-page > .page-width {
+  max-width: 1280px;
+}
+.home-page .intro-composition,
+.home-page .home-feature-story {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-section-gap);
+}
+.home-page .home-feature-copy h2 {
+  font-size: clamp(38px, 3.6vw, 52px);
+  overflow-wrap: anywhere;
+}
+.home-page > .home-feature:last-child {
+  margin-bottom: var(--ui-section-gap);
+}
+.home-page .home-feature-loading {
+  width: calc((100% - var(--ui-section-gap)) / 2);
+}
+.home-page .home-more {
+  padding-block: clamp(48px, 5vw, 72px);
+}
+.home-page .home-more-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--ui-section-gap);
+  padding-top: 32px;
+}
+.home-page .home-more-entry:nth-child(odd) {
+  margin-right: var(--ui-section-gap);
+}
+.home-page .home-more-entry:nth-child(even) {
+  margin-top: var(--ui-section-gap);
+}
+.home-page .home-more-entry > .picture {
+  aspect-ratio: 4 / 3 !important;
+  margin-bottom: 0;
+}
+.home-page .home-more-entry:nth-child(even) > .picture {
+  aspect-ratio: 3 / 2 !important;
+}
+.home-page .home-more-copy {
+  min-width: 0;
+}
+.home-page .home-more-copy > .eyebrow {
+  color: var(--olive);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+.home-page .home-more-copy h3 {
+  margin-block: 16px 12px;
+  font: 400 clamp(32px, 3vw, 44px) / 1.06 var(--serif);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.home-page .home-more-copy > p {
+  color: var(--olive);
+  font: italic 24px / 1.25 var(--serif);
+  overflow-wrap: anywhere;
+}
+/* With one supporting journey, keep the image on the opposite page of the spread. */
+.home-page .home-more-entry:only-child {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--ui-section-gap);
+  margin: 0;
+}
+.home-page .home-more-entry:only-child > .picture {
+  grid-column: 2;
+  grid-row: 1;
+  width: calc(100% - var(--ui-section-gap));
+  justify-self: end;
+}
+.home-page .home-more-entry:only-child > .home-more-copy {
+  grid-column: 1;
+  grid-row: 1;
+}
+@media (min-width: 761px) and (max-width: 1023px) {
+  .home-page .intro-composition {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+@media (max-width: 760px) {
+  .home-page .intro-composition,
+  .home-page .home-feature-story,
+  .home-page .home-more-grid,
+  .home-page .home-more-entry:only-child {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .home-page .home-feature-loading {
+    width: 100%;
+  }
+  .home-page .home-more-grid {
+    row-gap: 40px;
+  }
+  .home-page .home-more-entry:nth-child(n) {
+    margin: 0;
+  }
+  .home-page .home-more-entry:only-child > .picture,
+  .home-page .home-more-entry:only-child > .home-more-copy {
+    grid-column: auto;
+    grid-row: auto;
+    width: 100%;
+  }
+  .home-page .home-more-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

@@ -1084,6 +1084,18 @@ export function ModularEditor() {
       <header className="editor-bar">
         <div className="editor-identity">
           <Link
+            to="/"
+            className="editor-brand"
+            aria-label={t("WANDER home", "WANDER Startseite")}
+          >
+            <img
+              src="/assets/brand/logos/wander-monogram-black.svg"
+              width="32"
+              height="32"
+              alt=""
+            />
+          </Link>
+          <Link
             to="/studio"
             aria-label={t("Back to studio", "Zurück zum Studio")}
           >

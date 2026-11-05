@@ -207,7 +207,12 @@ function Header() {
     <header className="site-header">
       <div className="brand-lockup">
         <Link to="/" className="wordmark" aria-label={tr("WANDER home")}>
-          WANDER<span className="wordmark-star">✳</span>
+          <img
+            src="/assets/brand/logos/wander-logo-horizontal-white.svg"
+            width="160"
+            height="43"
+            alt=""
+          />
         </Link>
         <span className="header-caption">{tr("Places that stay.")}</span>
       </div>

@@ -18,6 +18,8 @@ import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
 import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
 import { closeNavigationOnEscape } from "./mobileNavigation";
+import { initialHeaderScroll, updateHeaderScroll } from "./adaptiveHeader";
+import { BrandMonogram, SignatureWordmark } from "./SignatureBrand";
 
 type StudioPageName =
   "Studio" | "NewJourney" | "JourneyEditor" | "GuidedEditor";
@@ -131,7 +133,7 @@ export default function App() {
       <Footer />
       {toast && (
         <div className="toast" role="status">
-          <Compass />
+          {location.pathname.startsWith("/studio") ? <Compass /> : <BrandMonogram light />}
           {toast}
           <button
             aria-label={tr("Dismiss notification")}
@@ -192,7 +194,45 @@ function StudioRoute({ page }: { page: StudioPageName }) {
 function Header() {
   const [menu, setMenu] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
+  const scrollState = useRef(initialHeaderScroll);
+  const [compact, setCompact] = useState(false);
+  const [focused, setFocused] = useState(false);
   const location = useLocation();
+  const publicHeader = !location.pathname.startsWith("/studio");
+  const visualCompact = !publicHeader || compact;
+  useEffect(() => {
+    scrollState.current = { ...initialHeaderScroll, lastY: window.scrollY };
+    setCompact(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    // Both edges of a menu interaction start a fresh scroll gesture.
+    scrollState.current = { ...scrollState.current, lastY: window.scrollY, travel: 0 };
+  }, [menu]);
+  useEffect(() => {
+    if (!publicHeader) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      scrollState.current = updateHeaderScroll(
+        scrollState.current,
+        window.scrollY,
+        focused,
+        publicHeader,
+        menu,
+      );
+      setCompact(scrollState.current.compact);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [menu, focused, publicHeader]);
   useEffect(() => {
     setMenu(false);
   }, [location.pathname]);
@@ -200,68 +240,136 @@ function Header() {
     if (!menu) return;
     const onKeyDown = (event: KeyboardEvent) =>
       closeNavigationOnEscape(event, () => setMenu(false), toggleRef.current);
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        // Language and other header controls stay usable without dismissing
+        // the menu lock before their focus event.
+        navigationRef.current?.parentElement?.contains(event.target as Node)
+      ) return;
+      if (navigationRef.current?.contains(document.activeElement))
+        (document.activeElement as HTMLElement)?.blur();
+      setMenu(false);
+    };
+    // Only an explicit open moves focus; scroll expansion never changes it.
+    navigationRef.current
+      ?.querySelector<HTMLAnchorElement>("a")
+      ?.focus({ preventScroll: true });
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [menu]);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [menu, publicHeader]);
   return (
-    <header className="site-header">
-      <div className="brand-lockup">
-        <Link to="/" className="wordmark" aria-label={tr("WANDER home")}>
-          <img
-            src="/assets/brand/logos/wander-logo-horizontal-white.svg"
-            width="160"
-            height="43"
-            alt=""
-          />
-        </Link>
-        <span className="header-caption">{tr("Places that stay.")}</span>
-      </div>
-      <nav
-        aria-label={tr("Main navigation")}
-        className={menu ? "nav-open" : ""}
+    <>
+      <div
+        className={publicHeader ? "public-header-slot" : "studio-header-slot"}
+        aria-hidden="true"
+      />
+      <header
+        className={`site-header ${publicHeader ? "public-header" : "studio-header"}${visualCompact ? " is-compact" : ""}${menu ? " has-open-menu" : ""}`}
+        onFocusCapture={(event) => {
+          // The toggle receives focus before its click; it must never unfold the
+          // masthead. Focus inside the open panel also keeps the existing state.
+          setFocused(!menu && !toggleRef.current?.contains(event.target as Node));
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setFocused(false);
+            setMenu(false);
+          }
+        }}
       >
-        <NavLink to="/" end>
-          {tr("Journal")}
-        </NavLink>
-        <NavLink to="/archive">{tr("The archive")}</NavLink>
-        <NavLink to="/inspiration">{tr("The editions")}</NavLink>
-        <NavLink to="/about">{tr("About")}</NavLink>
-        <Link to="/studio" className="studio-link">
-          {tr("My studio")}
-          <ArrowUpRight size={14} />
+        <Link
+          to="/"
+          className="editorial-brand"
+          aria-label={tr("WANDER home")}
+        >
+          {publicHeader && (
+            <OriginalBrand part="monogram" className="header-monogram" />
+          )}
+          <OriginalBrand part="wordmark" className="header-wordmark" />
         </Link>
-      </nav>
-      <LanguageSwitch />
-      <button
-        ref={toggleRef}
-        className="menu-toggle icon-button"
-        aria-label={menu ? tr("Close navigation") : tr("Open navigation")}
-        aria-expanded={menu}
-        onClick={() => setMenu(!menu)}
-      >
-        {menu ? <X /> : <Menu />}
-      </button>
-    </header>
+        <nav
+          ref={navigationRef}
+          id="main-navigation"
+          aria-label={tr("Main navigation")}
+          className={menu ? "nav-open" : ""}
+          inert={visualCompact && !menu}
+          onClick={(event) => {
+            if (menu && (event.target as Element).closest("a")) {
+              setMenu(false);
+              toggleRef.current?.focus({ preventScroll: true });
+            }
+          }}
+        >
+          <NavLink to="/" end>
+            <span className="nav-label">{tr("Journal")}</span>
+          </NavLink>
+          <NavLink to="/archive"><span className="nav-label">{tr("The archive")}</span></NavLink>
+          <NavLink to="/inspiration"><span className="nav-label">{tr("The editions")}</span></NavLink>
+          <NavLink to="/about"><span className="nav-label">{tr("About")}</span></NavLink>
+          <Link to="/studio" className="studio-link">
+            {tr("My studio")}
+            <ArrowUpRight size={14} />
+          </Link>
+        </nav>
+        <LanguageSwitch />
+        <button
+          ref={toggleRef}
+          className="menu-toggle icon-button"
+          aria-label={menu ? tr("Close navigation") : tr("Open navigation")}
+          aria-expanded={menu}
+          aria-controls="main-navigation"
+          onClick={() => setMenu(!menu)}
+        >
+          {menu ? <X strokeWidth={1.25} /> : <Menu strokeWidth={1.25} />}
+        </button>
+      </header>
+    </>
+  );
+}
+// Crop the original approved artboard; the source paths and contours stay intact.
+function OriginalBrand({
+  part,
+  className,
+}: {
+  part: "wordmark" | "monogram";
+  className?: string;
+}) {
+  return (
+    <svg
+      className={className}
+      viewBox={part === "wordmark" ? "432 195 696 83" : "65 74 279 145"}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <image
+        href="/assets/brand/logos/wander-logo-horizontal-white.svg"
+        width="1280"
+        height="345"
+      />
+    </svg>
   );
 }
 function Footer() {
   return (
     <footer className="site-footer">
+      <Link to="/" className="footer-wordmark" aria-label={tr("WANDER home")}>
+        <SignatureWordmark />
+      </Link>
       <div className="footer-top">
         <span>
           {tr("EVERY JOURNEY DESERVES")}
           <br />
           {tr("TO BE REMEMBERED.")}
         </span>
-        <Compass />
         <Link to="/archive" className="text-link">
           {tr("Keep exploring")}
           <ArrowUpRight size={17} />
         </Link>
       </div>
-      <Link to="/" className="footer-wordmark" aria-label={tr("WANDER home")}>
-        WANDER
-      </Link>
       <div className="footer-bottom">
         <span>
           © {new Date().getFullYear()}
@@ -282,9 +390,10 @@ export function PageState({
   text?: string;
   children?: ReactNode;
 }) {
+  const { pathname } = useLocation();
   return (
     <main id="main" className="page-state">
-      <Compass />
+      {pathname.startsWith("/studio") ? <Compass /> : <BrandMonogram />}
       <h1>{title}</h1>
       {text && <p>{text}</p>}
       {children || (

@@ -2377,3 +2377,318 @@ body {
     gap: 12px;
   }
 }
+
+
+/* WB2: the reserved masthead space never changes when the fixed layer folds. */
+.public-header-slot {
+  height: 164px;
+}
+.site-header:is(.public-header, .studio-header) {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  height: 164px;
+  overflow: clip;
+  padding: 0 var(--gutter);
+  transition: height 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.site-header:is(.public-header, .studio-header).has-open-menu {
+  overflow: visible;
+}
+:is(.public-header, .studio-header) .editorial-brand {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+:is(.public-header, .studio-header) .editorial-brand svg {
+  display: block;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+:is(.public-header, .studio-header) .header-monogram {
+  width: 78px;
+  height: 41px;
+  top: 12px;
+  transition: opacity 400ms cubic-bezier(0.22, 0.61, 0.36, 1), transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1), visibility 400ms;
+}
+:is(.public-header, .studio-header) .header-wordmark {
+  width: 268px;
+  height: 32px;
+  top: 64px;
+  transition: width 400ms cubic-bezier(0.22, 0.61, 0.36, 1), height 400ms cubic-bezier(0.22, 0.61, 0.36, 1), top 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.site-header:is(.public-header, .studio-header) nav {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  gap: 30px;
+  white-space: nowrap;
+  transition: opacity 400ms cubic-bezier(0.22, 0.61, 0.36, 1), visibility 400ms;
+}
+:is(.public-header, .studio-header) .language-switch {
+  position: absolute;
+  top: 10px;
+  right: var(--gutter);
+  margin: 0;
+}
+:is(.public-header, .studio-header) .menu-toggle {
+  display: flex;
+  position: absolute;
+  left: var(--gutter);
+  top: 10px;
+  margin: 0;
+  min-width: 44px;
+  min-height: 44px;
+  z-index: 1;
+}
+.site-header:is(.public-header, .studio-header) nav.nav-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  top: 100%;
+  left: var(--gutter);
+  right: auto;
+  width: min(320px, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100dvh - 164px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: none;
+  padding: 24px;
+  background: #26312c;
+  color: #d1d9d2;
+  border: 1px solid #3b4740;
+  border-top: 0;
+  white-space: normal;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+:is(.public-header, .studio-header) nav.nav-open > a {
+  padding-block: 13px;
+}
+:is(.public-header, .studio-header) nav.nav-open .studio-link {
+  margin: 8px 0 0;
+  border-top: 1px solid #3b4740;
+  padding-top: 20px;
+}
+.site-header:is(.public-header, .studio-header).is-compact {
+  height: 64px;
+}
+/* The panel follows the actual compact edge and uses its available viewport. */
+.site-header:is(.public-header, .studio-header).is-compact nav.nav-open {
+  max-height: calc(100dvh - 64px);
+  padding: 16px 24px;
+  gap: 4px;
+}
+:is(.public-header, .studio-header).is-compact nav.nav-open > a {
+  padding-block: 10px;
+}
+:is(.public-header, .studio-header).is-compact nav.nav-open .studio-link {
+  margin-top: 4px;
+  padding-top: 14px;
+}
+:is(.public-header, .studio-header).is-compact .header-wordmark {
+  top: 23px;
+  width: 146px;
+  height: 18px;
+}
+:is(.public-header, .studio-header).is-compact .header-monogram {
+  opacity: 0;
+  transform: translate(-50%, -56px);
+  pointer-events: none;
+  visibility: hidden;
+}
+.site-header:is(.public-header, .studio-header).is-compact nav:not(.nav-open) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+:is(.public-header, .studio-header) .editorial-brand:focus-visible {
+  outline-offset: -8px;
+}
+/* Compass sits below the current masthead, including during an upward reveal. */
+body:has(.public-header) .chapter-compass {
+  top: 176px;
+  transition: top 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+body:has(.public-header.is-compact) .chapter-compass {
+  top: 76px;
+}
+html:has(.public-header) {
+  scroll-padding-top: 176px;
+}
+.site-footer {
+  padding-top: 24px;
+  padding-bottom: 72px;
+}
+.site-footer .footer-wordmark {
+  display: block;
+  width: min(360px, 76%);
+  margin: 16px auto 32px;
+  line-height: 0;
+}
+.site-footer .footer-bottom {
+  margin-top: 24px;
+}
+.footer-wordmark > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 736 / 84;
+}
+@media (max-width: 760px) {
+  .public-header-slot,
+  .site-header.public-header {
+    height: 136px;
+  }
+  :is(.public-header, .studio-header) .header-monogram {
+    width: 66px;
+    height: 35px;
+    top: 12px;
+  }
+  :is(.public-header, .studio-header) .header-wordmark {
+    width: 218px;
+    height: 26px;
+    top: 66px;
+  }
+  :is(.public-header, .studio-header) .language-switch {
+    top: 10px;
+    left: auto;
+    right: 16px;
+  }
+  :is(.public-header, .studio-header) .menu-toggle {
+    display: flex;
+    position: absolute;
+    left: 16px;
+    right: auto;
+    top: 10px;
+    margin: 0;
+  }
+  .site-header:is(.public-header, .studio-header) nav {
+    display: none;
+    top: 100%;
+    left: 0;
+    right: 0;
+    transform: none;
+    white-space: normal;
+    max-height: calc(100dvh - 136px);
+    overflow-y: auto;
+  }
+  .site-header:is(.public-header, .studio-header) nav.nav-open {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    gap: 10px;
+    max-height: calc(100dvh - 136px);
+  }
+  body:has(.public-header) .chapter-compass {
+    top: 148px;
+  }
+  body:has(.public-header.is-compact) .chapter-compass {
+    top: 76px;
+  }
+  html:has(.public-header) {
+    scroll-padding-top: 148px;
+  }
+  .site-footer {
+    padding-top: 20px;
+    padding-bottom: 70px;
+  }
+  .site-footer .footer-wordmark {
+    margin-block: 12px 24px;
+  }
+  .site-footer .footer-bottom {
+    margin-top: 20px;
+  }
+}
+
+/* Studio reserves only the compact masthead and keeps editing controls below it. */
+.studio-header-slot {
+  height: 64px;
+}
+.studio-route {
+  min-height: calc(100vh - 64px);
+  min-height: calc(100svh - 64px);
+}
+.studio-route .editor-bar,
+.studio-route .studio-process {
+  top: 64px;
+}
+.studio-route .studio-process {
+  scroll-margin-top: 64px;
+}
+.studio-route .final-preview {
+  top: 94px;
+}
+@media (min-width: 761px) {
+  .studio-route .module-navigator,
+  .studio-route .module-inspector {
+    top: 152px;
+    max-height: calc(100svh - 152px);
+  }
+  .studio-route .module-navigator {
+    min-height: calc(100svh - 152px);
+  }
+  @supports (height: 100dvh) {
+    .studio-route .module-inspector {
+      max-height: calc(100dvh - 152px);
+    }
+  }
+}
+
+/* Size the indicator to the label while keeping the full navigation hit area. */
+.site-header nav > a:not(.studio-link)::after {
+  content: none;
+}
+.site-header .nav-label {
+  position: relative;
+  display: inline-block;
+}
+.site-header .nav-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0.72;
+  transition: transform 200ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 200ms;
+}
+.site-header a.active .nav-label::after {
+  transform: scaleX(1);
+  opacity: 0.62;
+}
+.site-header a:hover .nav-label::after,
+.site-header a:focus-visible .nav-label::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .nav-label::after {
+    transition: none;
+  }
+}
+[data-motion="off"] .site-header .nav-label::after {
+  transition: none;
+}
+[data-motion="off"] .site-header:is(.public-header, .studio-header),
+[data-motion="off"] .site-header:is(.public-header, .studio-header) *,
+[data-motion="off"] body:has(.public-header) .chapter-compass {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header:is(.public-header, .studio-header),
+  .site-header:is(.public-header, .studio-header) *,
+  .site-header:is(.public-header, .studio-header) nav,
+  body:has(.public-header) .chapter-compass {
+    transition: none;
+  }
+}

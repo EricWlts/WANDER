@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, List, Grid2X2 } from "lucide-react";
 import { api } from "./api";
 import { Reveal } from "./Reveal";
-import { Compass, dateLabel, dateRange, Picture } from "./components";
+import { dateLabel, dateRange, Picture } from "./components";
+import { BrandMonogram } from "./SignatureBrand";
 import type { Journey } from "./types";
 
 function useJourneys() {
@@ -125,7 +126,7 @@ export function Home() {
           </article>
         ) : (
           <div className="home-feature-empty">
-            <Compass />
+            <BrandMonogram />
             <div>
               <span className="eyebrow">{tr("THE JOURNAL")}</span>
               <h2>{tr("A place for journeys in photographs and stories.")}</h2>
@@ -278,7 +279,7 @@ export function Archive() {
         </div>
       ) : (
         <div className="empty-state">
-          <Compass />
+          <BrandMonogram />
           <h2>
             <Reveal as="span">
               {tr("No journeys have been published yet.")}
@@ -304,7 +305,7 @@ export function Archive() {
           <p>
             <Reveal as="span">{tr("And so much still to discover.")}</Reveal>
           </p>
-          <Compass />
+          <BrandMonogram />
         </div>
       )}
     </main>
@@ -324,7 +325,7 @@ export function About() {
         </Reveal>
       </h1>
       <div className="about-content">
-        <Compass />
+        <BrandMonogram />
         <div>
           <p className="about-lead">
             {tr("A photograph holds a place.")}

@@ -55,6 +55,8 @@ import { MotionControl } from "./MotionControl";
 import { PhotoViewer } from "./StoryExperience";
 import { t, useLocale } from "./I18n";
 import { moveModule } from "./moduleOrder";
+import { removeModuleFromDraft, selectionAfterModuleRemoval } from "./moduleDeletion";
+import { moduleDropTarget, moduleScrollSpeed, moduleTransferTarget } from "./moduleDrag";
 import { isRecoveryJourney } from "./recoveryModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 
@@ -171,6 +173,9 @@ export function ModularEditor() {
     [viewerPhotos, setViewerPhotos] = useState<Photo[]>([]),
     [viewer, setViewer] = useState<number | null>(null),
     [pending, setPending] = useState("");
+  const [deletingModule, setDeletingModule] = useState<{ id: number; title: string; navigator: boolean } | null>(null);
+  const deletingModuleRef = useRef(deletingModule);
+  const deleteReturn = useRef<HTMLElement | null>(null);
   const [library, setLibrary] = useState(false),
     [discard, setDiscard] = useState(false);
   const [backgroundSaving, setBackgroundSaving] = useState(false),
@@ -193,10 +198,36 @@ export function ModularEditor() {
       id: number;
       target: number;
       after: boolean;
+      inside?: boolean;
     } | null>(null);
-  const dragStart = useRef<{ id: number; y: number; active: boolean } | null>(
-    null,
-  );
+  const dragStart = useRef<{
+    id: number;
+    y: number;
+    active: boolean;
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    handle: HTMLButtonElement;
+  } | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const dragTarget = useRef<typeof drag>(null);
+  const dragFrame = useRef<number | null>(null);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cancelDrag();
+    };
+    const hidden = () => { if (document.hidden) cancelDrag(); };
+    document.addEventListener("keydown", escape);
+    document.addEventListener("visibilitychange", hidden);
+    window.addEventListener("blur", cancelDrag);
+    return () => {
+      cancelDrag();
+      document.removeEventListener("keydown", escape);
+      document.removeEventListener("visibilitychange", hidden);
+      window.removeEventListener("blur", cancelDrag);
+    };
+  }, [mode, tab, slug]);
   const revision = useRef(0),
     saving = useRef(false);
   const saved = useRef<Journey | null>(null),
@@ -452,10 +483,16 @@ export function ModularEditor() {
       setAddTarget((target) =>
         target === null ? null : (idMap.get(target) ?? target),
       );
+      if (deletingModuleRef.current) {
+        const pending = deletingModuleRef.current;
+        deletingModuleRef.current = { ...pending, id: idMap.get(pending.id) ?? pending.id };
+        setDeletingModule(deletingModuleRef.current);
+      }
       // Saving a new module replaces its keyed row. Cancel an in-flight gesture
       // before that replacement and return keyboard focus to the same module.
       const focusedHandle = document.activeElement;
-      const focusedId = focusedHandle?.classList.contains("module-drag-handle")
+      const focusedControl = focusedHandle?.classList.contains("module-delete-button") ? "module-delete-button" : "module-drag-handle";
+      const focusedId = focusedHandle?.classList.contains(focusedControl)
         ? Number(
             (focusedHandle.closest("[data-module-id]") as HTMLElement)?.dataset
               .moduleId,
@@ -465,8 +502,7 @@ export function ModularEditor() {
         dragStart.current &&
         idMap.get(dragStart.current.id) !== dragStart.current.id
       ) {
-        dragStart.current = null;
-        setDrag(null);
+        cancelDrag();
       }
       if (
         focusedId !== null &&
@@ -476,7 +512,7 @@ export function ModularEditor() {
         requestAnimationFrame(() =>
           document
             .querySelector<HTMLButtonElement>(
-              `[data-module-id="${idMap.get(focusedId)}"] > .module-drag-handle`,
+              `[data-module-id="${idMap.get(focusedId)}"] > .${focusedControl}`,
             )
             ?.focus({ preventScroll: true }),
         );
@@ -585,21 +621,56 @@ export function ModularEditor() {
     setPicker(false);
     setTab("settings");
   }
-  function remove(id: number) {
-    if (!journey) return;
-    change({
-      photos: journey.photos.map((p) =>
-        p.chapter_id === id ? { ...p, chapter_id: null } : p,
-      ),
-      chapters: journey.chapters
-        .filter((c) => c.id !== id)
-        .map((c) =>
-          c.layout?.parent_id === id
-            ? { ...c, layout: { ...c.layout, parent_id: undefined } }
-            : c,
-        ),
+  function requestModuleRemoval(id: number, trigger: HTMLElement, navigator = false) {
+    const current = draftRef.current;
+    const chapter = current?.chapters.find((c) => c.id === id);
+    if (!chapter) return;
+    cancelDrag();
+    deleteReturn.current = trigger;
+    deletingModuleRef.current = { id, title: chapter.title, navigator };
+    setDeletingModule(deletingModuleRef.current);
+  }
+  function closeModuleRemoval() {
+    const pending = deletingModuleRef.current;
+    deletingModuleRef.current = null;
+    setDeletingModule(null);
+    requestAnimationFrame(() => {
+      const original = deleteReturn.current;
+      if (original?.isConnected) original.focus({ preventScroll: true });
+      else if (pending) document.querySelector<HTMLButtonElement>(
+        `.module-navigator [data-module-id="${pending.id}"] > .module-delete-button`,
+      )?.focus({ preventScroll: true });
     });
-    select({ type: "hero" });
+  }
+  function remove(id: number) {
+    cancelDrag();
+    const current = draftRef.current;
+    if (!current) return;
+    const visible = current.chapters.filter((c) => !c.layout?.parent_id).flatMap((c) =>
+      [c, ...current.chapters.filter((child) => child.layout?.parent_id === c.id)],
+    );
+    const index = visible.findIndex((c) => c.id === id);
+    const neighbor = visible[index + 1] || visible[index - 1];
+    const navigator = deletingModuleRef.current?.navigator;
+    const next = removeModuleFromDraft(current, id);
+    if (next !== current) {
+      draftRef.current = next;
+      change({ chapters: next.chapters, photos: next.photos });
+      select((active) => selectionAfterModuleRemoval(active, id));
+      if (imageReturn.current?.moduleId === id) imageReturn.current = null;
+      setAddTarget((target) => target === id ? null : target);
+    }
+    deletingModuleRef.current = null;
+    setDeletingModule(null);
+    if (window.innerWidth < 760) setTab("modules");
+    requestAnimationFrame(() => {
+      const target = navigator && neighbor
+        ? document.querySelector<HTMLButtonElement>(
+            `.module-navigator [data-module-id="${neighbor.id}"] > .module-delete-button`,
+          )
+        : document.querySelector<HTMLButtonElement>(".module-navigator .cover-nav");
+      target?.focus({ preventScroll: true });
+    });
   }
   function duplicate(c: Chapter) {
     if (!journey) return;
@@ -636,47 +707,109 @@ export function ModularEditor() {
     change({ chapters: list });
     select({ type: "module", id: copy.id });
   }
-  function reorder(id: number, dir: number) {
-    if (!journey) return;
-    const source = journey.chapters.find((c) => c.id === id);
+  function focusMoveHandle(id: number, reveal = false) {
+    requestAnimationFrame(() => {
+      const handle = document.querySelector<HTMLButtonElement>(
+        `.module-navigator [data-module-id="${id}"] > .module-drag-handle`,
+      );
+      handle?.focus({ preventScroll: true });
+      if (reveal) handle?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    });
+  }
+  function announceMove(chapters: Chapter[], id: number) {
+    const source = chapters.find((c) => c.id === id);
     if (!source) return;
-    const siblings = journey.chapters.filter(
+    const peers = chapters.filter(
+      (c) => (c.layout?.parent_id || null) === (source.layout?.parent_id || null),
+    );
+    setMoveAnnouncement(`${source.title}: ${t("Position", "Position")} ${peers.indexOf(source) + 1} ${t("of", "von")} ${peers.length}`);
+  }
+  function reorder(id: number, dir: number, fromHandle = false) {
+    cancelDrag();
+    const current = draftRef.current;
+    if (!current) return;
+    const source = current.chapters.find((c) => c.id === id);
+    if (!source) return;
+    const siblings = current.chapters.filter(
       (c) =>
         (c.layout?.parent_id || null) === (source.layout?.parent_id || null),
     );
     const target = siblings[siblings.indexOf(source) + dir];
-    if (target)
-      change({
-        chapters: moveModule(journey.chapters, id, target.id, dir > 0),
-      });
+    if (target) {
+      const chapters = moveModule(current.chapters, id, target.id, dir > 0);
+      change({ chapters });
+      announceMove(chapters, id);
+      if (fromHandle) focusMoveHandle(id, true);
+    }
   }
 
-  function dropAt(id: number, y: number) {
+  function cancelDrag() {
+    const start = dragStart.current;
+    dragStart.current = null;
+    dragTarget.current = null;
+    setDraggingId(null);
+    if (start?.active)
+      setMoveAnnouncement(t("Move cancelled.", "Verschieben abgebrochen."));
+    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    dragFrame.current = null;
+    setDrag(null);
+    if (start?.handle.hasPointerCapture(start.pointerId))
+      start.handle.releasePointerCapture(start.pointerId);
+  }
+  function updateDragTarget() {
+    const start = dragStart.current;
     const current = draftRef.current;
-    const source = current?.chapters.find((c) => c.id === id);
-    if (!current || !source) return null;
-    const rows = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        ".module-navigator [data-module-id]",
-      ),
-    ).filter((row) =>
-      current.chapters.some(
-        (m) =>
-          m.id === Number(row.dataset.moduleId) &&
-          (m.layout?.parent_id || null) === (source.layout?.parent_id || null),
-      ),
-    );
-    const target =
-      rows.find((row) => y < row.getBoundingClientRect().bottom) || rows.at(-1);
-    if (!target) return null;
-    const rect = target
-      .querySelector<HTMLElement>(".module-nav-select")!
-      .getBoundingClientRect();
-    return {
-      id,
-      target: Number(target.dataset.moduleId),
-      after: y > rect.top + rect.height / 2,
+    if (!start?.active || !current) return;
+    const source = current.chapters.find((c) => c.id === start.id);
+    const panel = start.handle.closest<HTMLElement>(".module-navigator");
+    if (!source || !panel) return;
+    const bounds = panel.getBoundingClientRect();
+    const inside = start.clientX >= bounds.left && start.clientX <= bounds.right &&
+      start.clientY >= Math.max(0, bounds.top) &&
+      start.clientY <= Math.min(window.innerHeight, bounds.bottom);
+    const peers = new Set(current.chapters.filter((c) =>
+      source.kind !== "chapter" || !c.layout?.parent_id,
+    ).map((c) => c.id));
+    const rows = Array.from(panel.querySelectorAll<HTMLElement>("[data-module-id]"))
+      .filter((row) => peers.has(Number(row.dataset.moduleId)))
+      .map((row) => {
+        const chapter = current.chapters.find((c) => c.id === Number(row.dataset.moduleId));
+        const rect = (source.kind === "chapter" ? row : row.querySelector(".module-nav-select") || row).getBoundingClientRect();
+        return { id: Number(row.dataset.moduleId), top: rect.top, bottom: rect.bottom, chapter: chapter?.kind === "chapter" };
+      });
+    const target: typeof drag = inside ? (source.kind === "chapter"
+      ? moduleDropTarget(rows, start.id, start.clientY)
+      : moduleTransferTarget(rows, start.id, start.clientY)) : null;
+    const old = dragTarget.current;
+    dragTarget.current = target;
+    if (old?.id !== target?.id || old?.target !== target?.target || old?.after !== target?.after || old?.inside !== target?.inside)
+      setDrag(target);
+  }
+  function startDragScroll() {
+    let previous = performance.now();
+    const frame = (now: number) => {
+      const start = dragStart.current;
+      if (!start?.active) return;
+      const panel = start.handle.closest<HTMLElement>(".module-navigator");
+      if (!panel) { cancelDrag(); return; }
+      const bounds = panel.getBoundingClientRect();
+      // On mobile the navigator grows with the document; desktop owns its scroll.
+      const ownScroll = panel.scrollHeight > panel.clientHeight + 1;
+      const scroller = ownScroll ? panel : document.scrollingElement;
+      const insideX = start.clientX >= bounds.left && start.clientX <= bounds.right;
+      const speed = insideX ? moduleScrollSpeed(start.clientY,
+        Math.max(0, bounds.top), Math.min(window.innerHeight, bounds.bottom)) : 0;
+      if (scroller && speed) {
+        scroller.scrollTo({
+          top: scroller.scrollTop + speed * Math.min(32, now - previous) / 1000,
+          behavior: "instant",
+        });
+      }
+      previous = now;
+      updateDragTarget();
+      dragFrame.current = requestAnimationFrame(frame);
     };
+    dragFrame.current = requestAnimationFrame(frame);
   }
   function uploaded(value: Journey) {
     setJourney((j) =>
@@ -975,7 +1108,7 @@ export function ModularEditor() {
         <div
           key={c.id}
           data-module-id={c.id}
-          className={`module-nav-item ${drag?.id === c.id ? "module-dragging" : ""} ${drag?.target === c.id ? (drag.after ? "module-drop-after" : "module-drop-before") : ""}`}
+          className={`module-nav-item ${draggingId === c.id ? "module-dragging" : ""} ${drag?.target === c.id ? (drag.inside ? "module-drop-inside" : drag.after ? "module-drop-after" : "module-drop-before") : ""}`}
         >
           <button
             type="button"
@@ -985,74 +1118,67 @@ export function ModularEditor() {
               "Drag to reorder; use Up/Down keys",
               "Zum Verschieben ziehen; Pfeiltasten oben/unten verwenden",
             )}
+            aria-describedby="module-reorder-help"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                 e.preventDefault();
-                reorder(c.id, e.key === "ArrowUp" ? -1 : 1);
+                reorder(c.id, e.key === "ArrowUp" ? -1 : 1, true);
               }
-              if (e.key === "Escape") {
-                dragStart.current = null;
-                setDrag(null);
-              }
+              if (e.key === "Escape") cancelDrag();
             }}
             onPointerDown={(e) => {
-              if (e.button !== 0) return;
+              if (e.button !== 0 || !e.isPrimary || dragStart.current) return;
               e.currentTarget.setPointerCapture(e.pointerId);
               e.currentTarget.focus({ preventScroll: true });
-              dragStart.current = { id: c.id, y: e.clientY, active: false };
+              dragStart.current = {
+                id: c.id, y: e.clientY, active: false, pointerId: e.pointerId,
+                clientX: e.clientX, clientY: e.clientY, handle: e.currentTarget,
+              };
             }}
             onPointerMove={(e) => {
               const start = dragStart.current;
-              if (!start || start.id !== c.id) return;
-              if (!start.active && Math.abs(e.clientY - start.y) < 5) return;
-              start.active = true;
-              const panel =
-                e.currentTarget.closest<HTMLElement>(".module-navigator");
-              if (!panel) return;
-              const bounds = panel.getBoundingClientRect();
-              if (e.clientY < bounds.top + 40) panel.scrollTop -= 16;
-              if (e.clientY > bounds.bottom - 40) panel.scrollTop += 16;
-              const target = dropAt(c.id, e.clientY);
-              if (target) setDrag(target);
+              if (!start || start.id !== c.id || start.pointerId !== e.pointerId) return;
+              start.clientX = e.clientX;
+              start.clientY = e.clientY;
+              if (!start.active) {
+                if (Math.abs(e.clientY - start.y) < 6) return;
+                start.active = true;
+                setDraggingId(c.id);
+                setMoveAnnouncement(t("Moving module. Escape to cancel.", "Modul wird verschoben. Escape zum Abbrechen."));
+                startDragScroll();
+              }
+              updateDragTarget();
             }}
             onPointerUp={(e) => {
               const start = dragStart.current;
-              // Some touch input streams coalesce movement until release.
-              const target =
-                start && Math.abs(e.clientY - start.y) >= 5
-                  ? dropAt(c.id, e.clientY)
-                  : drag;
-              if (
-                target &&
-                start &&
-                (start.active || Math.abs(e.clientY - start.y) >= 5) &&
-                draftRef.current
-              ) {
-                const chapters = moveModule(
-                  draftRef.current.chapters,
-                  target.id,
-                  target.target,
-                  target.after,
-                );
-                if (chapters !== draftRef.current.chapters)
-                  change({ chapters });
+              if (!start || start.pointerId !== e.pointerId) return;
+              const target = dragTarget.current;
+              const current = draftRef.current;
+              cancelDrag();
+              // Commit exactly the previewed slot; a release alone never starts a drag.
+              if (start.active && target && current) {
+                const panel = start.handle.closest<HTMLElement>(".module-navigator");
+                const bounds = panel?.getBoundingClientRect();
+                if (bounds && e.clientX >= bounds.left && e.clientX <= bounds.right &&
+                    e.clientY >= Math.max(0, bounds.top) &&
+                    e.clientY <= Math.min(window.innerHeight, bounds.bottom)) {
+                  const chapters = moveModule(current.chapters, target.id, target.target, target.after, target.inside ? "inside" : "transfer");
+                  if (chapters !== current.chapters) {
+                    change({ chapters });
+                    announceMove(chapters, start.id);
+                    focusMoveHandle(start.id);
+                  }
+                }
               }
-              dragStart.current = null;
-              setDrag(null);
             }}
-            onPointerCancel={() => {
-              dragStart.current = null;
-              setDrag(null);
-            }}
-            onLostPointerCapture={() => {
-              dragStart.current = null;
-              setDrag(null);
-            }}
+            onPointerCancel={cancelDrag}
+            onLostPointerCapture={cancelDrag}
           >
             <GripVertical size={16} />
           </button>
           <button
+            title={c.title}
             className={`module-nav-select ${selected.type === "module" && selected.id === c.id ? "active" : ""}`}
             onClick={() => {
               select({ type: "module", id: c.id });
@@ -1061,6 +1187,19 @@ export function ModularEditor() {
           >
             <span>{t(...moduleNames[c.kind])}</span>
             <strong>{c.title}</strong>
+          </button>
+          <button
+            type="button"
+            className="module-delete-button"
+            aria-label={`${t("Delete module", "Modul löschen")}: ${c.title}`}
+            title={t("Delete module", "Modul löschen")}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              requestModuleRemoval(c.id, e.currentTarget, true);
+            }}
+          >
+            <Trash2 size={15} aria-hidden="true" />
           </button>
           {c.kind === "chapter" && (
             <div className="module-nav-children">{moduleList(c.id)}</div>
@@ -1235,6 +1374,10 @@ export function ModularEditor() {
       <div className="studio-workspace" inert={busy || undefined}>
         {mode === "edit" && (
           <aside className="module-navigator">
+            <p id="module-reorder-help" className="sr-only">
+              {t("Drag the handle to reorder or move into a chapter. Up and Down keys reorder within the group. Escape cancels dragging. Chapter placement is also available in module settings.", "Am Griff ziehen, um umzusortieren oder in ein Kapitel zu verschieben. Pfeiltasten oben und unten sortieren innerhalb der Gruppe. Escape bricht das Ziehen ab. Die Kapitelzuordnung ist auch in den Moduleinstellungen verfügbar.")}
+            </p>
+            <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{moveAnnouncement}</p>
             <div className="panel-heading">
               <span>{t("Your story", "Deine Geschichte")}</span>
               <LayoutGrid size={17} />
@@ -2146,7 +2289,7 @@ export function ModularEditor() {
                             "Remove module; photographs are preserved",
                             "Modul entfernen; Fotos bleiben erhalten",
                           )}
-                          onClick={() => remove(module.id)}
+                          onClick={(e) => requestModuleRemoval(module.id, e.currentTarget)}
                         >
                           <Trash2 size={17} />
                         </button>
@@ -2515,6 +2658,31 @@ export function ModularEditor() {
                 </div>
               </div>
             ))}
+          </div>
+        </Modal>
+      )}
+      {deletingModule && (
+        <Modal
+          title={t("Delete module?", "Modul löschen?")}
+          className="module-delete-modal"
+          onClose={closeModuleRemoval}
+        >
+          <h2>{t("Delete module?", "Modul löschen?")}</h2>
+          <p><strong>{deletingModule.title}</strong></p>
+          <p>{t(
+            "Only this module will be removed. Photographs and contained modules are preserved.",
+            "Nur dieses Modul wird entfernt. Fotos und enthaltene Module bleiben erhalten.",
+          )}</p>
+          <div className="confirm-actions">
+            <button autoFocus className="button button-outline" onClick={closeModuleRemoval}>
+              {t("Cancel", "Abbrechen")}
+            </button>
+            <button className="button danger-button" onClick={() => {
+              const pending = deletingModuleRef.current;
+              if (pending) remove(pending.id);
+            }}>
+              {t("Delete module", "Modul löschen")}
+            </button>
           </div>
         </Modal>
       )}

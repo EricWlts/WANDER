@@ -2173,18 +2173,30 @@ body {
 
 /* D04: reorder controls retain the existing navigator rows and hierarchy. */
 .module-nav-item { position: relative; }
-.module-nav-item > .module-nav-select { padding-left: 34px; }
+.module-nav-item > .module-nav-select { padding-left: 46px; }
 .module-navigator .module-drag-handle {
-  position: absolute; left: 0; top: 7px; width: 30px; height: 44px;
+  position: absolute; left: 0; top: 7px; width: 44px; height: 44px;
   display: grid; place-items: center; padding: 0; margin: 0; border: 0;
   color: inherit; background: transparent; cursor: grab; touch-action: none;
   user-select: none; z-index: 1;
 }
 .module-navigator .module-drag-handle:active { cursor: grabbing; }
-.module-dragging > .module-nav-select { opacity: .55; }
+.module-navigator .module-drag-handle:focus-visible {
+  outline: 2px solid currentColor; outline-offset: -3px;
+}
+.module-dragging {
+  outline: 1px dashed var(--muted, currentColor); outline-offset: -1px;
+  border-radius: 3px;
+}
+.module-dragging > .module-nav-select {
+  background: var(--panel); opacity: .7;
+}
+.module-navigator .module-dragging > .module-drag-handle { cursor: grabbing; }
+.module-navigator { overflow-anchor: none; }
 .module-drop-before::before, .module-drop-after::after {
   content: ""; position: absolute; left: 0; right: 0; height: 2px;
-  background: currentColor; pointer-events: none; z-index: 2;
+  background: var(--ink, currentColor); pointer-events: none; z-index: 2;
+  border-radius: 1px;
 }
 .module-drop-before::before { top: 0; }
 .module-drop-after::after { bottom: 0; }
@@ -2783,4 +2795,35 @@ html:has(.public-header) {
   body:has(.public-header) .chapter-compass {
     transition: none;
   }
+}
+
+/* Direct module deletion shares each row without borrowing its drag surface. */
+.module-nav-item > .module-nav-select { padding-right: 46px; }
+.module-navigator .module-delete-button {
+  position: absolute; right: 0; top: 7px; width: 44px; height: 44px;
+  display: grid; place-items: center; padding: 0; margin: 0; border: 0;
+  color: inherit; background: transparent; opacity: .45; z-index: 1;
+}
+.module-nav-item:hover > .module-delete-button,
+.module-nav-item:focus-within > .module-delete-button { opacity: 1; }
+.module-navigator .module-delete-button:hover,
+.module-navigator .module-delete-button:focus-visible {
+  color: #a14d44; background: color-mix(in srgb, currentColor 7%, transparent);
+}
+.module-navigator .module-delete-button:focus-visible {
+  outline: 2px solid currentColor; outline-offset: -3px;
+}
+@media (hover: none), (pointer: coarse) {
+  .module-navigator .module-delete-button { opacity: 1; }
+}
+.module-delete-modal { width: min(460px, calc(100vw - 32px)); }
+.module-delete-modal p strong { overflow-wrap: anywhere; }
+.module-drop-inside > .module-nav-select { position: relative; }
+.module-drop-inside > .module-nav-select::after {
+  content: ""; position: absolute; left: 24px; right: 0; bottom: -1px;
+  height: 2px; background: var(--ink, currentColor); pointer-events: none;
+}
+.module-nav-select > span,
+.module-nav-select > strong {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

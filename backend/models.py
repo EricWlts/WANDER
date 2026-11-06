@@ -31,6 +31,7 @@ class Journey(db.Model):
     filmstrip_ids = db.Column(db.JSON, default=list, nullable=False)
     reveal_settings = db.Column(db.JSON, default=dict, nullable=False)
     layout = db.Column(db.JSON, default=dict, nullable=False)
+    composition_version = db.Column(db.Integer, server_default="1", nullable=False)
     published_data = db.Column(db.JSON, nullable=True)
     published = db.Column(db.Boolean, default=False)
     demo = db.Column(db.Boolean, default=False)

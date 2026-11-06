@@ -22,7 +22,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { imageParallax } from "./imageParallax";
-import { api, json } from "./api";
+import { ApiError, api, json } from "./api";
 import { useApp, PageState } from "./App";
 import { Field, Modal, Picture } from "./components";
 import {
@@ -228,6 +228,21 @@ export function ModularEditor() {
       window.removeEventListener("blur", cancelDrag);
     };
   }, [mode, tab, slug]);
+  const [conflicted, setConflicted] = useState(false);
+  const conflictBanner = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (conflicted)
+      conflictBanner.current?.scrollIntoView({ block: "center", behavior: "instant" });
+  }, [conflicted]);
+  const conflictMessage = t(
+    "This journey has changed since you opened it. Your draft is still here. Open the current version in another tab to compare and reapply your edits.",
+    "Diese Reise wurde seit dem Öffnen geändert. Dein Entwurf ist noch da. Öffne den aktuellen Stand in einem anderen Tab, um zu vergleichen und deine Änderungen erneut zu übernehmen.",
+  );
+  function markConflict() {
+    setConflicted(true);
+    setError("");
+    setPublishReview(null);
+  }
   const revision = useRef(0),
     saving = useRef(false);
   const saved = useRef<Journey | null>(null),
@@ -238,6 +253,7 @@ export function ModularEditor() {
     api<Journey>(`/journeys/${slug}`)
       .then((j) => {
         if (alive) {
+          setConflicted(false);
           saved.current = j;
           setJourney(j);
         }
@@ -421,7 +437,7 @@ export function ModularEditor() {
     silent = false,
   ): Promise<Journey | null> {
     const current = draftRef.current;
-    if (!current || saving.current || uploadBusy) return null;
+    if (!current || saving.current || uploadBusy || conflicted) return null;
     saving.current = true;
     const sentRevision = revision.current;
     setAutoError(false);
@@ -432,6 +448,8 @@ export function ModularEditor() {
       const next = await api<Journey>(
         `/journeys/${current.id}/composition`,
         json("PATCH", {
+          base_version: current.composition_version,
+          base_slug: current.slug,
           journey: {
             title: current.title,
             subtitle: current.subtitle,
@@ -553,8 +571,11 @@ export function ModularEditor() {
         );
       return next;
     } catch (e) {
-      setError((e as Error).message);
-      setAutoError(true);
+      if (e instanceof ApiError && e.code === "composition_conflict") markConflict();
+      else {
+        setError((e as Error).message);
+        setAutoError(true);
+      }
       return null;
     } finally {
       saving.current = false;
@@ -563,10 +584,10 @@ export function ModularEditor() {
     }
   }
   useEffect(() => {
-    if (!dirty || busy || backgroundSaving || uploadBusy || autoError) return;
+    if (!dirty || busy || backgroundSaving || uploadBusy || autoError || conflicted) return;
     const timer = setTimeout(() => void save(false, true), 850);
     return () => clearTimeout(timer);
-  }, [journey, dirty, busy, backgroundSaving, uploadBusy, autoError]);
+  }, [journey, dirty, busy, backgroundSaving, uploadBusy, autoError, conflicted]);
   function nextModuleId() {
     return (
       Math.min(
@@ -855,6 +876,7 @@ export function ModularEditor() {
             }),
             cover_id: j.cover_id ?? value.cover_id,
             cover: j.cover || value.cover,
+            composition_version: value.composition_version,
             has_unpublished_changes: value.has_unpublished_changes,
           }
         : value,
@@ -1046,13 +1068,19 @@ export function ModularEditor() {
     }
   }
   async function deleteSource() {
-    if (!deletingPhoto || saving.current || uploadBusy) return;
+    if (!deletingPhoto || saving.current || uploadBusy || conflicted) return;
     setDeleteError("");
-    if (dirty && !(await save(false, true))) return;
+    const beforeSave = revision.current;
+    const base = dirty ? await save(false, true) : draftRef.current;
+    if (!base || revision.current !== beforeSave) return;
     setBusy(true);
     try {
       const next = await api<Journey>(`/photos/${deletingPhoto.id}`, {
         method: "DELETE",
+        headers: {
+          "X-Composition-Version": String(base.composition_version ?? 0),
+          "X-Composition-Journey": base.slug,
+        },
       });
       saved.current = next;
       setJourney(next);
@@ -1064,8 +1092,13 @@ export function ModularEditor() {
       }
       notify(t("Photograph deleted.", "Foto gelöscht."));
     } catch (e) {
-      setDeleteError((e as Error).message);
-      setError((e as Error).message);
+      if (e instanceof ApiError && e.code === "composition_conflict") {
+        markConflict();
+        setDeletingPhoto(null);
+      } else {
+        setDeleteError((e as Error).message);
+        setError((e as Error).message);
+      }
     } finally {
       setBusy(false);
     }
@@ -1294,6 +1327,7 @@ export function ModularEditor() {
               busy ||
               backgroundSaving ||
               uploadBusy ||
+              conflicted ||
               (!dirty && !j.has_unpublished_changes)
             }
             onClick={() => void save()}
@@ -1306,7 +1340,7 @@ export function ModularEditor() {
           <button
             aria-label={t("Publish journey", "Reise veröffentlichen")}
             className="button"
-            disabled={busy || backgroundSaving || uploadBusy}
+            disabled={busy || backgroundSaving || uploadBusy || conflicted}
             onClick={() => {
               if (saving.current || busy || backgroundSaving || uploadBusy)
                 return;
@@ -1321,6 +1355,11 @@ export function ModularEditor() {
           </button>
         </div>
       </header>
+      {conflicted && (
+        <div className="editor-error" role="alert" ref={conflictBanner}>
+          {conflictMessage}
+        </div>
+      )}
       {error && (
         <div className="editor-error" role="alert">
           {error}
@@ -1347,7 +1386,9 @@ export function ModularEditor() {
             "Es gibt offene Änderungen aus deiner letzten Sitzung.",
           )}
           <button
+            disabled={busy || backgroundSaving || uploadBusy}
             onClick={() => {
+              if (saving.current || busy || uploadBusy) return;
               revision.current++;
               setJourney(recovery);
               setDirty(true);
@@ -1671,7 +1712,9 @@ export function ModularEditor() {
                         </button>
                       ) : (
                         <Upload
-                          disabled={backgroundSaving}
+                          disabled={backgroundSaving || conflicted}
+                          composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
+                          onConflict={markConflict}
                           journeyId={j.id}
                           chapterId={
                             module.kind === "chapter" ? module.id : null
@@ -2475,7 +2518,9 @@ export function ModularEditor() {
               <Upload
                 journeyId={j.id}
                 multiple={!single}
-                disabled={backgroundSaving}
+                disabled={backgroundSaving || conflicted}
+                composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
+                onConflict={markConflict}
                 onBusy={setUploadBusy}
                 onSave={(next) => {
                   const added = next.photos.filter(
@@ -2560,7 +2605,9 @@ export function ModularEditor() {
             )}
           </p>
           <Upload
-            disabled={backgroundSaving}
+            disabled={backgroundSaving || conflicted}
+            composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
+            onConflict={markConflict}
             journeyId={j.id}
             multiple={false}
             onBusy={setUploadBusy}
@@ -2601,7 +2648,9 @@ export function ModularEditor() {
             )}
           </p>
           <Upload
-            disabled={backgroundSaving}
+            disabled={backgroundSaving || conflicted}
+            composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
+            onConflict={markConflict}
             journeyId={j.id}
             onSave={uploaded}
             onBusy={setUploadBusy}

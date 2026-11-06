@@ -1,6 +1,12 @@
 import { t } from "./I18n";
 const uploadKeys = new WeakMap<File, string>();
 let csrfToken = "";
+
+export class ApiError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+  }
+}
 export async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -24,7 +30,7 @@ export async function api<T>(
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(t(data.error || "Something went wrong. Please try again."));
+    throw new ApiError(t(data.error || "Something went wrong. Please try again."), data.code);
   }
   if (response.status === 204) return undefined as T;
   const data = await response.json();
@@ -41,11 +47,16 @@ export function uploadPhoto<T>(
   file: File,
   chapterId: number | null,
   progress: (percent: number) => void,
+  basis?: { slug: string; version: number },
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api${path}`);
     xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+    if (basis) {
+      xhr.setRequestHeader("X-Composition-Version", String(basis.version));
+      xhr.setRequestHeader("X-Composition-Journey", basis.slug);
+    }
     xhr.responseType = "json";
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable)
@@ -64,11 +75,12 @@ export function uploadPhoto<T>(
       if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
       else
         reject(
-          new Error(
+          new ApiError(
             t(
               xhr.response?.error ||
                 "This photograph could not be uploaded. Please try again.",
             ),
+            xhr.response?.code,
           ),
         );
     };

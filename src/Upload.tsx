@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { UploadCloud, RotateCcw, CheckCircle2 } from "lucide-react";
-import { uploadPhoto } from "./api";
+import { ApiError, uploadPhoto } from "./api";
 import { t } from "./I18n";
 import type { Journey } from "./types";
 type Item = {
@@ -17,8 +17,12 @@ export function Upload({
   ensureJourney,
   multiple = true,
   disabled = false,
+  composition,
+  onConflict,
 }: {
   journeyId?: number;
+  composition?: { slug: string; version: number };
+  onConflict?: () => void;
   multiple?: boolean;
   disabled?: boolean;
   ensureJourney?: () => Promise<Journey>;
@@ -42,6 +46,7 @@ export function Upload({
         throw new Error(
           t("Create a journey first.", "Bitte zuerst eine Reise anlegen."),
         );
+      let basis = composition;
       for (let i = 0; i < next.length; i++) {
         const item = next[i];
         if (item.status === "done" || item.status === "error") continue;
@@ -59,10 +64,16 @@ export function Upload({
               item.status = p === 100 ? "processing" : "uploading";
               setItems([...next]);
             },
+            basis,
           );
+          if (basis) basis = { ...basis, version: saved.composition_version ?? 0 };
           onSave(saved);
           item.status = "done";
         } catch (e) {
+          if (e instanceof ApiError && e.code === "composition_conflict") {
+            onConflict?.();
+            throw e;
+          }
           item.status = "error";
           item.error = (e as Error).message;
         }

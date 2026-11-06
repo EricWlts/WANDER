@@ -138,6 +138,7 @@ test("edits made during a save survive its response, including new module ID rem
   const pending = {
     ...journey,
     title: "Sent title",
+    composition_version: 5,
     chapters: [
       { ...wall, id: -1 },
       { id: -2, kind: "text", story: "Sent", layout: { parent_id: -1 } },
@@ -164,10 +165,12 @@ test("edits made during a save survive its response, including new module ID rem
       { ...pending.chapters[1], id: 8 },
     ],
     has_unpublished_changes: true,
+    composition_version: 6,
   };
   const before = structuredClone({ current, pending, saved });
   const merged = mergeSavedJourney(current, pending, saved);
   assert.equal(merged.title, "Typed while saving");
+  assert.equal(merged.composition_version, 6);
   assert.equal(merged.chapters[1].story, "More words");
   assert.equal(merged.chapters[1].layout?.parent_id, 7);
   assert.equal(merged.chapters[2].id, -3);

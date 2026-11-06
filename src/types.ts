@@ -103,6 +103,7 @@ export interface Chapter {
   position: number;
 }
 export interface Journey {
+  composition_version?: number;
   layout?: Layout;
   has_unpublished_changes?: boolean;
   story_template: "quiet-atlas" | "after-hours";

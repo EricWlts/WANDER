@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from functools import wraps
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 import click
@@ -155,6 +156,7 @@ def create_app(config=None):
             result["photos"] = [photo_dict(p) for p in photos]
             result["chapters"] = [{key: getattr(c, key) for key in ("id", "title", "date", "story", "quote", "position", "kind", "reveal", "gallery_mode", "layout")} for c in journey.chapters]
         if detail and current is False and session.get("admin"):
+            result["composition_version"] = journey.composition_version
             live = journey_dict(journey, current=True)
             result["has_unpublished_changes"] = bool(journey.published and journey.published_data and live != journey.published_data)
         return result
@@ -296,18 +298,79 @@ def create_app(config=None):
                 abort(400, description="Choose a cover belonging to this journey.")
             journey.cover_id = data["cover_id"]
 
+    # Existing direct writers keep their API contract, but share the same write
+    # lock and version as the full composition replacement.
+    journey_writers = {"save_composition", "edit_journey", "delete_journey",
+                       "create_chapter", "reorder", "upload_photo"}
+    child_writers = {
+        "edit_chapter": (Chapter, "chapter_id"), "delete_chapter": (Chapter, "chapter_id"),
+        "edit_photo": (Photo, "photo_id"), "delete_photo": (Photo, "photo_id"),
+    }
+
     @app.before_request
-    def preserve_published_version():
-        if request.method not in {"POST", "PATCH", "PUT", "DELETE"} or not session.get("admin"):
+    def prepare_journey_write():
+        if request.endpoint != "upload_photo":
+            return lock_journey_write()
+
+    def lock_journey_write(*, preserve_snapshot=True, expected_slug=None):
+        endpoint = request.endpoint
+        if not session.get("admin") or request.method not in {"POST", "PATCH", "PUT", "DELETE"}:
             return
-        match = re.match(r"/api/(journeys|chapters|photos)/(\d+)", request.path)
-        if not match:
+        if endpoint in journey_writers:
+            journey_id = request.view_args["journey_id"]
+        elif endpoint in child_writers:
+            model, arg = child_writers[endpoint]
+            journey_id = db.select(model.journey_id).where(model.id == request.view_args[arg]).scalar_subquery()
+        else:
             return
-        model = {"journeys": Journey, "chapters": Chapter, "photos": Photo}[match[1]]
-        item = db.session.get(model, int(match[2]))
-        journey = item if isinstance(item, Journey) else item.journey if item else None
-        if journey and journey.published and not journey.published_data:
-            journey.published_data = journey_dict(journey, current=True)
+        base = None
+        slug = None
+        guarded = endpoint == "save_composition" or "X-Composition-Version" in request.headers
+        if endpoint == "save_composition":
+            data = body()
+            base, slug = data.get("base_version"), data.get("base_slug")
+        elif guarded:
+            slug = request.headers.get("X-Composition-Journey")
+            value = request.headers["X-Composition-Version"]
+            if re.fullmatch(r"[0-9]{1,16}", value):
+                base = int(value)
+        if guarded and (type(base) is not int or not 1 <= base <= 2**53 - 1 or not isinstance(slug, str) or not slug):
+            return composition_conflict()
+
+        # The conditional UPDATE is the first database statement. It acquires
+        # SQLite's writer lock before any ORM reads, and holds it through commit.
+        # A no-op assignment lets idempotent upload retries keep their version.
+        lock = db.update(Journey).where(Journey.id == journey_id)
+        if expected_slug is not None:
+            lock = lock.where(Journey.slug == expected_slug)
+        if guarded:
+            # SQLite may reuse a deleted journey's numeric ID. Its slug
+            # identifies the original journey across such a replacement.
+            lock = lock.where(Journey.slug == slug, Journey.composition_version == base)
+        locked = db.session.execute(lock.values(composition_version=Journey.composition_version))
+        if not locked.rowcount:
+            if guarded:
+                return composition_conflict()
+            abort(404)
+        if preserve_snapshot:
+            journey = db.session.scalar(db.select(Journey).where(Journey.id == journey_id))
+            if journey.published and not journey.published_data:
+                journey.published_data = journey_dict(journey, current=True)
+
+    def composition_conflict():
+        return jsonify(code="composition_conflict",
+                       error="This journey has changed since you opened it. Your draft is still here. Open the current version in another tab to compare and reapply your edits."), 409
+
+    def finish_journey_write(journey, status=200, *, advance=True):
+        if advance:
+            journey.composition_version += 1
+        db.session.flush()
+        db.session.expire(journey, ["chapters", "photos"])
+        # Pair the version with this transaction's data, before another
+        # writer can change any of the rows used to build the response.
+        response = jsonify(journey_dict(journey))
+        db.session.commit()
+        return response, status
 
     @app.patch("/api/journeys/<int:journey_id>/composition")
     @admin_required
@@ -376,8 +439,7 @@ def create_app(config=None):
         if data.get("publish") is True:
             journey.published = True
             journey.published_data = journey_dict(journey, current=True)
-        db.session.commit()
-        return jsonify(journey_dict(journey))
+        return finish_journey_write(journey)
 
     @app.get("/api/auth")
     def auth():
@@ -432,8 +494,7 @@ def create_app(config=None):
         journey = Journey(title=title, start_date=start, end_date=end, slug=f"{slug_base}-{uuid4().hex[:8]}")
         update_journey(journey, data)
         db.session.add(journey)
-        db.session.commit()
-        return jsonify(journey_dict(journey)), 201
+        return finish_journey_write(journey, 201, advance=False)
 
     @app.patch("/api/journeys/<int:journey_id>")
     @admin_required
@@ -443,8 +504,7 @@ def create_app(config=None):
         update_journey(journey, data)
         if data.get("published") is True:
             journey.published_data = journey_dict(journey, current=True)
-        db.session.commit()
-        return jsonify(journey_dict(journey))
+        return finish_journey_write(journey)
 
     def remove_photo_files(photo):
         if not photo.demo:
@@ -506,16 +566,14 @@ def create_app(config=None):
         with db.session.no_autoflush:
             update_chapter(chapter, data)
         db.session.add(chapter)
-        db.session.commit()
-        return jsonify(journey_dict(journey)), 201
+        return finish_journey_write(journey, 201)
 
     @app.patch("/api/chapters/<int:chapter_id>")
     @admin_required
     def edit_chapter(chapter_id):
         chapter = db.get_or_404(Chapter, chapter_id)
         update_chapter(chapter, body())
-        db.session.commit()
-        return jsonify(journey_dict(chapter.journey))
+        return finish_journey_write(chapter.journey)
 
     @app.delete("/api/chapters/<int:chapter_id>")
     @admin_required
@@ -523,8 +581,7 @@ def create_app(config=None):
         chapter = db.get_or_404(Chapter, chapter_id)
         journey = chapter.journey
         db.session.delete(chapter)
-        db.session.commit()
-        return jsonify(journey_dict(journey))
+        return finish_journey_write(journey)
 
     @app.put("/api/journeys/<int:journey_id>/<string:kind>/order")
     @admin_required
@@ -539,19 +596,27 @@ def create_app(config=None):
         positions = {value: i for i, value in enumerate(values)}
         for item in items:
             item.position = positions[item.id]
-        db.session.commit()
-        db.session.expire_all()
-        return jsonify(journey_dict(journey))
+        return finish_journey_write(journey)
 
     @app.post("/api/journeys/<int:journey_id>/photos")
     @admin_required
     def upload_photo(journey_id):
-        journey = db.get_or_404(Journey, journey_id)
         upload_key = request.form.get("upload_key", "")[:80]
-        if upload_key:
-            existing = db.session.scalar(db.select(Photo).where(Photo.journey_id == journey.id, Photo.upload_key == upload_key))
-            if existing:
-                return jsonify(journey_dict(journey)), 200
+
+        def existing_upload():
+            return upload_key and db.session.scalar(
+                db.select(Photo.id).where(Photo.journey_id == journey_id, Photo.upload_key == upload_key)
+            )
+
+        conflict = lock_journey_write(preserve_snapshot=False)
+        if conflict:
+            return conflict
+        journey = db.session.get(Journey, journey_id)
+        if existing_upload():
+            return jsonify(journey_dict(journey)), 200
+        upload_slug = journey.slug
+        db.session.rollback()
+
         upload = request.files.get("file")
         if not upload:
             abort(400, description="Choose a JPEG, PNG or WebP photograph.")
@@ -559,13 +624,11 @@ def create_app(config=None):
         if upload.stream.tell() > MAX_UPLOAD_BYTES:
             abort(413)
         upload.stream.seek(0)
-        chapter = None
+        chapter_id = None
         if request.form.get("chapter_id"):
             try:
-                chapter = db.session.get(Chapter, int(request.form["chapter_id"]))
+                chapter_id = int(request.form["chapter_id"])
             except ValueError:
-                abort(400, description="Choose a section from this journey.")
-            if not chapter or chapter.journey_id != journey.id:
                 abort(400, description="Choose a section from this journey.")
         paths = []
         try:
@@ -592,17 +655,30 @@ def create_app(config=None):
             if width < 16 or height < 16:
                 abort(400, description="The image must be at least 16 × 16 pixels.")
             filename = uuid4().hex
-            # A metadata-free, lossless full-resolution copy makes resizing reversible.
-            master = Path(app.config["UPLOAD_FOLDER"]) / f"{filename}-master.webp"
-            paths.append(master)
-            image.save(master, "WEBP", lossless=True, method=4, exif=b"")
-            for size in (640, 1280, 2200, 3840):
-                variant = image.copy()
-                target_width = min(size, width)
-                variant = variant.resize((target_width, round(height * target_width / width)), Image.Resampling.LANCZOS)
-                path = Path(app.config["UPLOAD_FOLDER"]) / f"{filename}-{size}.webp"
-                paths.append(path)
-                variant.save(path, "WEBP", quality=92, method=4, exif=b"")
+            upload_folder = Path(app.config["UPLOAD_FOLDER"])
+            # Encoding can take longer than SQLite's writer timeout. Stage
+            # media first, then recheck the basis before installing files.
+            with TemporaryDirectory(dir=upload_folder) as staging:
+                master = Path(staging) / f"{filename}-master.webp"
+                image.save(master, "WEBP", lossless=True, method=4, exif=b"")
+                for size in (640, 1280, 2200, 3840):
+                    target_width = min(size, width)
+                    variant = image.resize((target_width, round(height * target_width / width)), Image.Resampling.LANCZOS)
+                    variant.save(Path(staging) / f"{filename}-{size}.webp", "WEBP", quality=92, method=4, exif=b"")
+                conflict = lock_journey_write(expected_slug=upload_slug)
+                if conflict:
+                    return conflict
+                journey = db.session.get(Journey, journey_id)
+                if existing_upload():
+                    return jsonify(journey_dict(journey)), 200
+                chapter = db.session.get(Chapter, chapter_id) if chapter_id is not None else None
+                if chapter_id is not None and (not chapter or chapter.journey_id != journey.id):
+                    abort(400, description="Choose a section from this journey.")
+                for staged in Path(staging).iterdir():
+                    path = upload_folder / staged.name
+                    staged.replace(path)
+                    paths.append(path)
+
             photo = Photo(journey=journey, filename=filename, width=width, height=height,
                           title="Untitled photograph", alt="", upload_key=upload_key or None, position=len(journey.photos), chapter=chapter, has_master=True)
             db.session.add(photo)
@@ -613,7 +689,7 @@ def create_app(config=None):
                 chapter.layout = {**chapter.layout, "photo_ids": [*chapter.layout["photo_ids"], photo.id]}
             if journey.cover_id is None:
                 journey.cover_id = photo.id
-            db.session.commit()
+            return finish_journey_write(journey, 201)
         except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
             for path in paths:
                 path.unlink(missing_ok=True)
@@ -623,7 +699,6 @@ def create_app(config=None):
             for path in paths:
                 path.unlink(missing_ok=True)
             raise
-        return jsonify(journey_dict(journey)), 201
 
     @app.patch("/api/photos/<int:photo_id>")
     @admin_required
@@ -644,8 +719,7 @@ def create_app(config=None):
             if data["chapter_id"] is not None and (not chapter or chapter.journey_id != photo.journey_id):
                 abort(400, description="Choose a chapter from this journey.")
             photo.chapter_id = data["chapter_id"]
-        db.session.commit()
-        return jsonify(journey_dict(photo.journey))
+        return finish_journey_write(photo.journey)
 
     @app.delete("/api/photos/<int:photo_id>")
     @admin_required
@@ -663,10 +737,9 @@ def create_app(config=None):
         if journey.published_data:
             journey.published_data = remove_from_snapshot(journey.published_data, photo.id)
         db.session.delete(photo)
-        db.session.commit()
-        db.session.expire(journey, ["photos"])
+        response = finish_journey_write(journey)
         remove_photo_files(photo)
-        return jsonify(journey_dict(journey))
+        return response
 
     @app.get("/media/<int:photo_id>/<string:size>")
     def media(photo_id, size):

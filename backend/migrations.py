@@ -8,7 +8,7 @@ from sqlalchemy import inspect
 
 def upgrade_schema(engine):
     additions = {
-        "journey": {"layout": "JSON NOT NULL DEFAULT '{}'", "published_data": "JSON", "reveal_settings": "JSON NOT NULL DEFAULT '{}'", "story_template": "VARCHAR(24) NOT NULL DEFAULT 'quiet-atlas'", "studio_step": "INTEGER NOT NULL DEFAULT 1", "filmstrip_ids": "JSON NOT NULL DEFAULT '[]'"},
+        "journey": {"composition_version": "INTEGER NOT NULL DEFAULT 1", "layout": "JSON NOT NULL DEFAULT '{}'", "published_data": "JSON", "reveal_settings": "JSON NOT NULL DEFAULT '{}'", "story_template": "VARCHAR(24) NOT NULL DEFAULT 'quiet-atlas'", "studio_step": "INTEGER NOT NULL DEFAULT 1", "filmstrip_ids": "JSON NOT NULL DEFAULT '[]'"},
         "chapter": {"layout": "JSON NOT NULL DEFAULT '{}'", "kind": "VARCHAR(24) NOT NULL DEFAULT 'chapter'", "reveal": "JSON NOT NULL DEFAULT '{}'", "gallery_mode": "VARCHAR(24) NOT NULL DEFAULT 'editorial'"},
         "photo": {"upload_key": "VARCHAR(80)", "edits": "JSON NOT NULL DEFAULT '{}'", "has_master": "BOOLEAN NOT NULL DEFAULT false"},
     }

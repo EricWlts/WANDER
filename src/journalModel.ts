@@ -171,6 +171,7 @@ export function mergeSavedJourney(
   );
   return {
     ...current,
+    composition_version: saved.composition_version,
     has_unpublished_changes: saved.has_unpublished_changes,
     chapters: current.chapters.map((c) => ({
       ...c,

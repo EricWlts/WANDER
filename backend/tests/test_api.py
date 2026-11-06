@@ -224,7 +224,7 @@ def test_all_write_routes_require_admin(client):
 
 
 def test_database_persists_between_app_instances(tmp_path):
-    settings = {"TESTING": True, "SEED_DEMO": False, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'persistent.db'}", "UPLOAD_FOLDER": str(tmp_path / 'uploads')}
+    settings = {"TESTING": True, "SECRET_KEY": "test-only-secret", "SEED_DEMO": False, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'persistent.db'}", "UPLOAD_FOLDER": str(tmp_path / 'uploads')}
     first = create_app(settings)
     with first.app_context():
         db.session.add(Journey(slug="persisted", title="Persisted memory", start_date="2026-10-01", end_date="2026-10-02", published=True))
@@ -299,7 +299,7 @@ def test_invalid_animation_settings_rejected(client, value):
 def test_existing_database_migration_preserves_content_and_is_idempotent(tmp_path):
     import sqlite3
     path = tmp_path / "old.db"
-    settings = {"TESTING": True, "SEED_DEMO": False, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}", "UPLOAD_FOLDER": str(tmp_path / "uploads")}
+    settings = {"TESTING": True, "SECRET_KEY": "test-only-secret", "SEED_DEMO": False, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}", "UPLOAD_FOLDER": str(tmp_path / "uploads")}
     app = create_app(settings)
     # Insert through SQL because this fixture models the previous schema version.
     with app.app_context():
@@ -307,7 +307,7 @@ def test_existing_database_migration_preserves_content_and_is_idempotent(tmp_pat
         db.session.commit()
         db.engine.dispose()
     with sqlite3.connect(path) as connection:
-        for table, column in [("journey", "story_template"), ("journey", "studio_step"), ("journey", "filmstrip_ids"), ("chapter", "gallery_mode"), ("journey", "reveal_settings"), ("chapter", "reveal"), ("chapter", "kind"), ("photo", "has_master")]:
+        for table, column in [("journey", "composition_version"), ("journey", "story_template"), ("journey", "studio_step"), ("journey", "filmstrip_ids"), ("chapter", "gallery_mode"), ("journey", "reveal_settings"), ("chapter", "reveal"), ("chapter", "kind"), ("photo", "has_master")]:
             connection.execute(f'ALTER TABLE "{table}" DROP COLUMN "{column}"')
     upgraded = create_app(settings)
     data = upgraded.test_client().get("/api/journeys/kept").json
@@ -315,6 +315,18 @@ def test_existing_database_migration_preserves_content_and_is_idempotent(tmp_pat
     assert data["reveal_settings"] == {}
     assert data["story_template"] == "quiet-atlas"
     assert data["studio_step"] == 1 and data["filmstrip_ids"] == []
+    with upgraded.app_context():
+        admin = Admin(id=1)
+        admin.set_password("test-password-123")
+        db.session.add(admin)
+        db.session.commit()
+    editor = upgraded.test_client()
+    headers = auth(editor)
+    record = editor.get("/api/journeys/kept").json
+    assert record["composition_version"] == 1
+    assert composition(editor, headers, record, [], base_version=None).status_code == 409
+    assert composition(editor, headers, record, []).json["composition_version"] == 2
+    assert upgraded.test_client().get("/api/journeys/kept").json == data
     backups = list((tmp_path / "backups").glob("*.db"))
     assert len(backups) == 1
     create_app(settings)
@@ -405,7 +417,7 @@ def test_day_gallery_rejects_invalid_selection_and_mode(client):
 
 def composition(client, headers, record, chapters, **extra):
     return client.patch(f"/api/journeys/{record['id']}/composition", headers=headers,
-                        json={"journey": {}, "chapters": chapters, "photos": [], **extra})
+                        json={"base_version": record["composition_version"], "base_slug": record["slug"], "journey": {}, "chapters": chapters, "photos": [], **extra})
 
 
 def test_composition_nested_modules_reuse_images_and_atomic_validation(client, app):
@@ -716,8 +728,9 @@ def test_media_layout_persists_publishes_and_resets_without_changing_legacy(clie
     assert response.status_code == 200, response.json
     public = client.application.test_client().get(f"/api/journeys/{journey['slug']}").json
     assert public['chapters'][0]['layout'] == layout
-    reset = {**saved['chapters'][0], "layout": legacy}
-    response = composition(client, headers, saved, [reset])
+    published = response.json
+    reset = {**published['chapters'][0], "layout": legacy}
+    response = composition(client, headers, published, [reset])
     assert response.status_code == 200, response.json
     assert client.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == legacy
     # An unpublished reset must not alter the last public snapshot.
@@ -755,7 +768,9 @@ def test_vertical_media_spacing_independent_roundtrip_and_public_snapshot(client
     assert response.status_code == 200, response.json
     saved = client.get(f"/api/journeys/{journey['slug']}").json
     assert saved['chapters'][0]['layout'] == layout
-    assert composition(client, headers, saved, saved['chapters'], publish=True).status_code == 200
+    publication = composition(client, headers, saved, saved['chapters'], publish=True)
+    assert publication.status_code == 200
+    saved = publication.json
     public = client.application.test_client()
     assert public.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
     reset = {**saved['chapters'][0], "layout": previous}
@@ -859,3 +874,196 @@ def test_invalid_image_parallax_is_rejected_atomically(client, invalid, target):
         record = reader.get(f"/api/journeys/{journey['slug']}").json
         assert record['title'] == saved['title']
         assert record['chapters'][0]['layout'] == {"image_parallax": True}
+
+
+
+def test_stale_composition_cannot_change_draft_or_snapshot(app, client):
+    headers = auth(client)
+    other = app.test_client()
+    other_headers = auth(other)
+    journey = create(client, headers)
+    assert journey["composition_version"] == 1
+    journey = upload(client, headers, journey)
+    photo_id = journey["photos"][0]["id"]
+    first = composition(client, headers, journey, [{"id": -1, "title": "Existing module"}], publish=True)
+    assert first.status_code == 200
+    assert first.json["composition_version"] == journey["composition_version"] + 1
+    detail = f"/api/journeys/{journey['slug']}"
+    public = app.test_client()
+    snapshot = public.get(detail).json
+    base = other.get(detail).json
+    modules = [*base["chapters"], {"id": -15, "title": "Module 15"}]
+    added = composition(client, headers, base, modules)
+    assert added.status_code == 200
+    assert added.json["composition_version"] == base["composition_version"] + 1
+    assert public.get(detail).json == snapshot
+
+    stale = composition(other, other_headers, base, base["chapters"], publish=True,
+                        journey={"title": "Stale title"}, photos=[{"id": photo_id, "title": "Stale caption"}])
+    assert stale.status_code == 409 and stale.json["code"] == "composition_conflict"
+    assert client.get(detail).json == added.json
+    assert public.get(detail).json == snapshot
+    published = composition(client, headers, added.json, added.json["chapters"], publish=True)
+    assert published.status_code == 200
+    assert published.json["composition_version"] == added.json["composition_version"] + 1
+    assert public.get(detail).json["chapters"][-1]["title"] == "Module 15"
+
+
+@pytest.mark.parametrize("version", [{}, {"base_version": None}, {"base_version": 0},
+                                      {"base_version": True}, {"base_version": "1"}])
+def test_missing_or_invalid_composition_version_never_mutates(client, version):
+    headers = auth(client)
+    record = create(client, headers)
+    rejected = client.patch(f"/api/journeys/{record['id']}/composition", headers=headers,
+                            json={"chapters": [], "base_slug": record["slug"], "journey": {"title": "Invalid change"}, "publish": True, **version})
+    assert rejected.status_code == 409 and rejected.json["code"] == "composition_conflict"
+    assert client.get(f"/api/journeys/{record['slug']}").json == record
+    saved = composition(client, headers, record, [])
+    assert saved.status_code == 200 and saved.json["composition_version"] == 2
+
+
+@pytest.mark.parametrize("mutation", ["journey", "publish", "chapter-create", "chapter-edit",
+                                     "chapter-delete", "chapter-order", "photo-order",
+                                     "photo-upload", "photo-edit", "photo-delete"])
+def test_direct_journey_writers_invalidate_old_compositions(client, mutation):
+    headers = auth(client)
+    record = create(client, headers)
+    root = f"/api/journeys/{record['id']}"
+    record = composition(client, headers, record, [{"id": -1, "title": "A"}, {"id": -2, "title": "B"}]).json
+    for _ in range(2):
+        record = upload(client, headers, record)
+    chapters = [chapter["id"] for chapter in record["chapters"]]
+    photos = [photo["id"] for photo in record["photos"]]
+    if mutation == "photo-upload":
+        updated = upload(client, headers, record)
+    else:
+        method, path, payload = {
+            "journey": ("PATCH", root, {"title": "Direct title"}),
+            "publish": ("PATCH", root, {"published": True}),
+            "chapter-create": ("POST", f"{root}/chapters", {"title": "New module"}),
+            "chapter-edit": ("PATCH", f"/api/chapters/{chapters[0]}", {"title": "Updated module"}),
+            "chapter-delete": ("DELETE", f"/api/chapters/{chapters[0]}", None),
+            "chapter-order": ("PUT", f"{root}/chapters/order", {"ids": chapters[::-1]}),
+            "photo-order": ("PUT", f"{root}/photos/order", {"ids": photos[::-1]}),
+            "photo-edit": ("PATCH", f"/api/photos/{photos[0]}", {"title": "Updated caption", "chapter_id": chapters[1]}),
+            "photo-delete": ("DELETE", f"/api/photos/{photos[0]}", None),
+        }[mutation]
+        response = client.open(path, method=method, json=payload, headers=headers)
+        assert response.status_code in (200, 201), response.json
+        updated = response.json
+    assert updated["composition_version"] == record["composition_version"] + 1
+    assert composition(client, headers, record, record["chapters"]).status_code == 409
+    assert client.get(f"/api/journeys/{record['slug']}").json == updated
+
+
+def test_editor_photo_writes_check_base_version_before_files_or_rows(app, client):
+    headers = auth(client)
+    record = upload(client, headers, create(client, headers))
+    saved = composition(client, headers, record, []).json
+    stale = {**headers, "X-Composition-Journey": record["slug"], "X-Composition-Version": str(record["composition_version"])}
+    photo_id = saved["photos"][0]["id"]
+    upload_dir = Path(app.config["UPLOAD_FOLDER"])
+    files = set(upload_dir.iterdir())
+    data = {"file": (image_file((32, 32)), "new.jpg"), "upload_key": "editor-upload"}
+    response = client.post(f"/api/journeys/{saved['id']}/photos", headers=stale, data=data)
+    assert response.status_code == 409 and response.json["code"] == "composition_conflict"
+    response = client.delete(f"/api/photos/{photo_id}", headers=stale)
+    assert response.status_code == 409 and response.json["code"] == "composition_conflict"
+    assert set(upload_dir.iterdir()) == files
+    assert client.get(f"/api/journeys/{saved['slug']}").json == saved
+
+    url = f"/api/journeys/{saved['id']}/photos"
+    current = {**headers, "X-Composition-Journey": saved["slug"], "X-Composition-Version": str(saved["composition_version"])}
+    response = client.post(url, headers=current, data={"file": (image_file((32, 32)), "new.jpg"), "upload_key": "editor-upload"})
+    assert response.status_code == 201
+    uploaded = response.json
+    assert uploaded["composition_version"] == saved["composition_version"] + 1
+    current["X-Composition-Version"] = str(uploaded["composition_version"])
+    retry = client.post(url, headers=current, data={"upload_key": "editor-upload"})
+    assert retry.status_code == 200 and retry.json == uploaded
+    deleted = client.delete(f"/api/photos/{photo_id}", headers=current)
+    assert deleted.status_code == 200
+    assert deleted.json["composition_version"] == uploaded["composition_version"] + 1
+
+
+def test_two_concurrent_composition_saves_have_one_winner(app, client):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    record = create(client, auth(client))
+    start = Barrier(2, timeout=10)
+
+    def attempt(title):
+        editor = app.test_client()
+        headers = auth(editor)
+        start.wait()
+        return composition(editor, headers, record, [{"id": -1, "title": title}])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(attempt, ("First writer", "Second writer")))
+    assert sorted(response.status_code for response in results) == [200, 409]
+    winner = next(response.json for response in results if response.status_code == 200)
+    assert winner["composition_version"] == record["composition_version"] + 1
+    assert client.get(f"/api/journeys/{record['slug']}").json == winner
+
+
+
+def test_deleted_journey_version_cannot_write_to_reused_id(client):
+    headers = auth(client)
+    old = create(client, headers)
+    assert client.delete(f"/api/journeys/{old['id']}", headers=headers).status_code == 204
+    new = create(client, headers, title="New journey")
+    assert new["id"] == old["id"] and new["composition_version"] == old["composition_version"]
+    stale = composition(client, headers, old, [], journey={"title": "Old title"})
+    assert stale.status_code == 409 and stale.json["code"] == "composition_conflict"
+    assert client.get(f"/api/journeys/{new['slug']}").json == new
+
+
+
+@pytest.mark.parametrize("replace_journey", [False, True])
+def test_upload_rechecks_basis_after_encoding_without_blocking_saves(app, client, monkeypatch, replace_journey):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    headers = auth(client)
+    uploader = app.test_client()
+    upload_headers = auth(uploader)
+    record = create(client, headers)
+    if not replace_journey:
+        upload_headers.update({"X-Composition-Journey": record["slug"], "X-Composition-Version": "1"})
+    encoding, finish = Event(), Event()
+    original_save = Image.Image.save
+
+    def pause_master(image, path, *args, **kwargs):
+        if str(path).endswith("-master.webp"):
+            encoding.set()
+            assert finish.wait(10)
+        return original_save(image, path, *args, **kwargs)
+
+    monkeypatch.setattr(Image.Image, "save", pause_master)
+
+    def submit():
+        return uploader.post(f"/api/journeys/{record['id']}/photos", headers=upload_headers,
+                             data={"file": (image_file((32, 32)), "new.jpg")})
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        upload_request = pool.submit(submit)
+        try:
+            assert encoding.wait(10)
+            if replace_journey:
+                assert client.delete(f"/api/journeys/{record['id']}", headers=headers).status_code == 204
+                expected = create(client, headers, title="Replacement journey")
+                assert expected["id"] == record["id"]
+            else:
+                saved = composition(client, headers, record, [{"id": -15, "title": "Module 15"}])
+                assert saved.status_code == 200
+                expected = saved.json
+        finally:
+            finish.set()
+        rejected = upload_request.result(timeout=10)
+    if replace_journey:
+        assert rejected.status_code == 404
+    else:
+        assert rejected.status_code == 409 and rejected.json["code"] == "composition_conflict"
+    assert client.get(f"/api/journeys/{expected['slug']}").json == expected
+    assert not list(Path(app.config["UPLOAD_FOLDER"]).iterdir())

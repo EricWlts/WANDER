@@ -124,3 +124,88 @@ export function isRecoveryJourney(value: unknown, journeyId: number): value is J
   }
   return true;
 }
+
+export function canRestoreRecovery(draft: Journey, current: Journey): boolean {
+  const version = draft.composition_version;
+  if (
+    draft.id !== current.id || draft.slug !== current.slug ||
+    typeof version !== "number" || !Number.isSafeInteger(version) || version < 1 ||
+    version !== current.composition_version
+  ) return false;
+
+  const sources = new Set(current.photos.map((photo) => photo.id));
+  if (sources.size !== draft.photos.length || !draft.photos.every((photo) => sources.has(photo.id)))
+    return false;
+
+  const references = [
+    ...(draft.cover_id === null ? [] : [String(draft.cover_id)]),
+    ...draft.filmstrip_ids.map(String),
+    ...[draft.layout, ...draft.chapters.map((chapter) => chapter.layout)].flatMap((layout) => [
+      ...(layout?.photo_ids ?? []).map(String),
+      ...Object.keys(layout?.photo_edits ?? {}),
+      ...(layout?.placements ?? []).map((placement) => String(placement.photo_id)),
+      ...(layout?.filmstrip_placements ?? []).map((placement) => String(placement.photo_id)),
+    ]),
+  ];
+  const sourceKeys = new Set(Array.from(sources, String));
+  return references.every((id) => sourceKeys.has(id));
+}
+
+type RecoveryStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+export type RecoveryCopy = {
+  storage: RecoveryStorage;
+  key: string;
+  raw: string;
+  draft: Journey;
+};
+
+function readCopy(storage: RecoveryStorage, key: string, id: number): RecoveryCopy | null {
+  try {
+    const raw = storage.getItem(key);
+    if (raw === null) return null;
+    const draft: unknown = JSON.parse(raw);
+    return isRecoveryJourney(draft, id) ? { storage, key, raw, draft } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function readRecoveries(stores: RecoveryStorage[], id: number): RecoveryCopy[] {
+  const key = `wander-recovery-${id}`;
+  return stores.flatMap((storage) => readCopy(storage, key, id) ?? []);
+}
+
+export function writeRecovery(
+  stores: RecoveryStorage[], draft: Journey, owned: RecoveryCopy | null,
+): RecoveryCopy | null {
+  const key = `wander-recovery-${draft.id}`;
+  const raw = JSON.stringify(draft);
+  // Prefer the existing slot. Use the session slot when another copy occupies local storage.
+  const candidates = owned?.key === key
+    ? [owned.storage, ...stores.filter((storage) => storage !== owned.storage)]
+    : stores;
+  for (const storage of candidates) {
+    let updatingOwnedCopy = false;
+    try {
+      const previous = storage.getItem(key);
+      updatingOwnedCopy = owned?.storage === storage && owned.key === key && owned.raw === previous;
+      if (previous !== null && !updatingOwnedCopy) continue;
+      storage.setItem(key, raw);
+      return { storage, key, raw, draft };
+    } catch {
+      // Keep ownership of the older backup if updating it failed.
+      if (updatingOwnedCopy) return null;
+    }
+  }
+  return null;
+}
+
+export function removeRecovery(copy: RecoveryCopy): boolean {
+  try {
+    if (copy.storage.getItem(copy.key) === copy.raw) copy.storage.removeItem(copy.key);
+    return true;
+  } catch {
+    return false;
+  }
+}

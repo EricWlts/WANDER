@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowDown,
@@ -57,8 +57,30 @@ import { t, useLocale } from "./I18n";
 import { moveModule } from "./moduleOrder";
 import { removeModuleFromDraft, selectionAfterModuleRemoval } from "./moduleDeletion";
 import { moduleDropTarget, moduleScrollSpeed, moduleTransferTarget } from "./moduleDrag";
-import { isRecoveryJourney } from "./recoveryModel";
+import {
+  canRestoreRecovery,
+  readRecoveries,
+  removeRecovery,
+  writeRecovery,
+  type RecoveryCopy,
+} from "./recoveryModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
+
+function recoveryStores(): Storage[] {
+  return (["localStorage", "sessionStorage"] as const).flatMap((name) => {
+    try {
+      return [window[name]];
+    } catch {
+      return [];
+    }
+  });
+}
+
+async function withRecoveryLock<T>(id: number, action: () => T): Promise<T> {
+  // Tabs using this editor serialize read/modify/write on the shared local slot.
+  if (navigator.locks) return navigator.locks.request(`wander-recovery-${id}`, action);
+  return action();
+}
 
 function PreviewFrame({
   mobile,
@@ -155,6 +177,7 @@ const cleanChapter = (c: Chapter) => ({
   layout: c.layout || {},
 });
 export function ModularEditor() {
+  const navigate = useNavigate();
   const { slug } = useParams(),
     { notify } = useApp();
   useLocale();
@@ -243,6 +266,21 @@ export function ModularEditor() {
     setError("");
     setPublishReview(null);
   }
+  const [recoveries, setRecoveries] = useState<RecoveryCopy[]>([]);
+  const ownedRecovery = useRef<RecoveryCopy | null>(null);
+  const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
+  function refreshRecoveries(id: number) {
+    const owned = ownedRecovery.current;
+    setRecoveries(readRecoveries(recoveryStores(), id).filter(
+      (copy) => copy.storage !== owned?.storage || copy.raw !== owned.raw,
+    ));
+  }
+  function clearRecovery(copy: RecoveryCopy) {
+    if (!removeRecovery(copy)) return false;
+    if (ownedRecovery.current === copy) ownedRecovery.current = null;
+    refreshRecoveries(copy.draft.id);
+    return true;
+  }
   const revision = useRef(0),
     saving = useRef(false);
   const saved = useRef<Journey | null>(null),
@@ -255,6 +293,9 @@ export function ModularEditor() {
         if (alive) {
           setConflicted(false);
           saved.current = j;
+          ownedRecovery.current = null;
+          setDirty(false);
+          refreshRecoveries(j.id);
           setJourney(j);
         }
       })
@@ -291,15 +332,17 @@ export function ModularEditor() {
   }, [dirty]);
   // Preserve unfinished edits across an accidental reload, without replacing server data.
   useEffect(() => {
-    if (!journey) return;
-    const key = `wander-recovery-${journey.id}`;
-    try {
-      if (dirty) localStorage.setItem(key, JSON.stringify(journey));
-      else if (saved.current && journey !== saved.current)
-        localStorage.removeItem(key);
-    } catch {
-      /* Recovery storage may be unavailable. */
-    }
+    if (!journey || !dirty) return;
+    let active = true;
+    void withRecoveryLock(journey.id, () => {
+      if (!active) return;
+      const copy = writeRecovery(recoveryStores(), journey, ownedRecovery.current);
+      if (copy) ownedRecovery.current = copy;
+      setRecoveryUnavailable(!copy);
+    }).catch(() => {
+      if (active) setRecoveryUnavailable(true);
+    });
+    return () => { active = false; };
   }, [journey, dirty]);
   useEffect(() => {
     if (restoring.current) {
@@ -373,22 +416,6 @@ export function ModularEditor() {
     });
     return () => cancelAnimationFrame(frame);
   }, [selected, tab, previewReturn]);
-  const [recovery, setRecovery] = useState<Journey | null>(null);
-  useEffect(() => {
-    if (!journey) return;
-    setRecovery(null);
-    try {
-      const value =
-        localStorage.getItem(`wander-recovery-${journey.id}`) ||
-        sessionStorage.getItem(`wander-recovery-${journey.id}`);
-      if (value) {
-        const j: unknown = JSON.parse(value);
-        if (isRecoveryJourney(j, journey.id)) setRecovery(j);
-      }
-    } catch {
-      /* Invalid recovery is ignored. */
-    }
-  }, [journey?.id]);
   function change(patch: Partial<Journey>) {
     revision.current++;
     setAutoError(false);
@@ -545,10 +572,17 @@ export function ModularEditor() {
       setDirty(changed);
       if (!changed) {
         try {
-          localStorage.removeItem(`wander-recovery-${next.id}`);
-          sessionStorage.removeItem(`wander-recovery-${next.id}`);
+          await withRecoveryLock(current.id, () => {
+            const copy = ownedRecovery.current;
+            if (revision.current !== sentRevision || copy?.draft.id !== current.id) return;
+            if (!clearRecovery(copy)) {
+              ownedRecovery.current = null;
+              refreshRecoveries(current.id);
+            }
+          });
         } catch {
-          /* Optional recovery. */
+          ownedRecovery.current = null;
+          refreshRecoveries(current.id);
         }
       }
       if (publish) {
@@ -833,13 +867,15 @@ export function ModularEditor() {
     dragFrame.current = requestAnimationFrame(frame);
   }
   function uploaded(value: Journey) {
+    saved.current = value;
     setJourney((j) =>
       j
         ? {
             ...j,
-            photos: value.photos.map(
-              (p) => j.photos.find((old) => old.id === p.id) || p,
-            ),
+            photos: [
+              ...j.photos,
+              ...value.photos.filter((p) => !j.photos.some((old) => old.id === p.id)),
+            ],
             chapters: j.chapters.map((c) => {
               const added = value.photos.filter(
                 (p) =>
@@ -1379,39 +1415,77 @@ export function ModularEditor() {
           </button>
         </div>
       )}
-      {recovery && (
-        <div className="recovery-banner">
+      {dirty && recoveryUnavailable && (
+        <div className="editor-error" role="status">
           {t(
-            "Unfinished changes are available from your last session.",
-            "Es gibt offene Änderungen aus deiner letzten Sitzung.",
+            "This browser could not back up your current changes. Save before leaving.",
+            "Dieser Browser konnte deine aktuellen Änderungen nicht lokal sichern. Speichere vor dem Verlassen.",
           )}
-          <button
-            disabled={busy || backgroundSaving || uploadBusy}
-            onClick={() => {
-              if (saving.current || busy || uploadBusy) return;
-              revision.current++;
-              setJourney(recovery);
-              setDirty(true);
-              setRecovery(null);
-            }}
-          >
-            {t("Restore", "Wiederherstellen")}
-          </button>
-          <button
-            onClick={() => {
-              setRecovery(null);
-              try {
-                localStorage.removeItem(`wander-recovery-${j.id}`);
-                sessionStorage.removeItem(`wander-recovery-${j.id}`);
-              } catch {
-                /* Optional recovery. */
-              }
-            }}
-          >
-            {t("Dismiss", "Verwerfen")}
-          </button>
         </div>
       )}
+      {recoveries.map((recovery, index) => (
+        <div className="recovery-banner" key={index}>
+          {recoveries.length > 1 && <strong>{recovery.draft.title}</strong>}
+          {canRestoreRecovery(recovery.draft, j) && !conflicted ? (
+            <>
+              {t(
+                "Unfinished changes are available from your last session.",
+                "Es gibt offene Änderungen aus deiner letzten Sitzung.",
+              )}
+              <button
+                disabled={dirty || busy || backgroundSaving || uploadBusy}
+                onClick={() => {
+                  if (dirty || saving.current || busy || uploadBusy) return;
+                  const available = readRecoveries(recoveryStores(), j.id).some(
+                    (copy) => copy.storage === recovery.storage && copy.raw === recovery.raw,
+                  );
+                  if (!available) {
+                    refreshRecoveries(j.id);
+                    return;
+                  }
+                  revision.current++;
+                  ownedRecovery.current = recovery;
+                  setJourney(recovery.draft);
+                  select({ type: "hero" });
+                  setAutoError(false);
+                  setDirty(true);
+                  setRecoveries((copies) => copies.filter((copy) => copy !== recovery));
+                }}
+              >
+                {t("Restore", "Wiederherstellen")}
+              </button>
+            </>
+          ) : (
+            <>
+              {t(
+                "This local draft has a different or unknown starting version, or its photo sources have changed. Download a copy to compare and reapply your changes to the current version.",
+                "Dieser lokale Entwurf hat eine andere oder unbekannte Ausgangsversion oder seine Fotoquellen haben sich geändert. Lade eine Kopie herunter, um zu vergleichen und Änderungen im aktuellen Stand erneut zu übernehmen.",
+              )}
+              <button
+                onClick={() => {
+                  const url = URL.createObjectURL(new Blob([recovery.raw], { type: "application/json" }));
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `${j.slug}-draft.json`;
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                }}
+              >
+                {t("Download draft", "Entwurf herunterladen")}
+              </button>
+            </>
+          )}
+          <button
+            onClick={async () => {
+              const cleared = await withRecoveryLock(j.id, () => clearRecovery(recovery)).catch(() => false);
+              if (!cleared)
+                setError(t("The local draft could not be discarded.", "Der lokale Entwurf konnte nicht verworfen werden."));
+            }}
+          >
+            {t("Discard local draft", "Lokalen Entwurf verwerfen")}
+          </button>
+        </div>
+      ))}
       <div className="studio-workspace" inert={busy || undefined}>
         {mode === "edit" && (
           <aside className="module-navigator">
@@ -2962,7 +3036,7 @@ export function ModularEditor() {
                   const next = pending;
                   setPending("");
                   setDiscard(false);
-                  if (next) window.location.href = next;
+                  if (next) navigate(next);
                 }
               }}
             >
@@ -2970,13 +3044,24 @@ export function ModularEditor() {
             </button>
             <button
               className="button button-outline"
-              onClick={() => {
+              disabled={busy || backgroundSaving || uploadBusy}
+              onClick={async () => {
+                if (saving.current || busy || uploadBusy) return;
+                const cleared = await withRecoveryLock(j.id, () => {
+                  if (saving.current) return false;
+                  return !ownedRecovery.current || clearRecovery(ownedRecovery.current);
+                }).catch(() => false);
+                if (!cleared) {
+                  setError(t("The local draft could not be discarded.", "Der lokale Entwurf konnte nicht verworfen werden."));
+                  setDiscard(false);
+                  return;
+                }
                 setDirty(false);
                 setJourney(saved.current);
                 const next = pending;
                 setPending("");
                 setDiscard(false);
-                if (next) window.location.href = next;
+                if (next) navigate(next);
               }}
             >
               {t("Discard changes", "Änderungen verwerfen")}

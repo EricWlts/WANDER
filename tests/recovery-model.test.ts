@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isRecoveryJourney } from "../src/recoveryModel.ts";
+import { canRestoreRecovery, isRecoveryJourney, readRecoveries, removeRecovery, writeRecovery } from "../src/recoveryModel.ts";
 import type { Journey } from "../src/types.ts";
 
 function draft(): Journey {
@@ -199,4 +199,76 @@ test("explicit image parallax survives recovery with legacy cover settings and r
     (bad.chapters[1].layout as Record<string, unknown>).image_parallax = invalid;
     assert.equal(isRecoveryJourney(bad, 1), false);
   }
+});
+
+test("only the same P01 basis and complete photo sources permit restore", () => {
+  const value = { ...draft(), composition_version: 5 };
+  const current = structuredClone(value);
+  assert.equal(canRestoreRecovery(value, current), true);
+  assert.equal(canRestoreRecovery({ ...value, composition_version: undefined }, current), false);
+  assert.equal(canRestoreRecovery({ ...value, composition_version: 0 }, current), false);
+  assert.equal(canRestoreRecovery(value, { ...current, slug: "renamed" }), false);
+  assert.equal(canRestoreRecovery(value, {
+    ...current, composition_version: 6,
+    chapters: [...current.chapters, { ...current.chapters[0], id: 8 }],
+  }), false);
+  assert.equal(canRestoreRecovery(value, {
+    ...current, photos: [...current.photos, { ...current.photos[0], id: 12 }],
+  }), false);
+  assert.equal(canRestoreRecovery(value, { ...current, photos: [] }), false);
+  value.chapters[1].layout!.placements!.push({ id: "missing", photo_id: 99 });
+  assert.equal(canRestoreRecovery(value, current), false);
+  assert.equal(value.chapters[1].layout!.placements!.at(-1)!.photo_id, 99);
+});
+
+function storage() {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
+  };
+}
+
+test("an independent edit and its cleanup preserve pending recovery across reload", () => {
+  const local = storage(), session = storage();
+  const stores = [local, session];
+  const pending = writeRecovery(stores, draft(), null)!;
+  const working = writeRecovery(stores, { ...draft(), title: "Independent edit" }, null)!;
+  assert.equal(working.storage, session);
+  assert.deepEqual(readRecoveries(stores, 1).map((copy) => copy.raw), [pending.raw, working.raw]);
+  assert.equal(readRecoveries(stores, 1)[0]?.raw, pending.raw);
+  assert.equal(removeRecovery(working), true);
+  assert.equal(readRecoveries(stores, 1)[0]?.raw, pending.raw);
+  assert.equal(removeRecovery(pending), true);
+  assert.deepEqual(readRecoveries(stores, 1), []);
+});
+
+test("a stale tab cannot overwrite or remove a different stored copy", () => {
+  const local = storage(), session = storage();
+  const copy = writeRecovery([local, session], draft(), null)!;
+  const other = JSON.stringify({ ...draft(), title: "Other tab" });
+  local.setItem(copy.key, other);
+  assert.equal(writeRecovery([local, session], draft(), copy)?.storage, session);
+  assert.equal(removeRecovery(copy), true);
+  assert.equal(local.getItem(copy.key), other);
+});
+
+test("invalid local storage does not hide a valid session copy", () => {
+  const local = storage(), session = storage();
+  local.setItem("wander-recovery-1", "{invalid");
+  const fallback = writeRecovery([local, session], draft(), null)!;
+  assert.equal(readRecoveries([local, session], 1)[0]?.raw, fallback.raw);
+  assert.equal(local.getItem(fallback.key), "{invalid");
+});
+
+test("a quota failure preserves ownership of the previous backup for cleanup", () => {
+  const local = storage(), session = storage();
+  const stores = [local, session];
+  const copy = writeRecovery(stores, draft(), null)!;
+  local.setItem = () => { throw new Error("Quota exceeded"); };
+  assert.equal(writeRecovery(stores, { ...draft(), title: "Larger edit" }, copy), null);
+  assert.deepEqual(readRecoveries(stores, 1).map((entry) => entry.raw), [copy.raw]);
+  assert.equal(removeRecovery(copy), true);
+  assert.deepEqual(readRecoveries(stores, 1), []);
 });

@@ -169,41 +169,6 @@ body {
 .image-expand {
   display: none !important;
 }
-/* Free positioning: no snap, hint motion, scrollbar, or hover ornaments. */
-.free-rail {
-  scroll-snap-type: none !important;
-  scroll-behavior: auto !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none;
-  padding-bottom: 0;
-  gap: clamp(16px, 2.2vw, 30px);
-  overscroll-behavior-x: contain;
-  cursor: grab;
-  overflow-x: auto;
-}
-.free-rail::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-.free-rail:active {
-  cursor: grabbing;
-}
-.free-rail > figure {
-  scroll-snap-align: none;
-  scroll-snap-stop: normal;
-  width: min(calc(58svh * var(--frame-ratio)), 78vw);
-  max-width: 78vw;
-}
-.free-rail .picture {
-  height: clamp(240px, 58svh, 700px) !important;
-}
-.free-rail .picture img {
-  height: 100%;
-}
-.free-rail .picture-button {
-  cursor: inherit;
-}
 .rail-instructions {
   display: none !important;
 }
@@ -760,14 +725,6 @@ body {
   .type-presets button {
     min-height: 44px;
     font-size: 12px;
-  }
-  .free-rail > figure {
-    width: min(calc(54svh * var(--frame-ratio)), 80vw);
-    max-width: 80vw;
-  }
-  .free-rail .picture,
-  .free-rail .picture[style*="aspect-ratio"] {
-    height: clamp(250px, 54svh, 620px) !important;
   }
   .module-picker-grid .module-schematic {
     height: 90px;
@@ -1952,25 +1909,9 @@ body {
   grid-column: span var(--wall-desktop-span, 12);
 }
 
-/* D03: rail frames follow Picture's effective ratio within the existing bounds. */
-.free-rail > figure {
-  width: min(calc(var(--rail-max-height, 58svh) * var(--frame-ratio)), 78vw);
-  max-width: 78vw;
-}
-.free-rail .picture,
-.free-rail .picture[style*="aspect-ratio"] {
-  width: 100%;
-  height: auto !important;
-  max-height: none;
-}
-.free-rail .picture img {
-  width: 100%;
-  height: 100%;
-}
-
 /* D03: captions share one quiet, conditional treatment in walls and rails. */
 .wall-group figcaption,
-.free-rail figcaption {
+.carousel-track figcaption {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
@@ -2015,16 +1956,11 @@ body {
   .photo-wall[data-auto-composition="true"] .wall-group > figure {
     grid-column: span var(--wall-mobile-span, 12);
   }
-  .free-rail > figure {
-    --rail-max-height: 54svh;
-    width: min(calc(54svh * var(--frame-ratio)), 80vw);
-    max-width: 80vw;
-  }
   .chapter-prose-default-size .module-day-heading .module-prose {
     font-size: 18px;
   }
   .wall-group figcaption,
-  .free-rail figcaption {
+  .carousel-track figcaption {
     font-size: 12px;
   }
 }
@@ -2202,28 +2138,41 @@ body {
 .module-drop-after::after { bottom: 0; }
 .collection-grid button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
 
-/* D05b: opt-in manual pages; the automatic filmstrip remains independent. */
-.single-rail {
-  gap: 0;
-  scroll-snap-type: x mandatory !important;
+/* One track for the original placements and the inert seam copies. */
+.carousel-viewport {
+  container-type: inline-size;
+  overflow: clip;
+  touch-action: pan-y pinch-zoom;
+  cursor: grab;
 }
-.single-rail > figure {
-  flex: 0 0 100%;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+.carousel-viewport:active { cursor: grabbing; }
+.carousel-track {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 28px);
+  width: max-content;
 }
-.single-rail .picture,
-.single-rail .picture[style*="aspect-ratio"] {
-  height: min(65svh, 720px) !important;
-  aspect-ratio: auto !important;
+.carousel-track > figure {
+  flex: 0 0 auto;
+  width: clamp(28cqw, calc(58svh * var(--frame-ratio)), 76cqw);
+  margin: 0;
+}
+.carousel-track .picture {
+  width: min(100%, calc(58svh * var(--frame-ratio)));
+  margin-inline: auto;
+  cursor: inherit;
+}
+.editorial-carousel[data-whole] .carousel-track > figure {
+  width: clamp(28cqw, calc(65svh * var(--frame-ratio)), 96cqw);
+}
+.editorial-carousel[data-whole] .carousel-track .picture {
+  width: min(100%, calc(65svh * var(--frame-ratio)));
   --active-hover: 1 !important;
 }
-.single-rail .picture img {
-  object-fit: contain;
+.carousel-track figcaption {
+  text-align: center;
 }
+
 /* Shared Studio/Public manual rail position controls; automatic strips stay unchanged. */
 .rail-indicators {
   color: var(--canvas-ink, inherit);
@@ -2234,13 +2183,15 @@ body {
 }
 .rail-segments {
   display: flex;
-  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: min(100%, 360px, calc(var(--rail-count) * 56px));
 }
 .rail-segments button {
-  flex: 1 1 0;
+  flex: 0 0 max(24px, calc(100% / var(--rail-count)));
   min-width: 0;
   height: 28px;
-  padding: 0 4px;
+  padding: 0 clamp(2px, 1vw, 4px);
   border: 0;
   background: transparent;
   color: inherit;
@@ -2252,24 +2203,14 @@ body {
   width: 100%;
   border-radius: 1px;
   background: currentColor;
-  opacity: 0.24;
+  opacity: 0.54;
 }
 .rail-segments button[aria-current="true"] span { opacity: 0.85; }
 .rail-segments button:focus-visible,
-.rail-position-select:focus-visible {
+.rail-navigation button:focus-visible,
+.carousel-viewport:focus-visible {
   outline: 1px solid currentColor;
   outline-offset: 2px;
-}
-.rail-position-select {
-  max-width: 100%;
-  min-height: 28px;
-  margin-top: 6px;
-  background: var(--module-bg, var(--canvas-paper, var(--paper)));
-  color: inherit;
-  border: 0;
-  font: inherit;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 .rail-navigation {
   display: flex;
@@ -2286,15 +2227,6 @@ body {
   color: inherit;
   background: transparent;
 }
-.rail-navigation button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.photo-rail-shell[data-rail-mode="free"][data-rail-loop="true"] .free-rail > figure:last-child {
-  margin-right: var(--rail-tail-space, 0px);
-}
-
 /* Motion stays inside existing picture frames without changing wall or rail geometry. */
 .picture > .image-parallax {
   position: absolute;
@@ -2826,4 +2758,111 @@ html:has(.public-header) {
 .module-nav-select > span,
 .module-nav-select > strong {
   display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.home-showcase .home-feature-description {
+  color: var(--ink);
+}
+
+.home-showcase-note {
+  display: block;
+  margin-top: 0.6em;
+  color: var(--olive);
+  font-size: 0.875em;
+}
+
+.showcase-story .story-end {
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.showcase-story .module-quote {
+  padding-block: clamp(24px, 3vw, 48px);
+}
+
+.showcase-story .module-quote blockquote {
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+/* The showcase title should land within the opening screen, below the edition bar. */
+.showcase-story .journal-cover {
+  min-height: 420px;
+  height: min(680px, 65svh);
+}
+
+@media (max-width: 760px) {
+  .showcase-story .journal-cover {
+    min-height: 360px;
+    height: 52svh;
+  }
+
+  .showcase-story .cover-overlay .journal-cover-copy {
+    bottom: 58px;
+  }
+}
+
+
+/* On narrow story pages the toggle sits in the reading flow, clear of prose. */
+.story-motion-row,
+.story-motion,
+.story-facts button.story-motion {
+  display: none;
+}
+@media (max-width: 760px) {
+  body:has(.story-experience) .global-motion {
+    display: none;
+  }
+  .story-motion-row {
+    display: flex;
+    justify-content: end;
+    margin-block: 4px -8px;
+  }
+  .story-motion,
+  .story-facts button.story-motion {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding-inline: 8px;
+    color: inherit;
+    font-size: 13px;
+  }
+}
+
+
+.home-showcase-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 2vw, 20px);
+  max-width: 400px;
+  margin-top: 24px;
+}
+.home-showcase-details .picture {
+  aspect-ratio: 3 / 2 !important;
+}
+.home-journey-meta {
+  display: block;
+  margin-top: 8px;
+  color: var(--olive);
+  font-size: 13px;
+}
+body:has(.home-page) :is(.public-header, .site-footer, .footer-bottom, .home-more-heading) {
+  border-color: transparent;
+}
+body:has(.home-page) .global-motion {
+  box-shadow: none;
+  font-size: 13px;
+}
+body:has(.home-page) :is(.public-header nav a, .footer-bottom, .footer-top > span, .footer-top .text-link) {
+  font-size: max(13px, 0.8rem);
+}
+/* Keep the teaser readable at the edge of the viewport as its details settle. */
+.home-showcase h2 > .reveal {
+  opacity: 1;
+}
+.home-showcase .home-feature-copy :is(p > .reveal, .home-showcase-details > .picture) {
+  opacity: max(.72, var(--scroll-opacity, 1));
+}
+body:has(.home-page) .public-header nav {
+  border-color: transparent;
 }

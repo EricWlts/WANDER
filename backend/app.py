@@ -772,6 +772,14 @@ def create_app(config=None):
             abort(404)
         return jsonify(example)
 
+    @app.get("/api/showcase/<string:edition>")
+    def showcase(edition):
+        from .showcase import make_showcase
+        story = make_showcase(edition, request.args.get("lang", "de"))
+        if story is None:
+            abort(404)
+        return jsonify(story)
+
     @app.get("/", defaults={"path": ""})
     @app.get("/<path:path>")
     def frontend(path):

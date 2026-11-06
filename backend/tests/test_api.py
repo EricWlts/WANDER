@@ -1067,3 +1067,45 @@ def test_upload_rechecks_basis_after_encoding_without_blocking_saves(app, client
         assert rejected.status_code == 409 and rejected.json["code"] == "composition_conflict"
     assert client.get(f"/api/journeys/{expected['slug']}").json == expected
     assert not list(Path(app.config["UPLOAD_FOLDER"]).iterdir())
+
+
+@pytest.mark.parametrize("edition", ["quiet-atlas", "after-hours"])
+@pytest.mark.parametrize("locale,title", [
+    ("de", "Bevor der Wald erwacht"),
+    ("en", "Before the forest wakes"),
+])
+def test_showcase_is_read_only_and_uses_the_existing_photo_assets(client, edition, locale, title):
+    before = client.get("/api/journeys?public=1").json
+    reference = client.get(f"/api/templates/{edition}/example").json
+
+    response = client.get(f"/api/showcase/{edition}?lang={locale}")
+    assert response.status_code == 200
+    story = response.json
+    assert story["story_template"] == edition
+    assert story["preset"] == reference["preset"]
+    assert story["title"] == title
+    assert story["cover_id"] == story["cover"]["id"]
+    photos = {photo["id"]: photo for photo in story["photos"]}
+    assert len(photos) == 8
+    for original in reference["photos"]:
+        photo = photos[original["id"]]
+        for key in ("url", "srcset", "width", "height", "credit", "source_url"):
+            assert photo[key] == original[key]
+
+    modules = story["chapters"]
+    assert [module["kind"] for module in modules] == [
+        "chapter", "pair", "chapter", "pair", "quote", "chapter", "image",
+    ]
+    for chapter, pair in ((modules[0], modules[1]), (modules[2], modules[3])):
+        assert pair["layout"]["parent_id"] == chapter["id"]
+        assert pair["layout"]["ratio"] == "original"
+        assert len(pair["layout"]["placements"]) == 2
+    assert modules[4]["quote"]
+    assert modules[5]["gallery_mode"] == "horizontal"
+    assert len(modules[5]["layout"]["placements"]) == 3
+    assert {placement["photo_id"] for module in modules
+            for placement in module["layout"]["placements"]} == set(photos)
+    assert client.get("/api/journeys?public=1").json == before
+    assert client.get(f"/api/templates/{edition}/example").json == reference
+    assert client.get("/api/showcase/unknown").status_code == 404
+    assert client.get(f"/api/showcase/{edition}?lang=unknown").status_code == 404

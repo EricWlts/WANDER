@@ -5,7 +5,8 @@ import { Reveal, resolveReveal, journeyReveal } from "./Reveal";
 import { imageParallax, canPanImage } from "./imageParallax";
 import { Parallax } from "./Motion";
 import { QuietAtlasChapterCompass } from "./QuietAtlasChapterCompass";
-import { PhotoRail, Filmstrip } from "./StoryExperience";
+import { Filmstrip } from "./StoryExperience";
+import { PhotoRail } from "./PhotoRail";
 import { t } from "./I18n";
 import {
   modulePhotos,
@@ -503,11 +504,13 @@ export function JournalCanvas({
           </div>
         </Parallax>
         <div className="journal-cover-copy">
-          <span className="eyebrow">
-            {journey.location}
-            {journey.location ? " · " : ""}
-            {dateRange(journey.start_date, journey.end_date)}
-          </span>
+          {(journey.location || journey.start_date) && (
+            <span className="eyebrow">
+              {journey.location}
+              {journey.location && journey.start_date ? " · " : ""}
+              {journey.start_date && dateRange(journey.start_date, journey.end_date)}
+            </span>
+          )}
           <h1>{journey.title}</h1>
           {journey.subtitle && <p>{journey.subtitle}</p>}
         </div>

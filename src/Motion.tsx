@@ -5,10 +5,15 @@ import {
   useEffect,
   useRef,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { Pause, Play } from "lucide-react";
 import { t, useLocale } from "./I18n";
-const MotionContext = createContext(false);
+const MotionContext = createContext({
+  off: false,
+  reduced: false,
+  toggle: () => {},
+});
 export function MotionProvider({ children }: { children: ReactNode }) {
   useLocale();
   const [disabled, setDisabled] = useState(() => {
@@ -32,53 +37,61 @@ export function MotionProvider({ children }: { children: ReactNode }) {
       disabled || reduced ? "off" : "on";
     window.dispatchEvent(new Event("wander-motion"));
   }, [disabled, reduced]);
+  const off = disabled || reduced;
+  function toggle() {
+    const next = !disabled;
+    setDisabled(next);
+    try {
+      localStorage.setItem("wander-motion", next ? "off" : "on");
+    } catch {
+      /* Session setting. */
+    }
+  }
   return (
-    <MotionContext.Provider value={disabled || reduced}>
+    <MotionContext.Provider value={{ off, reduced, toggle }}>
       {children}
-      <button
-        className="global-motion"
-        aria-pressed={disabled || reduced}
-        aria-label={
-          disabled || reduced
-            ? t("Enable movement", "Bewegung einschalten")
-            : t("Pause movement", "Bewegung anhalten")
-        }
-        title={
-          reduced
-            ? t(
-                "Reduced motion follows your system",
-                "Reduzierte Bewegung folgt deiner Systemeinstellung",
-              )
-            : t("Automatic movement", "Automatische Bewegung")
-        }
-        disabled={reduced}
-        onClick={() => {
-          const next = !disabled;
-          setDisabled(next);
-          try {
-            localStorage.setItem("wander-motion", next ? "off" : "on");
-          } catch {
-            /* Session setting. */
-          }
-        }}
-      >
-        {disabled || reduced ? <Play size={16} /> : <Pause size={16} />}
-        <span>{t("Movement", "Bewegung")}</span>
-      </button>
+      <MotionToggle className="global-motion" />
     </MotionContext.Provider>
   );
 }
-export const useMotionOff = () => useContext(MotionContext);
+
+export const useMotionOff = () => useContext(MotionContext).off;
+
+export function MotionToggle({ className }: { className: string }) {
+  useLocale();
+  const { off, reduced, toggle } = useContext(MotionContext);
+  return (
+    <button
+      type="button"
+      className={className}
+      aria-pressed={off}
+      aria-label={off
+        ? t("Enable movement", "Bewegung einschalten")
+        : t("Pause movement", "Bewegung anhalten")}
+      title={reduced
+        ? t("Reduced motion follows your system", "Reduzierte Bewegung folgt deiner Systemeinstellung")
+        : t("Automatic movement", "Automatische Bewegung")}
+      disabled={reduced}
+      onClick={toggle}
+    >
+      {off ? <Play size={16} /> : <Pause size={16} />}
+      <span>{t("Movement", "Bewegung")}</span>
+    </button>
+  );
+}
+
 export function Parallax({
   children,
   enabled = true,
   intensity = 90,
   image = false,
+  visibilityTarget,
 }: {
   children: ReactNode;
   enabled?: boolean;
   intensity?: number;
   image?: boolean;
+  visibilityTarget?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     off = useMotionOff();
@@ -114,7 +127,7 @@ export function Parallax({
       visible = e.isIntersecting;
       scroll();
     });
-    observer.observe(el);
+    observer.observe(visibilityTarget?.current ?? el);
     const reduced = () => {
       el.classList.toggle("parallax-active", !media.matches);
       if (media.matches) el.style.setProperty("--parallax-y", "0px");
@@ -135,7 +148,7 @@ export function Parallax({
       window.removeEventListener("scroll", scroll);
       ownerWindow.removeEventListener("resize", scroll);
     };
-  }, [enabled, intensity, off]);
+  }, [enabled, intensity, off, visibilityTarget]);
   return (
     <div
       ref={ref}

@@ -16,7 +16,7 @@ import { LanguageSwitch, useLocale } from "./I18n";
 import { api, json } from "./api";
 import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
-import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
+import { Inspiration, ExampleStory, JourneyStory, ShowcaseStory } from "./StoryExperience";
 import { closeNavigationOnEscape } from "./mobileNavigation";
 import { initialHeaderScroll, updateHeaderScroll, resetHeaderGesture, headerScrollThresholds, headerIsCompact, initialHeaderWheel, updateHeaderWheel } from "./adaptiveHeader";
 import { BrandMonogram, SignatureWordmark } from "./SignatureBrand";
@@ -102,6 +102,7 @@ export default function App() {
         <Route path="/archive" element={<Archive />} />
         <Route path="/about" element={<About />} />
         <Route path="/journeys/:slug" element={<JourneyStory />} />
+        <Route path="/showcase/:edition" element={<ShowcaseStory />} />
         <Route path="/studio" element={<StudioRoute page="Studio" />} />
         <Route path="/inspiration" element={<Inspiration />} />
         <Route path="/inspiration/:templateId" element={<ExampleStory />} />

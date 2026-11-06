@@ -23,6 +23,20 @@ ASSETS = [
 ]
 
 
+def example_photo(index, *, title=None, alt=None, chapter_id=None, featured=False):
+    name, default_title, default_alt, width, height, credit, source = ASSETS[index]
+    return {
+        "id": -(index + 1), "chapter_id": chapter_id, "position": index,
+        "title": default_title if title is None else title,
+        "alt": default_alt if alt is None else alt,
+        "description": "Illustrative stock photography · fictional editorial example.",
+        "width": width, "height": height, "featured": featured, "demo": True,
+        "credit": credit, "source_url": f"https://unsplash.com/photos/{source}",
+        "url": f"/images/{name}-1280.webp", "large_url": f"/images/{name}-2200.webp", "original_url": None,
+        "srcset": ", ".join(f"/images/{name}-{size}.webp {size}w" for size in (640, 1280, 2200)),
+    }
+
+
 def make_example(template_id):
     template = next((item for item in TEMPLATES if item["id"] == template_id), None)
     if not template:
@@ -43,14 +57,9 @@ def make_example(template_id):
         ])
     ]
     photos = []
-    for index, (name, title, alt, width, height, credit, source) in enumerate(ASSETS):
+    for index in range(len(ASSETS)):
         day = 0 if index < 2 else 1 if index < 5 else 2
-        photos.append({"id": -(index + 1), "chapter_id": chapters[day]["id"], "position": index,
-                       "title": title, "alt": alt, "description": "Illustrative stock photography · fictional editorial example.",
-                       "width": width, "height": height, "featured": index in {0, 2, 3, 5}, "demo": True,
-                       "credit": credit, "source_url": f"https://unsplash.com/photos/{source}",
-                       "url": f"/images/{name}-1280.webp", "large_url": f"/images/{name}-2200.webp", "original_url": None,
-                       "srcset": ", ".join(f"/images/{name}-{size}.webp {size}w" for size in (640, 1280, 2200))})
+        photos.append(example_photo(index, chapter_id=chapters[day]["id"], featured=index in {0, 2, 3, 5}))
     cover = photos[5] if dark else photos[0]
     return {"id": -2 if dark else -1, "slug": template_id, "is_example": True,
             "title": "When the light stays" if dark else "The art of going nowhere",

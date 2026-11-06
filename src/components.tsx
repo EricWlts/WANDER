@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
   type CSSProperties,
 } from "react";
 import { ArrowUpRight, X } from "lucide-react";
@@ -48,6 +49,7 @@ export function Picture({
   animate = false,
   motion = imageMotion,
   parallax = false,
+  parallaxVisibility,
 }: {
   photo: Photo | null;
   className?: string;
@@ -58,6 +60,7 @@ export function Picture({
   animate?: boolean;
   motion?: RevealConfig;
   parallax?: boolean;
+  parallaxVisibility?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -148,7 +151,7 @@ export function Picture({
       }
     >
       {pan ? (
-        <Parallax image intensity={140}>{img}</Parallax>
+        <Parallax image intensity={140} visibilityTarget={parallaxVisibility}>{img}</Parallax>
       ) : img}
       {indicator}
       <span className="image-expand">
@@ -165,7 +168,7 @@ export function Picture({
       className={`picture ${className}`}
     >
       {pan ? (
-        <Parallax image intensity={140}>{img}</Parallax>
+        <Parallax image intensity={140} visibilityTarget={parallaxVisibility}>{img}</Parallax>
       ) : img}
       {indicator}
     </div>

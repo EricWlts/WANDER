@@ -1,4 +1,4 @@
-import { tr } from "./I18n";
+import { t, tr, useLocale } from "./I18n";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, List, Grid2X2 } from "lucide-react";
@@ -7,6 +7,8 @@ import { Reveal } from "./Reveal";
 import { dateLabel, dateRange, Picture } from "./components";
 import { BrandMonogram } from "./SignatureBrand";
 import type { Journey } from "./types";
+
+const showcaseReveal = { effect: "up", intensity: 18 } as const;
 
 function useJourneys() {
   const [journeys, setJourneys] = useState<Journey[]>([]),
@@ -22,8 +24,37 @@ function useJourneys() {
 }
 export function Home() {
   const { journeys, loading, error } = useJourneys();
-  const journey = journeys[0];
-  const otherJourneys = journeys.slice(1, 4);
+  const { locale } = useLocale();
+  const [showcaseResult, setShowcaseResult] = useState<{
+    locale: typeof locale;
+    story: Journey | null;
+  } | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<Journey>(`/showcase/quiet-atlas?lang=${locale}`, {
+      signal: controller.signal,
+    })
+      .then((story) => {
+        if (!controller.signal.aborted) setShowcaseResult({ locale, story });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setShowcaseResult({ locale, story: null });
+        }
+      });
+    return () => controller.abort();
+  }, [locale]);
+  const showcase =
+    showcaseResult?.locale === locale ? showcaseResult.story : null;
+  const journey = showcase ?? journeys[0];
+  const otherJourneys = showcase ? journeys.slice(0, 4) : journeys.slice(1, 4);
+  const featureUrl = showcase
+    ? "/showcase/quiet-atlas"
+    : `/journeys/${journey?.slug}`;
+  const featureLabel = showcase
+    ? t("Featured photo essay", "Fotoessay im Fokus")
+    : tr("Latest journey");
+  const readLabel = showcase ? tr("Read the photo essay") : tr("Read the journey");
   return (
     <main id="main" className="home-page">
       <section className="home-intro page-width">
@@ -51,16 +82,16 @@ export function Home() {
         </div>
       </section>
       <section
-        className="home-feature page-width"
+        className={`home-feature page-width${showcase ? " home-showcase" : ""}`}
         id="latest"
-        aria-label={tr("Latest journey")}
+        aria-label={featureLabel}
       >
-        {loading ? (
+        {(!showcase && loading) || showcaseResult?.locale !== locale ? (
           <div
             className="home-feature-loading"
             aria-label={tr("Loading journeys")}
           />
-        ) : error ? (
+        ) : !showcase && error ? (
           <div className="home-feature-error inline-error" role="alert">
             {error}
             <button onClick={() => location.reload()}>{tr("Try again")}</button>
@@ -68,9 +99,9 @@ export function Home() {
         ) : journey ? (
           <article className="home-feature-story">
             <Link
-              to={`/journeys/${journey.slug}`}
+              to={featureUrl}
               state={
-                journey.cover
+                !showcase && journey.cover
                   ? {
                       storyCover: {
                         slug: journey.slug,
@@ -87,7 +118,7 @@ export function Home() {
                   : undefined
               }
               className="home-feature-image-link"
-              aria-label={`${tr("Read the journey")}: ${journey.title}`}
+              aria-label={`${readLabel}: ${journey.title}`}
             >
               <Picture
                 photo={journey.cover}
@@ -95,33 +126,53 @@ export function Home() {
                 className="home-feature-image"
                 sizes="(max-width: 760px) calc(100vw - 44px), (min-width: 1455px) 616px, calc(50vw - 4.2vw - 24px)"
               />
-              <span className="home-feature-image-label">
-                {tr("THE LATEST JOURNEY")}
-              </span>
+              {!showcase && (
+                <span className="home-feature-image-label">
+                  {tr("THE LATEST JOURNEY")}
+                </span>
+              )}
               <span className="home-feature-image-arrow" aria-hidden="true">
                 <ArrowUpRight />
               </span>
             </Link>
             <div className="home-feature-copy">
-              <span className="eyebrow">
-                {journey.country} /{" "}
-                {dateLabel(journey.start_date, {
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-              <h2>{journey.title}</h2>
+              {!showcase && (
+                <span className="eyebrow">
+                  {journey.country} / {dateLabel(journey.start_date, {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+              <h2>
+                {showcase ? <Reveal as="span" config={showcaseReveal}>{journey.title}</Reveal> : journey.title}
+              </h2>
               {journey.subtitle && (
-                <p className="home-feature-subtitle">{journey.subtitle}</p>
+                <p className="home-feature-subtitle">
+                  {showcase ? <Reveal as="span" config={showcaseReveal}>{journey.subtitle}</Reveal> : journey.subtitle}
+                </p>
               )}
               {journey.description && (
                 <p className="home-feature-description">
-                  {journey.description}
+                  {showcase ? (
+                    <Reveal as="span" config={showcaseReveal}>{journey.description}</Reveal>
+                  ) : journey.description}
+                  {showcase && (
+                    <small className="home-showcase-note">{journey.country}</small>
+                  )}
                 </p>
               )}
-              <Link className="text-link" to={`/journeys/${journey.slug}`}>
-                {tr("Read the journey")} <ArrowUpRight size={18} />
+              <Link className="text-link" to={featureUrl}>
+                {readLabel} <ArrowUpRight size={18} />
               </Link>
+              {showcase && (
+                <div className="home-showcase-details">
+                  {/* Water and the walker foreshadow the essay's change in scale. */}
+                  {[showcase.photos[3], showcase.photos[5]].map((photo) => photo && (
+                    <Picture key={photo.id} photo={photo} animate sizes="(max-width: 480px) 40vw, 200px" />
+                  ))}
+                </div>
+              )}
             </div>
           </article>
         ) : (
@@ -138,6 +189,14 @@ export function Home() {
           </div>
         )}
       </section>
+      {showcase && error && (
+        <div className="home-more page-width">
+          <p className="inline-error" role="alert">{error}</p>
+          <Link to="/archive" className="text-link">
+            {tr("Explore the archive")} <ArrowUpRight size={16} />
+          </Link>
+        </div>
+      )}
       {otherJourneys.length > 0 && (
         <section
           className="home-more page-width"
@@ -161,12 +220,11 @@ export function Home() {
                   sizes="(max-width: 760px) calc(100vw - 44px), (min-width: 1455px) 616px, calc(50vw - 4.2vw - 24px)"
                 />
                 <div className="home-more-copy">
-                  <span className="eyebrow">
-                    {item.country} /{" "}
-                    {dateLabel(item.start_date, { year: "numeric" })}
-                  </span>
                   <h3>{item.title}</h3>
                   {item.subtitle && <p>{item.subtitle}</p>}
+                  <small className="home-journey-meta">
+                    {item.country} / {dateLabel(item.start_date, { year: "numeric" })}
+                  </small>
                 </div>
               </Link>
             ))}

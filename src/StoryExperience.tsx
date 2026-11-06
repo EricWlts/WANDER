@@ -4,7 +4,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 import {
   Link,
@@ -21,10 +20,8 @@ import {
   Play,
   Share2,
 } from "lucide-react";
-import { imageParallax } from "./imageParallax";
 import { sequenceIndex } from "./journalModel";
-import { effectivePhotoRatio } from "./storyLayout";
-import { railOptions, railDestination, railIndex, railPhoto, railTailSpace, railBoundaryDirection, railVisibleIndex, railIndicators } from "./photoRailModel";
+import { PhotoRail } from "./PhotoRail";
 import {
   PhotoViewerModel,
   decodedImageRequest,
@@ -32,7 +29,7 @@ import {
   type ViewerState,
 } from "./photoViewerModel";
 import { JournalCanvas } from "./JournalCanvas";
-import { useMotionOff } from "./Motion";
+import { MotionToggle, useMotionOff } from "./Motion";
 import { t, useLocale } from "./I18n";
 import { api } from "./api";
 import { PageState, useApp } from "./App";
@@ -42,7 +39,6 @@ import type {
   Chapter,
   Journey,
   Photo,
-  Layout,
   RevealConfig,
   StoryTemplate,
 } from "./types";
@@ -155,6 +151,16 @@ export function JourneyStory() {
   const { slug } = useParams();
   return <StoryLoader path={`/journeys/${slug}?public=1`} slug={slug} />;
 }
+export function ShowcaseStory() {
+  const { edition } = useParams();
+  const { locale } = useLocale();
+  return (
+    <StoryLoader
+      path={`/showcase/${encodeURIComponent(edition ?? "")}?lang=${locale}`}
+      showcase
+    />
+  );
+}
 type StoryCover = Pick<
   Photo,
   "id" | "url" | "srcset" | "alt" | "width" | "height"
@@ -218,7 +224,15 @@ function linkedStoryCover(state: unknown, slug?: string): StoryCover | null {
     height: value.height,
   };
 }
-function StoryLoader({ path, slug }: { path: string; slug?: string }) {
+function StoryLoader({
+  path,
+  slug,
+  showcase,
+}: {
+  path: string;
+  slug?: string;
+  showcase?: boolean;
+}) {
   const location = useLocation();
   const cover = linkedStoryCover(location.state, slug);
   const [result, setResult] = useState<{
@@ -289,7 +303,11 @@ function StoryLoader({ path, slug }: { path: string; slug?: string }) {
       </PageState>
     );
   return (
-    <StoryExperience key={current.journey.slug} journey={current.journey} />
+    <StoryExperience
+      key={current.journey.slug}
+      journey={current.journey}
+      showcase={showcase}
+    />
   );
 }
 export function DayTeaser({
@@ -377,338 +395,6 @@ export function DayTeaser({
     </section>
   );
 }
-export function PhotoRail({
-  photos,
-  onPhoto,
-  layout = {},
-}: {
-  photos: Photo[];
-  onPhoto: (photo: Photo) => void;
-  layout?: Layout;
-}) {
-  const ref = useRef<HTMLDivElement>(null),
-    drag = useRef<{
-      x: number;
-      y: number;
-      left: number;
-      end: boolean;
-      mouse: boolean;
-      active: boolean;
-    } | null>(null),
-    suppress = useRef(false),
-    touch = useRef<{
-      x: number;
-      y: number;
-      start: boolean;
-      end: boolean;
-    } | null>(null),
-    wheel = useRef({ time: 0, wrapped: false }),
-    activeIndex = useRef(0);
-  const [index, setIndex] = useState(0);
-  const [indicatorWidth, setIndicatorWidth] = useState(0);
-  const scrollFrame = useRef<number | null>(null);
-  useLocale();
-  const { single, loop } = railOptions(layout);
-  const enhanced = single || loop;
-  const sequenceKey = photos
-    .map((photo, position) => photo.placement_id || `${photo.id}:${position}`)
-    .join("\0");
-  const starts = () => {
-    const rail = ref.current;
-    return rail
-      ? Array.from(
-          rail.children,
-          (child) =>
-            (child as HTMLElement).offsetLeft -
-            (rail.firstElementChild as HTMLElement).offsetLeft,
-        )
-      : [];
-  };
-  const currentIndex = () => {
-    const rail = ref.current;
-    if (!rail) return 0;
-    if (enhanced) return railIndex(rail.scrollLeft, starts());
-    const offsets = starts();
-    return railVisibleIndex(rail.scrollLeft, rail.clientWidth,
-      Array.from(rail.children, (child, i) => ({ start: offsets[i], width: (child as HTMLElement).offsetWidth })));
-  };
-  const updateIndex = (next: number) => {
-    activeIndex.current = next;
-    setIndex((previous) => previous === next ? previous : next);
-  };
-  const go = (next: number) => {
-    const rail = ref.current;
-    if (!rail) return;
-    // Immediate scrolling also respects global pause and reduced motion; no timer
-    // or automatic movement is involved, including at the loop boundary.
-    rail.scrollLeft = starts()[next] || 0;
-    updateIndex(currentIndex());
-  };
-  const step = (direction: number) =>
-    go(railDestination(activeIndex.current, direction, photos.length, loop));
-  const wrap = (direction: number, atStart: boolean, atEnd: boolean) => {
-    if (!loop || photos.length < 2) return false;
-    if (direction < 0 && atStart) {
-      go(photos.length - 1);
-      return true;
-    }
-    if (direction > 0 && atEnd) {
-      go(0);
-      return true;
-    }
-    return false;
-  };
-  useLayoutEffect(() => {
-    const rail = ref.current;
-    if (!rail) return;
-    const last = rail.lastElementChild as HTMLElement | null;
-    const sync = () => {
-      setIndicatorWidth(rail.clientWidth);
-      rail.style.setProperty("--rail-tail-space", `${loop && !single && photos.length > 1 && last ? railTailSpace(rail.clientWidth, last.offsetWidth) : 0}px`);
-      if (single)
-        go(Math.max(0, Math.min(activeIndex.current, photos.length - 1)));
-      else updateIndex(currentIndex());
-    };
-    const observer = new ResizeObserver(sync);
-    observer.observe(rail);
-    Array.from(rail.children).forEach((child) => observer.observe(child));
-    sync();
-    return () => {
-      observer.disconnect();
-      if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
-      scrollFrame.current = null;
-      rail.style.removeProperty("--rail-tail-space");
-    };
-    // Reconfigure only when the sequence or mode changes, never on manual scroll.
-  }, [single, loop, enhanced, photos.length, sequenceKey]);
-  useEffect(() => {
-    const rail = ref.current;
-    if (!rail || !loop) return;
-    const onWheel = (event: WheelEvent) => {
-      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-      const now = Date.now(),
-        fresh = now - wheel.current.time > 220;
-      if (fresh) wheel.current.wrapped = false;
-      wheel.current.time = now;
-      if (wheel.current.wrapped) {
-        event.preventDefault();
-        return;
-      }
-      // Momentum arriving at an edge never wraps. A fresh outward gesture does.
-      if (
-        fresh &&
-        wrap(
-          Math.sign(event.deltaX),
-          rail.scrollLeft <= 1,
-          rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1,
-        )
-      ) {
-        wheel.current.wrapped = true;
-        event.preventDefault();
-      }
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      const gesture = touch.current, point = event.touches[0];
-      if (!gesture || !point || event.touches.length !== 1) return;
-      // Cancel the outward native drag before it creates momentum. Wrapping on
-      // touchend then cannot be undone by inertia from that same gesture.
-      if (railBoundaryDirection(gesture.x - point.clientX, gesture.y - point.clientY,
-        gesture.start, gesture.end, 6)) event.preventDefault();
-    };
-    rail.addEventListener("wheel", onWheel, { passive: false });
-    rail.addEventListener("touchmove", onTouchMove, { passive: false });
-    return () => {
-      rail.removeEventListener("wheel", onWheel);
-      rail.removeEventListener("touchmove", onTouchMove);
-    };
-  }, [loop, photos.length]);
-  const indicators = railIndicators(photos.length, indicatorWidth);
-  const shownIndex = Math.min(index, Math.max(0, photos.length - 1));
-  if (!photos.length) return null;
-  return (
-    <div
-      className="photo-rail-shell"
-      data-rail-mode={single ? "single" : "free"}
-      data-rail-loop={loop || undefined}
-    >
-      <div
-        className={`photo-rail free-rail${single ? " single-rail" : ""}`}
-        ref={ref}
-        tabIndex={0}
-        role="region"
-        aria-label={t("Horizontal photographs", "Horizontale Bildreihe")}
-        onScroll={() => {
-          if (scrollFrame.current !== null) return;
-          scrollFrame.current = requestAnimationFrame(() => {
-            scrollFrame.current = null;
-            // Position observation must never navigate or snap a free rail.
-            updateIndex(currentIndex());
-          });
-        }}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            if (enhanced) step(e.key === "ArrowRight" ? 1 : -1);
-            else
-              e.currentTarget.scrollLeft +=
-                (e.key === "ArrowRight" ? 1 : -1) * 80;
-          }
-          if (e.key === "Home" || e.key === "End") {
-            e.preventDefault();
-            if (enhanced) go(e.key === "Home" ? 0 : photos.length - 1);
-            else
-              e.currentTarget.scrollLeft =
-                e.key === "Home" ? 0 : e.currentTarget.scrollWidth;
-          }
-        }}
-        onTouchStart={(e) => {
-          const point = e.touches[0],
-            rail = e.currentTarget;
-          touch.current =
-            e.touches.length === 1
-              ? {
-                  x: point.clientX,
-                  y: point.clientY,
-                  start: rail.scrollLeft <= 1,
-                  end:
-                    rail.scrollLeft >= rail.scrollWidth - rail.clientWidth - 1,
-                }
-              : null;
-        }}
-        onTouchEnd={(e) => {
-          const gesture = touch.current,
-            point = e.changedTouches[0];
-          touch.current = null;
-          if (!gesture || !point) return;
-          const dx = gesture.x - point.clientX,
-            dy = gesture.y - point.clientY;
-          const direction = railBoundaryDirection(dx, dy, gesture.start, gesture.end);
-          if (direction) wrap(direction, gesture.start, gesture.end);
-        }}
-        onTouchCancel={() => {
-          touch.current = null;
-        }}
-        onPointerDown={(e) => {
-          if (e.button !== 0) return;
-          drag.current = {
-            x: e.clientX,
-            y: e.clientY,
-            left: e.currentTarget.scrollLeft,
-            end:
-              e.currentTarget.scrollLeft >=
-              e.currentTarget.scrollWidth - e.currentTarget.clientWidth - 1,
-            mouse: e.pointerType === "mouse",
-            active: false,
-          };
-          suppress.current = false;
-        }}
-        onPointerMove={(e) => {
-          const d = drag.current;
-          if (!d || !d.mouse) return;
-          const distance = e.clientX - d.x;
-          if (Math.abs(distance) > 6) {
-            d.active = true;
-            suppress.current = true;
-            e.currentTarget.setPointerCapture(e.pointerId);
-            if (single) e.currentTarget.style.setProperty("scroll-snap-type", "none", "important");
-            e.currentTarget.scrollLeft = d.left - distance;
-          }
-        }}
-        onPointerUp={(e) => {
-          const d = drag.current;
-          drag.current = null;
-          e.currentTarget.style.removeProperty("scroll-snap-type");
-          if (!d) return;
-          const dx = d.x - e.clientX,
-            dy = d.y - e.clientY;
-          const horizontal = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy);
-          if (d.mouse && horizontal && wrap(Math.sign(dx), d.left <= 1, d.end))
-            return;
-          if (single && d.mouse && d.active) go(currentIndex());
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-          suppress.current = false;
-          if (ref.current) ref.current.style.removeProperty("scroll-snap-type");
-        }}
-        onClickCapture={(e) => {
-          if (suppress.current) {
-            e.preventDefault();
-            e.stopPropagation();
-            suppress.current = false;
-          }
-        }}
-        onDragStart={(e) => e.preventDefault()}
-      >
-        {photos.map((photo, index) => (
-          <figure
-            onClick={(e) => e.stopPropagation()}
-            key={photo.placement_id || `${photo.id}:${index}`}
-            style={
-              { "--frame-ratio": effectivePhotoRatio(photo) } as CSSProperties
-            }
-          >
-            <Picture
-              parallax={imageParallax(layout).enabled}
-              photo={railPhoto(photo, single)}
-              eager
-              onClick={() => onPhoto(photo)}
-              sizes="90vw"
-            />
-            {photo.edits?.show_title && photo.title?.trim() && (
-              <figcaption>{photo.title}</figcaption>
-            )}
-          </figure>
-        ))}
-      </div>
-      {photos.length > 1 && (
-        <div className="rail-indicators" onClick={(e) => e.stopPropagation()}>
-          {indicators.compact ? (
-            <select
-              className="rail-position-select"
-              aria-label={t("Photograph position", "Bildposition")}
-              value={shownIndex}
-              onChange={(e) => go(Number(e.target.value))}
-            >
-              {photos.map((_, position) => (
-                <option key={position} value={position}>
-                  {t(`Image ${position + 1} of ${photos.length}`, `Bild ${position + 1} von ${photos.length}`)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="rail-segments" style={{ width: indicators.width }}
-              role="group" aria-label={t("Photograph position", "Bildposition")}>
-              {photos.map((_, position) => (
-                <button
-                  key={position}
-                  type="button"
-                  aria-label={t(`Show image ${position + 1} of ${photos.length}`, `Bild ${position + 1} von ${photos.length} anzeigen`)}
-                  aria-current={position === shownIndex ? "true" : undefined}
-                  onClick={() => go(position)}
-                ><span /></button>
-              ))}
-            </div>
-          )}
-          {enhanced && (
-            <div className="rail-navigation">
-              <button type="button" aria-label={t("Previous photograph", "Vorheriges Foto")}
-                disabled={!loop && shownIndex === 0} onClick={() => step(-1)}>
-                <ChevronLeft size={18} />
-              </button>
-              <button type="button" aria-label={t("Next photograph", "Nächstes Foto")}
-                disabled={!loop && shownIndex === photos.length - 1} onClick={() => step(1)}>
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function Filmstrip({
   photos,
   onExplore,
@@ -1112,7 +798,7 @@ export function DayGallery({
     </Modal>
   );
 }
-function StoryExperience({ journey }: { journey: Journey }) {
+function StoryExperience({ journey, showcase }: { journey: Journey; showcase?: boolean }) {
   const { authenticated, notify } = useApp();
   const [params, setParams] = useSearchParams();
   const [viewerPhotos, setViewerPhotos] = useState<Photo[]>(journey.photos);
@@ -1144,16 +830,20 @@ function StoryExperience({ journey }: { journey: Journey }) {
       setShareLink(url);
     }
   }
+  const afterHours = journey.story_template === "after-hours";
+  const editionLink = afterHours ? "/showcase/quiet-atlas" : "/showcase/after-hours";
+  const editionName = afterHours ? "Quiet Atlas" : "After Hours";
+  const endLink = journey.is_example ? "/inspiration" : "/archive";
   return (
     <main
       id="main"
-      className={`story-experience template-${journey.story_template || "quiet-atlas"}`}
+      className={`story-experience template-${journey.story_template || "quiet-atlas"}${showcase ? " showcase-story" : ""}`}
     >
       {journey.is_example && (
         <div className="example-banner">
-          <Link to="/inspiration">
+          <Link to={showcase ? "/" : "/inspiration"}>
             <ArrowLeft size={14} />
-            {tr("All editions")}
+            {showcase ? tr("Journal") : tr("All editions")}
           </Link>
           <span>
             {tr("ORIGINAL FICTIONAL ESSAY /")}{" "}
@@ -1161,10 +851,15 @@ function StoryExperience({ journey }: { journey: Journey }) {
               ? "AFTER HOURS"
               : "QUIET ATLAS"}
           </span>
-          <Link to={`/studio/new?template=${journey.story_template}`}>
-            {tr("Make it yours")}
+          <Link to={showcase ? editionLink : `/studio/new?template=${journey.story_template}`}>
+            {showcase ? editionName : tr("Make it yours")}
             <ArrowUpRight size={14} />
           </Link>
+        </div>
+      )}
+      {showcase && (
+        <div className="story-motion-row page-width">
+          <MotionToggle className="story-motion" />
         </div>
       )}
       {!journey.published && (
@@ -1173,37 +868,47 @@ function StoryExperience({ journey }: { journey: Journey }) {
           <Link to={`/studio/${journey.slug}`}>{tr("Return to studio ↗")}</Link>
         </div>
       )}
-      <div className="story-facts page-width">
-        <span>
-          {journey.location} · {journey.photos.length}{" "}
-          {t("photographs", "Fotos")}
-        </span>
-        <div>
-          {authenticated && !journey.is_example && (
-            <Link to={`/studio/${journey.slug}`}>
-              {t("Edit story", "Reise bearbeiten")} ↗
-            </Link>
-          )}
-          <button onClick={share}>
-            <Share2 size={14} />
-            {t("Share", "Teilen")}
-          </button>
+      {!showcase && (
+        <div className="story-facts page-width">
+          <span>
+            {journey.location} · {journey.photos.length}{" "}
+            {t("photographs", "Fotos")}
+          </span>
+          <div>
+            <MotionToggle className="story-motion" />
+            {authenticated && !journey.is_example && (
+              <Link to={`/studio/${journey.slug}`}>
+                {t("Edit story", "Reise bearbeiten")} ↗
+              </Link>
+            )}
+            <button onClick={share}>
+              <Share2 size={14} />
+              {t("Share", "Teilen")}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       <JournalCanvas journey={journey} onPhoto={openPhoto} />
       <div className="story-end page-width">
         <Link
           className="text-link"
-          to={journey.is_example ? "/inspiration" : "/archive"}
+          to={showcase ? editionLink : endLink}
         >
           <ArrowLeft size={17} />{" "}
-          {journey.is_example
-            ? tr("Explore the other edition")
-            : tr("Back to the archive")}
+          {showcase
+            ? t(`Read in ${editionName}`, `In ${editionName} lesen`)
+            : journey.is_example
+              ? tr("Explore the other edition")
+              : tr("Back to the archive")}
         </Link>
+        {showcase && (
+          <button className="text-link" onClick={share}>
+            <Share2 size={14} /> {t("Share", "Teilen")}
+          </button>
+        )}
         <button className="text-link" onClick={() => setCollection("all")}>
-          {tr("All")}
-          {journey.photos.length} {tr("photographs")} <ArrowUpRight size={17} />
+          {tr("All")} {journey.photos.length} {tr("photographs")}{" "}
+          <ArrowUpRight size={17} />
         </button>
       </div>
       {journey.demo && (

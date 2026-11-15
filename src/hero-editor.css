@@ -1,0 +1,362 @@
+/* Studio: homepage cover editor. Quiet, collapsible, earthy. */
+.hero-editor {
+  border-bottom: 1px solid var(--line);
+  padding-top: 8px;
+}
+.hero-editor-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 0;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.hero-editor-toggle:focus-visible,
+.hero-editor-tile:focus-visible,
+.hero-editor-frame:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 3px;
+}
+.hero-editor-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+}
+.hero-editor-title {
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.1;
+}
+.hero-editor-status {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.hero-editor-toggle svg {
+  flex: none;
+  transition: transform 0.3s ease;
+}
+.hero-editor.is-open .hero-editor-toggle svg {
+  transform: rotate(180deg);
+}
+.hero-editor-panel {
+  display: grid;
+  gap: 20px;
+  padding: 4px 0 26px;
+}
+.hero-editor-lead,
+.hero-editor-note {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.hero-editor-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hero-editor-tile {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--c-stone);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.hero-editor-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-editor-tile:hover:not(:disabled) {
+  border-color: var(--c-line-strong);
+}
+.hero-editor-tile[aria-pressed="true"] {
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 2px var(--c-moss);
+}
+.hero-editor-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 96px;
+  padding: 6px;
+  background: transparent;
+  border-style: dashed;
+  color: var(--c-moss);
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+}
+.hero-editor-upload:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+.hero-editor-frames {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.hero-editor-device {
+  margin: 0;
+  min-width: 0;
+}
+.hero-editor-device[data-device="desktop"] { flex: 1.6 1 0; }
+.hero-editor-device[data-device="tablet"] { flex: 0.8 1 0; }
+.hero-editor-device[data-device="mobile"] { flex: 0.4615 1 0; }
+.hero-editor-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--c-night-deep);
+  border: 1px solid var(--line);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.hero-editor-frame.is-dragging { cursor: grabbing; }
+.hero-editor-frame.is-locked { cursor: default; }
+.hero-editor-frame img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.hero-editor-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(160deg, var(--c-forest-raised), var(--c-night-deep) 70%);
+}
+.hero-editor-device figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.hero-editor-device figcaption small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.hero-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.hero-editor-actions .button {
+  min-width: 140px;
+}
+.hero-editor-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 760px) {
+  .hero-editor-title { font-size: 22px; }
+  .hero-editor-frames {
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scroll-snap-type: x proximity;
+  }
+  .hero-editor-device { flex: none !important; scroll-snap-align: start; }
+  .hero-editor-frame { width: auto; height: 200px; }
+  .hero-editor-actions .button { flex: 1 1 140px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-editor-toggle svg,
+  .hero-editor-tile { transition: none; }
+}
+[data-motion="off"] .hero-editor-toggle svg,
+[data-motion="off"] .hero-editor-tile { transition: none; }
+
+/* Collapsed state: a quiet image card with the current cover behind the title. */
+.hero-editor-toggle {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 160px;
+  padding: 0 clamp(20px, 3vw, 36px);
+  background: var(--c-forest, #243326);
+  color: var(--c-linen, #f1ece2);
+}
+.hero-editor-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.78);
+  transform: scale(1.02);
+  transition: filter 0.6s ease, transform 0.9s ease;
+}
+.hero-editor-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(14, 22, 16, 0.82) 0%, rgba(14, 22, 16, 0.5) 45%, rgba(14, 22, 16, 0.12) 100%);
+}
+.hero-editor-toggle:hover .hero-editor-bg,
+.hero-editor-toggle:focus-visible .hero-editor-bg {
+  filter: brightness(0.92);
+  transform: scale(1.04);
+}
+.hero-editor-heading {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.hero-editor-title { color: var(--c-linen, #f1ece2); font-size: clamp(26px, 3vw, 34px); }
+.hero-editor-status {
+  color: color-mix(in srgb, var(--c-linen, #f1ece2) 78%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+.hero-editor-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid color-mix(in srgb, var(--c-linen, #f1ece2) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #0e1610 35%, transparent);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+.hero-editor-toggle:hover .hero-editor-action,
+.hero-editor-toggle:focus-visible .hero-editor-action {
+  background: color-mix(in srgb, var(--c-linen, #f1ece2) 18%, transparent);
+  border-color: var(--c-linen, #f1ece2);
+}
+.hero-editor-toggle > svg { display: none; }
+.hero-editor-action svg { transition: transform 0.3s ease; }
+.hero-editor.is-open .hero-editor-action svg { transform: rotate(180deg); }
+.hero-editor-toggle:focus-visible { outline-offset: -3px; outline-color: var(--c-linen, #f1ece2); }
+@media (max-width: 760px) {
+  .hero-editor-toggle { height: 120px; }
+  .hero-editor-action { padding: 0 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-editor-bg, .hero-editor-action, .hero-editor-action svg { transition: none; }
+  .hero-editor-toggle:hover .hero-editor-bg { transform: scale(1.02); }
+}
+[data-motion="off"] .hero-editor-bg,
+[data-motion="off"] .hero-editor-action,
+[data-motion="off"] .hero-editor-action svg { transition: none; }
+[data-motion="off"] .hero-editor-toggle:hover .hero-editor-bg { transform: scale(1.02); }
+
+/* Photo folders: every journey's uploads, closed by default. */
+.photo-folders { display: flex; flex-direction: column; gap: 4px; }
+.photo-folders-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.photo-folders-head small { font-size: 12px; letter-spacing: 0; }
+.photo-folder { border-top: 1px solid var(--line); }
+.photo-folder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 2px;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.photo-folder-toggle svg { flex: none; transition: transform 0.2s ease; }
+.photo-folder-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.photo-folder-toggle small { margin-left: auto; color: var(--muted); font-size: 12px; }
+.photo-folder-toggle:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.photo-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+  padding: 2px 0 14px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.photo-folder-tile { width: 100%; height: auto; aspect-ratio: 1; }
+@media (prefers-reduced-motion: reduce) { .photo-folder-toggle svg { transition: none; } }
+[data-motion="off"] .photo-folder-toggle svg { transition: none; }
+
+/* Journey cover crop inside the editor inspector (narrow column). */
+.cover-focus-editor .hero-editor-frames { gap: 10px; }
+.cover-focus-editor .hero-editor-actions { margin-top: 12px; }
+
+/* One-tap focus point on a single picture. */
+.cover-tap {
+  position: relative;
+  width: min(100%, calc(46vh * var(--cover-tap-ratio, 1.5)));
+  aspect-ratio: var(--cover-tap-ratio, 1.5);
+  margin: 4px auto 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink, #1c1a17) 8%, transparent);
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+.cover-tap.is-locked { cursor: default; opacity: 0.6; }
+.cover-tap img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
+.cover-tap:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.cover-tap-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.cover-fine { margin-top: 14px; }
+.cover-fine > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.cover-fine .field, .cover-fine .title-position { margin-bottom: 12px; }
+
+/* Archive band crop: stacked wide frames, narrow portrait frame for the phone. */
+.archive-focus-editor .hero-editor-frames { flex-direction: column; align-items: stretch; gap: 14px; overflow: visible; }
+.archive-focus-editor .hero-editor-device { flex: none !important; }
+.archive-focus-editor .hero-editor-device[data-device="mobile"] { width: 56%; }
+.archive-focus-editor .hero-editor-frame { width: 100%; height: auto; }

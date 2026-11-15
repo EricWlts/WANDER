@@ -1,36 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { imageParallax, canPanImage } from "../src/imageParallax.ts";
+import { canPanImage, parallaxShift, maxParallaxShift } from "../src/imageParallax.ts";
 import { railPhoto } from "../src/photoRailModel.ts";
 import type { Photo } from "../src/types.ts";
-
-test("untouched cover defaults and saved strengths survive while other modules stay static", () => {
-  assert.deepEqual(imageParallax({}, true), { enabled: true, intensity: 90 });
-  assert.deepEqual(
-    imageParallax({ parallax: false, parallax_intensity: 125 }, true),
-    { enabled: false, intensity: 125 },
-  );
-  assert.deepEqual(imageParallax({ parallax_intensity: 20 }, true), {
-    enabled: true,
-    intensity: 20,
-  });
-  assert.equal(imageParallax({ parallax: true }).enabled, false);
-});
-
-test("an explicit choice uses the same maximum on covers and modules without destroying legacy settings", () => {
-  const legacy = { parallax: false, parallax_intensity: 125 };
-  for (const cover of [false, true]) {
-    assert.deepEqual(
-      imageParallax({ ...legacy, image_parallax: true }, cover),
-      { enabled: true, intensity: 140 },
-    );
-    assert.deepEqual(
-      imageParallax({ ...legacy, image_parallax: false }, cover),
-      { enabled: false, intensity: 140 },
-    );
-  }
-  assert.deepEqual(legacy, { parallax: false, parallax_intensity: 125 });
-});
 
 test("full-motif containment and single rail pages remain static without changing crop or lightbox source", () => {
   const photo = {
@@ -46,4 +18,22 @@ test("full-motif containment and single rail pages remain static without changin
   );
   assert.equal(canPanImage(null), false);
   assert.deepEqual(photo, before);
+});
+
+test("parallax shift is bounded, signed, and gentler on small touch viewports", () => {
+  assert.equal(parallaxShift(0, 140), 0);
+  assert.equal(parallaxShift(1, 140), maxParallaxShift);
+  assert.equal(parallaxShift(-3, 140), -maxParallaxShift);
+  assert.equal(parallaxShift(1, 40), 20);
+  assert.ok(parallaxShift(1, 140, true) < parallaxShift(1, 140));
+  assert.equal(parallaxShift(Number.NaN, 90), 0);
+});
+
+test("cover parallax shifts twice as far as the regular ceiling", async () => {
+  const { coverParallaxIntensity, coverParallaxShift } = await import("../src/imageParallax.ts");
+  assert.equal(parallaxShift(1, coverParallaxIntensity), coverParallaxShift);
+  assert.ok(coverParallaxShift >= 60 && coverParallaxShift <= 80);
+  assert.ok(Math.abs(parallaxShift(0.02, coverParallaxIntensity)) < 1);
+  // The layer overscan (intensity / 2 + 8) always covers the full shift: no edges.
+  assert.ok(coverParallaxIntensity * 0.5 + 8 >= coverParallaxShift);
 });

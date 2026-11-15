@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { Field } from "./components";
 import { ColorControl, NumberStepper } from "./EditorControls";
 import { t } from "./I18n";
@@ -8,7 +9,29 @@ import {
   offsetsFor,
   typePresets,
 } from "./journalModel";
-import type { Chapter, Journey, Layout } from "./types";
+import {
+  FRAME_FORMATS,
+  canMoveCrop,
+  dragFrameFocus,
+  focusPatch,
+  formatFromRatio,
+  frameRatio,
+  isCentered,
+  keyFrameFocus,
+  ratioForFormat,
+  readFocus,
+  TITLE_DEFAULT,
+  TITLE_GRID,
+  dragTitlePosition,
+  gridIndex,
+  nudgeTitle,
+  snapTitle,
+  readTitlePosition,
+  titleAlign,
+  type FrameFormat,
+} from "./imageFrame";
+import { focusToPosition } from "./heroFocus";
+import type { Chapter, Journey, Layout, Photo } from "./types";
 export function AppearanceSettings({
   layout,
   edition,
@@ -39,12 +62,12 @@ export function AppearanceSettings({
       <p className="inspector-note">
         {moduleScope
           ? t(
-              "This module: empty colour follows the journey or its own edition.",
-              "Dieses Modul: Eine leere Farbe folgt der Reise oder seiner eigenen Edition.",
+              "This module: empty colour follows the story or its own edition.",
+              "Dieses Modul: Eine leere Farbe folgt der Geschichte oder ihrer eigenen Edition.",
             )
           : t(
-              "Journey default: modules inherit this surface unless they choose their own colour or edition.",
-              "Reisevorgabe: Module übernehmen diese Fläche, sofern sie keine eigene Farbe oder Edition wählen.",
+              "Story default: modules inherit this surface unless they choose their own colour or edition.",
+              "Vorgabe der Geschichte: Module übernehmen diese Fläche, sofern sie keine eigene Farbe oder Edition wählen.",
             )}
       </p>
     </details>
@@ -54,7 +77,7 @@ export function TypographySettings({
   layout,
   onChange,
   open = true,
-  background = "#ECEDEB",
+  background = "#EEECE6",
 }: {
   layout: Layout;
   open?: boolean;
@@ -429,5 +452,312 @@ export function RailSettings({
         )}
       </p>
     </>
+  );
+}
+
+const formatShapes: Record<FrameFormat, [number, number]> = {
+  original: [18, 13],
+  "3:2": [18, 12],
+  "16:9": [20, 11.25],
+  "4:5": [12, 15],
+  "1:1": [15, 15],
+};
+/** Picture format tiles plus a small draggable crop preview for the single-image module. */
+export function SingleImageFrame({
+  layout,
+  photo,
+  onChange,
+}: {
+  layout: Layout;
+  photo?: Photo;
+  onChange: (p: Partial<Layout>) => void;
+}) {
+  const drag = useRef<{
+    x: number;
+    y: number;
+    start: { x: number; y: number };
+    w: number;
+    h: number;
+  } | null>(null);
+  const format = formatFromRatio(layout.ratio);
+  const focus = readFocus(photo?.edits);
+  const ratio = photo && format ? frameRatio(format, photo) : undefined;
+  const movable = !!photo && !!ratio && format !== "original" && canMoveCrop(ratio, photo);
+  const move = (point: { x: number; y: number }) =>
+    photo && onChange(focusPatch(layout, photo.id, point));
+  const hintId = "single-frame-hint";
+  return (
+    <div className="single-frame-settings">
+      <div
+        className="single-frame-tiles"
+        role="group"
+        aria-label={t("Picture format", "Bildformat")}
+      >
+        {FRAME_FORMATS.map((option) => {
+          const [w, h] = formatShapes[option.id];
+          return (
+            <button
+              key={option.id}
+              type="button"
+              className="single-frame-tile"
+              aria-pressed={format === option.id}
+              onClick={() => onChange({ ratio: ratioForFormat(option.id) })}
+            >
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <rect
+                  x={12 - w / 2}
+                  y={12 - h / 2}
+                  width={w}
+                  height={h}
+                  rx="1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <span>{t(...option.label)}</span>
+            </button>
+          );
+        })}
+      </div>
+      {format === null && (
+        <p className="inspector-note">
+          {t(
+            "A custom format is set; pick one here to replace it.",
+            "Ein eigenes Format ist gesetzt; hier wählen ersetzt es.",
+          )}
+        </p>
+      )}
+      {photo && format && format !== "original" && ratio && (
+        <div className="single-frame-crop">
+          <div
+            className="single-frame-preview"
+            style={{ aspectRatio: String(ratio) }}
+            tabIndex={movable ? 0 : -1}
+            role="group"
+            aria-label={t(
+              "Image crop: drag or use arrow keys to move",
+              "Bildausschnitt: Ziehen oder Pfeiltasten zum Verschieben",
+            )}
+            aria-describedby={hintId}
+            data-movable={movable || undefined}
+            onPointerDown={(e) => {
+              if (!movable) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              const box = e.currentTarget.getBoundingClientRect();
+              drag.current = {
+                x: e.clientX,
+                y: e.clientY,
+                start: focus,
+                w: box.width,
+                h: box.height,
+              };
+            }}
+            onPointerMove={(e) => {
+              const d = drag.current;
+              if (!d) return;
+              move(
+                dragFrameFocus(
+                  d.start,
+                  { dx: e.clientX - d.x, dy: e.clientY - d.y },
+                  { width: d.w, height: d.h },
+                  photo,
+                ),
+              );
+            }}
+            onPointerUp={() => (drag.current = null)}
+            onPointerCancel={() => (drag.current = null)}
+            onKeyDown={(e) => {
+              if (!movable) return;
+              if (
+                ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home"].includes(
+                  e.key,
+                )
+              ) {
+                e.preventDefault();
+                move(keyFrameFocus(focus, e.key, e.shiftKey));
+              }
+            }}
+          >
+            <img
+              src={photo.url}
+              srcSet={photo.srcset}
+              sizes="320px"
+              alt=""
+              draggable={false}
+              style={{ objectPosition: focusToPosition(focus) }}
+            />
+          </div>
+          <p className="inspector-note" id={hintId}>
+            {movable
+              ? t("Drag to move the crop", "Zum Verschieben ziehen")
+              : t("This format shows the whole image", "Dieses Format zeigt das ganze Bild")}
+          </p>
+          {movable && (
+            <button
+              type="button"
+              className="text-link"
+              disabled={isCentered(focus)}
+              onClick={() => move({ x: 50, y: 50 })}
+            >
+              {t("Reset to centre", "Zurücksetzen")}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const gridNames: [string, string][] = [
+  ["Top left", "Oben links"],
+  ["Top centre", "Oben Mitte"],
+  ["Top right", "Oben rechts"],
+  ["Middle left", "Mitte links"],
+  ["Centre", "Mitte"],
+  ["Middle right", "Mitte rechts"],
+  ["Bottom left", "Unten links"],
+  ["Bottom centre", "Unten Mitte"],
+  ["Bottom right", "Unten rechts"],
+];
+/** Drag the title block over a small cover preview, or pick one of nine points. */
+export function TitlePositionControl({
+  layout,
+  cover,
+  title,
+  subtitle,
+  onChange,
+}: {
+  layout: Layout;
+  cover?: Photo | null;
+  title: string;
+  subtitle?: string;
+  onChange: (p: Partial<Layout>) => void;
+}) {
+  const drag = useRef<{
+    x: number;
+    y: number;
+    start: { x: number; y: number };
+    frame: { width: number; height: number };
+    block: { width: number; height: number };
+  } | null>(null);
+  const stored = readTitlePosition(layout);
+  const point = stored ?? TITLE_DEFAULT;
+  const [snap, setSnap] = useState<number | null>(null);
+  const hintId = "title-position-hint";
+  const set = (next: { x: number; y: number } | null) =>
+    onChange(
+      next
+        ? { title_x: next.x, title_y: next.y }
+        : { title_x: undefined, title_y: undefined },
+    );
+  const active = gridIndex(stored);
+  return (
+    <div className="title-position">
+      <div
+        className="title-position-preview"
+        role="group"
+        aria-label={t("Title position preview", "Vorschau der Titelposition")}
+      >
+        {cover && (
+          <img src={cover.url} srcSet={cover.srcset} sizes="320px" alt="" draggable={false} />
+        )}
+        {TITLE_GRID.map((g, i) => (
+          <button
+            key={i}
+            type="button"
+            className="title-snap"
+            aria-label={t(...gridNames[i])}
+            aria-pressed={active === i}
+            data-snap={snap === i || undefined}
+            style={{
+              left: `calc(8px + (100% - 16px) * ${g.x / 100})`,
+              top: `calc(8px + (100% - 16px) * ${g.y / 100})`,
+            }}
+            onClick={() => set(i === 6 ? null : g)}
+          />
+        ))}
+        <div
+          className="title-position-block"
+          tabIndex={0}
+          role="group"
+          aria-label={t(
+            "Title block: drag or use arrow keys to move",
+            "Titelblock: Ziehen oder Pfeiltasten zum Verschieben",
+          )}
+          aria-describedby={hintId}
+          data-title-align={titleAlign(point.x)}
+          style={{
+            left: `calc(8px + (100% - 16px) * ${point.x / 100})`,
+            top: `calc(8px + (100% - 16px) * ${point.y / 100})`,
+            translate: `${-point.x}% ${-point.y}%`,
+            textAlign: titleAlign(point.x),
+          }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            const box = e.currentTarget.getBoundingClientRect();
+            const frame = e.currentTarget.parentElement!.getBoundingClientRect();
+            drag.current = {
+              x: e.clientX,
+              y: e.clientY,
+              start: point,
+              frame: { width: frame.width - 16, height: frame.height - 16 },
+              block: { width: box.width, height: box.height },
+            };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d) return;
+            const moved = snapTitle(
+              dragTitlePosition(
+                d.start,
+                { dx: e.clientX - d.x, dy: e.clientY - d.y },
+                d.frame,
+                d.block,
+              ),
+            );
+            setSnap(moved.index);
+            set(moved.point);
+          }}
+          onPointerUp={() => {
+            drag.current = null;
+            setSnap(null);
+          }}
+          onPointerCancel={() => {
+            drag.current = null;
+            setSnap(null);
+          }}
+          onKeyDown={(e) => {
+            if (
+              ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home"].includes(
+                e.key,
+              )
+            ) {
+              e.preventDefault();
+              set(nudgeTitle(stored, e.key, e.shiftKey));
+            }
+          }}
+        >
+          {title || t("Title", "Titel")}
+          {subtitle && <small>{subtitle}</small>}
+        </div>
+      </div>
+      <p className="inspector-note" id={hintId}>
+        {t(
+          "Drag the title to place it; it snaps to nine positions",
+          "Titel ziehen; er rastet an neun Positionen ein",
+        )}
+      </p>
+      <div className="title-position-tools">
+        <button
+          type="button"
+          className="text-link"
+          disabled={!stored}
+          onClick={() => set(null)}
+        >
+          {t("Reset", "Zurücksetzen")}
+        </button>
+      </div>
+    </div>
   );
 }

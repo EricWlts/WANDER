@@ -146,6 +146,58 @@ def test_chapter_crud_reordering_and_keep_photos(client):
     assert response.json["photos"][0]["chapter_id"] is None
 
 
+def test_only_chapter_modules_need_a_title(client):
+    """Regression: the new-story assistant adds a text module without a title; the draft was refused."""
+    headers = auth(client)
+    journey = create(client, headers)
+    # Text, quote and the like may stay untitled ...
+    for kind in ("text", "quote", "gallery", "hero", "image", "pair", "rail", "filmstrip", "wall"):
+        response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "", "kind": kind})
+        assert response.status_code == 201, (kind, response.json)
+        assert response.json["chapters"][-1]["title"] == ""
+    # ... a day / chapter may not.
+    response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "  ", "kind": "chapter"})
+    assert response.status_code == 400
+    response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"kind": "chapter"})
+    assert response.status_code == 400
+    # Editing: a text module may be emptied, a chapter may not.
+    chapters = client.get(f"/api/journeys/{journey['slug']}").json["chapters"]
+    text = next(c for c in chapters if c["kind"] == "text")
+    assert client.patch(f"/api/chapters/{text['id']}", json={"title": "Prelude"}, headers=headers).status_code == 200
+    assert client.patch(f"/api/chapters/{text['id']}", json={"title": ""}, headers=headers).status_code == 200
+    chapter = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "Day 1"}).json["chapters"][-1]
+    assert client.patch(f"/api/chapters/{chapter['id']}", json={"title": ""}, headers=headers).status_code == 400
+    # A text module may not become a chapter without a title in the same step.
+    assert client.patch(f"/api/chapters/{text['id']}", json={"kind": "chapter", "title": ""}, headers=headers).status_code == 400
+
+
+def test_composition_accepts_untitled_text_module_but_not_untitled_chapter(client):
+    headers = auth(client)
+    record = create(client, headers)
+    text = {"id": -1, "kind": "text", "title": "", "story": "An opening sentence.", "layout": {}}
+    saved = composition(client, headers, record, [text])
+    assert saved.status_code == 200, saved.json
+    assert saved.json["chapters"][0]["title"] == ""
+    assert saved.json["chapters"][0]["story"] == "An opening sentence."
+    record = saved.json
+    untitled_chapter = {"id": -2, "kind": "chapter", "title": "", "layout": {}}
+    assert composition(client, headers, record, [saved.json["chapters"][0], untitled_chapter]).status_code == 400
+
+
+def test_validation_messages_name_story_or_module(client):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = client.patch(f"/api/journeys/{journey['id']}", json={"title": ""}, headers=headers)
+    assert response.status_code == 400
+    assert response.json["error"] == "Please provide a valid title for the story (maximum 160 characters)."
+    response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "", "kind": "chapter"})
+    assert response.json["error"] == "Please provide a valid title for the chapter module (maximum 160 characters)."
+    response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "x" * 161, "kind": "quote"})
+    assert response.json["error"] == "Please provide a valid title for the quote module (maximum 160 characters)."
+    response = client.post(f"/api/journeys/{journey['id']}/chapters", headers=headers, json={"title": "Q", "kind": "quote", "quote": "y" * 1001})
+    assert response.json["error"] == "Please provide a valid quote for the quote module (maximum 1000 characters)."
+
+
 def test_upload_privacy_variants_exif_and_photo_crud(client, app):
     headers = auth(client)
     journey = upload(client, headers, create(client, headers))
@@ -157,7 +209,8 @@ def test_upload_privacy_variants_exif_and_photo_crud(client, app):
         with Image.open(path) as image:
             assert not image.getexif()
             assert image.format == "WEBP"
-    assert len(list(Path(app.config["UPLOAD_FOLDER"]).glob("*.webp"))) == 5
+    assert len(list(Path(app.config["UPLOAD_FOLDER"]).glob("*.webp"))) == 4
+    assert len(list(Path(app.config["UPLOAD_FOLDER"]).glob("*-master.jpg"))) == 1
     assert public.get(photo["original_url"]).status_code == 404
     assert client.get(photo["original_url"]).status_code == 200
     response = client.patch(f"/api/photos/{photo['id']}", headers=headers, json={"title": "A memory", "description": "By the trees", "alt": "A quiet forest", "featured": True})
@@ -165,14 +218,14 @@ def test_upload_privacy_variants_exif_and_photo_crud(client, app):
     assert client.patch(f"/api/journeys/{journey['id']}", json={"published": True}, headers=headers).status_code == 200
     assert public.get(photo["url"]).status_code == 200
     assert public.get(photo["original_url"]).status_code == 200
-    assert public.get(photo["url"]).headers["Cache-Control"] == "private, no-store"
+    assert public.get(photo["url"]).headers["Cache-Control"] == "private, max-age=604800, stale-while-revalidate=86400"
     client.patch(f"/api/journeys/{journey['id']}", json={"published": False}, headers=headers)
     assert public.get(photo["url"]).status_code == 404
     assert public.get(photo["original_url"]).status_code == 404
     response = client.delete(f"/api/photos/{photo['id']}", headers=headers)
     assert response.json["photos"] == []
     assert response.json["cover_id"] is None
-    assert list(Path(app.config["UPLOAD_FOLDER"]).glob("*.webp")) == []
+    assert [p for p in Path(app.config["UPLOAD_FOLDER"]).iterdir() if p.is_file()] == []
     assert public.get(photo["url"]).status_code == 404
 
 
@@ -265,7 +318,8 @@ def test_large_photo_automatically_resized_and_lossless_master_kept(client, app)
     with Image.open(io.BytesIO(client.get(photo["url"].replace("1280", "2200")).data)) as variant:
         assert variant.size == (2200, 1467)
         assert variant.format == "WEBP"
-    assert all(p.stat().st_size < 12 * 1024 * 1024 for p in Path(app.config["UPLOAD_FOLDER"]).iterdir())
+    # The master is now the original PNG (metadata stripped); only the display variants must stay small.
+    assert all(p.stat().st_size < 12 * 1024 * 1024 for p in Path(app.config["UPLOAD_FOLDER"]).glob("*.webp"))
 
 
 def test_modules_and_reveal_settings_round_trip_and_order(client):
@@ -345,7 +399,7 @@ def test_original_templates_are_public_and_do_not_create_personal_content(client
         assert len(example['chapters']) == 3
         for photo in example['photos']:
             assert (ROOT / 'public' / photo['url'].lstrip('/')).is_file()
-            assert photo['source_url'].startswith('https://unsplash.com/photos/')
+            assert not photo['credit'] and not photo['source_url'] and not photo['description']
         assert make_example(template['id']) == example
     assert client.get('/api/templates/unknown/example').status_code == 404
     assert client.get('/api/journeys').json == []
@@ -674,7 +728,8 @@ def test_deleting_source_cleans_every_reference_and_published_snapshot(client, a
         assert db.session.get(Photo, first) is None
         for photo_id in (second, third):
             photo = db.session.get(Photo, photo_id)
-            assert (Path(app.config['UPLOAD_FOLDER']) / f'{photo.filename}-master.webp').exists()
+            folder = Path(app.config['UPLOAD_FOLDER'])
+            assert any((folder / f'{photo.filename}-master{ext}').exists() for ext in ('.jpg', '.png', '.webp'))
 
 
 def test_delete_last_photo_leaves_valid_empty_journey(client):
@@ -1035,7 +1090,8 @@ def test_upload_rechecks_basis_after_encoding_without_blocking_saves(app, client
     original_save = Image.Image.save
 
     def pause_master(image, path, *args, **kwargs):
-        if str(path).endswith("-master.webp"):
+        # Pause inside image encoding (display variants; legacy master path included).
+        if str(path).endswith(".webp"):
             encoding.set()
             assert finish.wait(10)
         return original_save(image, path, *args, **kwargs)
@@ -1069,14 +1125,15 @@ def test_upload_rechecks_basis_after_encoding_without_blocking_saves(app, client
     assert not list(Path(app.config["UPLOAD_FOLDER"]).iterdir())
 
 
-@pytest.mark.parametrize("edition", ["quiet-atlas", "after-hours"])
-@pytest.mark.parametrize("locale,title", [
-    ("de", "Bevor der Wald erwacht"),
-    ("en", "Before the forest wakes"),
+@pytest.mark.parametrize("edition,locale,title", [
+    ("quiet-atlas", "de", "Zwischen Schnee und Stille"),
+    ("quiet-atlas", "en", "Between snow and stillness"),
+    ("after-hours", "de", "Was die Sonne dalässt"),
+    ("after-hours", "en", "What the sun leaves behind"),
 ])
 def test_showcase_is_read_only_and_uses_the_existing_photo_assets(client, edition, locale, title):
     before = client.get("/api/journeys?public=1").json
-    reference = client.get(f"/api/templates/{edition}/example").json
+    reference = client.get(f"/api/templates/{edition}/example?lang={locale}").json
 
     response = client.get(f"/api/showcase/{edition}?lang={locale}")
     assert response.status_code == 200
@@ -1106,6 +1163,291 @@ def test_showcase_is_read_only_and_uses_the_existing_photo_assets(client, editio
     assert {placement["photo_id"] for module in modules
             for placement in module["layout"]["placements"]} == set(photos)
     assert client.get("/api/journeys?public=1").json == before
-    assert client.get(f"/api/templates/{edition}/example").json == reference
+    assert client.get(f"/api/templates/{edition}/example?lang={locale}").json == reference
     assert client.get("/api/showcase/unknown").status_code == 404
     assert client.get(f"/api/showcase/{edition}?lang=unknown").status_code == 404
+
+
+def _jpeg_with_exif(tags=None, ifd_tags=None):
+    image = Image.new("RGB", (32, 32), (10, 20, 30))
+    exif = Image.Exif()
+    for tag, value in (tags or {}).items():
+        exif[tag] = value
+    if ifd_tags:
+        ifd = exif.get_ifd(0x8769)
+        for tag, value in ifd_tags.items():
+            ifd[tag] = value
+    stream = io.BytesIO()
+    image.save(stream, "JPEG", exif=exif)
+    stream.seek(0)
+    return Image.open(stream)
+
+
+def test_taken_at_prefers_date_time_original():
+    from datetime import datetime
+
+    image = _jpeg_with_exif({306: "2020:01:01 00:00:00"}, {36867: "2026:05:17 14:03:09"})
+    assert app_module._taken_at_from_image(image) == datetime(2026, 5, 17, 14, 3, 9)
+
+
+def test_taken_at_falls_back_to_date_time():
+    from datetime import datetime
+
+    image = _jpeg_with_exif({306: "2024:12:31 23:59:58"})
+    assert app_module._taken_at_from_image(image) == datetime(2024, 12, 31, 23, 59, 58)
+
+
+@pytest.mark.parametrize("raw", ["", "not a date", "0000:00:00 00:00:00", "2026:13:40 99:99:99"])
+def test_taken_at_ignores_unparseable_values(raw):
+    assert app_module._taken_at_from_image(_jpeg_with_exif({306: raw})) is None
+
+
+def test_taken_at_is_none_without_exif():
+    assert app_module._taken_at_from_image(Image.new("RGB", (16, 16))) is None
+
+
+def test_public_list_highlights_come_from_published_snapshot(client, app):
+    headers = auth(client)
+    journey = create(client, headers)
+    for _ in range(5):
+        journey = upload(client, headers, journey)
+    ids = [p["id"] for p in journey["photos"]]
+    assert client.patch(f"/api/photos/{ids[3]}", headers=headers, json={"featured": True}).status_code == 200
+    assert client.patch(f"/api/journeys/{journey['id']}", json={"published": True, "cover_id": ids[0]}, headers=headers).status_code == 200
+    public = app.test_client()
+    item = public.get("/api/journeys").json[0]
+    assert "photos" not in item
+    highlights = item["highlights"]
+    assert len(highlights) == 3 and ids[0] not in [h["id"] for h in highlights]
+    assert highlights[0]["id"] == ids[3]
+    assert {"id", "url", "srcset", "width", "height", "alt"} <= set(highlights[0])
+    # A later, unpublished draft change must not leak into the public list.
+    client.patch(f"/api/photos/{ids[4]}", headers=headers, json={"featured": True, "alt": "Draft only"})
+    public_after = public.get("/api/journeys").json[0]["highlights"]
+    assert [h["id"] for h in public_after] == [h["id"] for h in highlights]
+    assert all(h["alt"] != "Draft only" for h in public_after)
+
+
+def private_jpeg(size=(900, 600)):
+    stream = io.BytesIO()
+    exif = Image.Exif()
+    exif[271] = "SecretCam"
+    exif[0x0112] = 6
+    exif.get_ifd(0x8825)[1] = "N"
+    exif.get_ifd(0x8825)[2] = (52.0, 31.0, 12.0)
+    Image.effect_noise(size, 50).convert("RGB").save(stream, "JPEG", quality=88, exif=exif, comment=b"private comment")
+    return stream.getvalue()
+
+
+def test_jpeg_upload_keeps_original_scan_bytes_without_private_metadata(client, app):
+    headers = auth(client)
+    journey = create(client, headers)
+    original = private_jpeg()
+    response = client.post(f"/api/journeys/{journey['id']}/photos", headers=headers,
+                           data={"file": (io.BytesIO(original), "IMG_0001.jpg")}, content_type="multipart/form-data")
+    assert response.status_code == 201, response.json
+    photo = response.json["photos"][0]
+    assert (photo["width"], photo["height"]) == (600, 900)  # orientation 6 applied
+    master = client.get(photo["original_url"])
+    assert master.status_code == 200 and master.mimetype == "image/jpeg"
+    assert b"SecretCam" not in master.data and b"private comment" not in master.data
+    assert master.data[master.data.index(b"\xff\xda"):] == original[original.index(b"\xff\xda"):]
+    with Image.open(io.BytesIO(master.data)) as image:
+        assert dict(image.getexif()) == {0x0112: 6}
+    uploads = Path(app.config["UPLOAD_FOLDER"])
+    assert sorted(p.name.split("-", 1)[1] for p in uploads.iterdir()) == ["1280.webp", "2200.webp", "3840.webp", "640.webp", "master.jpg"]
+    for size, width in {"640": 600, "1280": 600, "2200": 600, "3840": 600}.items():
+        with Image.open(io.BytesIO(client.get(f"/media/{photo['id']}/{size}").data)) as variant:
+            assert variant.size == (width, 900)
+    client.delete(f"/api/photos/{photo['id']}", headers=headers)
+    assert list(uploads.iterdir()) == []
+
+
+def test_unparsable_container_falls_back_to_lossless_webp_master(client, app, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise app_module.image_pipeline.MetadataStripError("simulated")
+    monkeypatch.setattr(app_module.image_pipeline, "strip_metadata", refuse)
+    headers = auth(client)
+    journey = create(client, headers)
+    response = client.post(f"/api/journeys/{journey['id']}/photos", headers=headers,
+                           data={"file": (io.BytesIO(private_jpeg()), "IMG_0002.jpg")}, content_type="multipart/form-data")
+    assert response.status_code == 201, response.json
+    photo = response.json["photos"][0]
+    master = client.get(photo["original_url"])
+    assert master.status_code == 200 and master.mimetype == "image/webp"
+    with Image.open(io.BytesIO(master.data)) as image:
+        assert image.size == (600, 900) and not image.getexif()
+    client.delete(f"/api/photos/{photo['id']}", headers=headers)
+    assert list(Path(app.config["UPLOAD_FOLDER"]).iterdir()) == []
+
+
+def test_legacy_webp_master_is_still_served_and_deleted(client, app):
+    headers = auth(client)
+    photo = upload(client, headers, create(client, headers))["photos"][0]
+    uploads = Path(app.config["UPLOAD_FOLDER"])
+    jpg = next(uploads.glob("*-master.jpg"))
+    legacy = jpg.with_suffix(".webp")
+    Image.new("RGB", (1600, 1000), "#67745d").save(legacy, "WEBP", lossless=True)
+    jpg.unlink()
+    response = client.get(photo["original_url"])
+    assert response.status_code == 200 and response.mimetype == "image/webp"
+    client.delete(f"/api/photos/{photo['id']}", headers=headers)
+    assert not legacy.exists()
+    assert client.get(photo["original_url"]).status_code == 404
+
+
+def test_corrupt_upload_leaves_no_files(client, app):
+    headers = auth(client)
+    journey = create(client, headers)
+    data = private_jpeg()
+    response = client.post(f"/api/journeys/{journey['id']}/photos", headers=headers,
+                           data={"file": (io.BytesIO(data[: len(data) // 2]), "cut.jpg")}, content_type="multipart/form-data")
+    assert response.status_code == 400
+    assert list(Path(app.config["UPLOAD_FOLDER"]).iterdir()) == []
+
+
+def test_edition_fill_and_title_position_roundtrip(client):
+    headers = auth(client)
+    journey = create(client, headers)
+    layout = {"edition": "after-hours", "edition_fill": True, "title_x": 12.5, "title_y": 100, "dates_from_photos": True, "margin_x": 48, "stagger": -40}
+    response = composition(client, headers, journey, [{"id": -1, "kind": "hero", "title": "Cover", "layout": layout}])
+    assert response.status_code == 200, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json['chapters'][0]['layout'] == layout
+
+
+@pytest.mark.parametrize("invalid", [
+    {"edition_fill": "yes"}, {"edition_fill": 1}, {"dates_from_photos": "yes"}, {"dates_from_photos": 0}, {"title_x": -1}, {"title_y": 101}, {"margin_x": 121}, {"margin_x": -1}, {"stagger": 101}, {"stagger": "10"}, {"title_x": "50"}, {"title_y": None},
+])
+def test_invalid_edition_fill_and_title_position_are_rejected(client, invalid):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = composition(client, headers, journey, [{"id": -1, "kind": "hero", "title": "Cover", "layout": invalid}])
+    assert response.status_code == 400, response.json
+
+
+@pytest.mark.parametrize("form", ["journey", "collection", "moment"])
+def test_journey_form_roundtrip_in_layout(client, form):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = client.patch(f"/api/journeys/{journey['id']}", json={"layout": {"form": form, "dates_from_photos": True}}, headers=headers)
+    assert response.status_code == 200, response.json
+    assert client.get(f"/api/journeys/{journey['slug']}").json["layout"]["form"] == form
+
+
+@pytest.mark.parametrize("invalid", ["trip", "", 1, None])
+def test_invalid_journey_form_is_rejected(client, invalid):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = client.patch(f"/api/journeys/{journey['id']}", json={"layout": {"form": invalid}}, headers=headers)
+    assert response.status_code == 400, response.json
+
+
+def test_iphone_mpo_upload_is_accepted_as_jpeg(client):
+    headers = auth(client)
+    journey = create(client, headers)
+    first = Image.new("RGB", (1600, 1000), (52, 81, 63))
+    second = Image.new("RGB", (400, 250), (200, 20, 20))
+    stream = io.BytesIO()
+    first.save(stream, "MPO", save_all=True, append_images=[second])
+    assert Image.open(io.BytesIO(stream.getvalue())).format == "MPO"
+    stream.seek(0)
+    response = client.post(f"/api/journeys/{journey['id']}/photos", headers=headers,
+                           data={"file": (stream, "IMG_6968.jpeg")}, content_type="multipart/form-data")
+    assert response.status_code == 201, response.json
+    photo = response.json["photos"][0]
+    assert (photo["width"], photo["height"]) == (1600, 1000)
+    master = client.get(photo["original_url"])
+    assert master.mimetype == "image/jpeg"
+    with Image.open(io.BytesIO(master.data)) as image:
+        assert image.format == "JPEG"
+        assert image.size == (1600, 1000)
+
+
+def test_heic_upload_is_converted_to_jpeg_master(client):
+    pillow_heif = pytest.importorskip("pillow_heif")
+    pillow_heif.register_heif_opener()
+    headers = auth(client)
+    journey = create(client, headers)
+    stream = io.BytesIO()
+    Image.new("RGB", (1200, 800), (52, 81, 63)).save(stream, "HEIF", quality=90)
+    stream.seek(0)
+    response = client.post(f"/api/journeys/{journey['id']}/photos", headers=headers,
+                           data={"file": (stream, "IMG_0001.HEIC")}, content_type="multipart/form-data")
+    assert response.status_code == 201, response.json
+    photo = response.json["photos"][0]
+    master = client.get(photo["original_url"])
+    assert master.mimetype == "image/jpeg"
+    with Image.open(io.BytesIO(master.data)) as image:
+        assert image.format == "JPEG"
+
+
+def test_journey_cover_focus_saves_publishes_and_resets(client):
+    headers = auth(client)
+    journey = upload(client, headers, create(client, headers))
+    assert journey['cover_focus'] is None
+    focus = {"desktop": {"x": 20, "y": 80.04}, "tablet": {"x": 0, "y": 100}, "mobile": {"x": 33.3, "y": 50}}
+    response = client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"cover_focus": focus})
+    assert response.status_code == 200, response.json
+    assert response.json['cover_focus'] == {"desktop": {"x": 20.0, "y": 80.0}, "tablet": {"x": 0.0, "y": 100.0}, "mobile": {"x": 33.3, "y": 50.0}}
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    published = composition(client, headers, saved, [], journey={"cover_focus": saved['cover_focus']}, publish=True)
+    assert published.status_code == 200, published.json
+    public = client.application.test_client().get(f"/api/journeys/{journey['slug']}?public=1").json
+    assert public['cover_focus']['mobile'] == {"x": 33.3, "y": 50.0}
+    for bad in ({"desktop": {"x": 101, "y": 0}}, {"phone": {"x": 1, "y": 1}}, {"desktop": {"x": "1", "y": 1}}, {"desktop": {"x": True, "y": 1}}, "centre"):
+        assert client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"cover_focus": bad}).status_code == 400
+    assert client.get(f"/api/journeys/{journey['slug']}").json['cover_focus']['desktop'] == {"x": 20.0, "y": 80.0}
+    reset = client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"cover_focus": None})
+    assert reset.status_code == 200 and reset.json['cover_focus'] is None
+    centred = {device: {"x": 50, "y": 50} for device in ("desktop", "tablet", "mobile")}
+    client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"cover_focus": focus})
+    assert client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"cover_focus": centred}).json['cover_focus'] is None
+
+
+def test_journey_archive_focus_saves_publishes_and_resets(client):
+    headers = auth(client)
+    journey = upload(client, headers, create(client, headers))
+    focus = {"desktop": {"x": 20, "y": 80.04}, "tablet": {"x": 0, "y": 100}, "mobile": {"x": 33.3, "y": 50}}
+    response = client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"layout": {"archive_focus": focus}})
+    assert response.status_code == 200, response.json
+    assert response.json['layout']['archive_focus'] == {"desktop": {"x": 20.0, "y": 80.0}, "tablet": {"x": 0.0, "y": 100.0}, "mobile": {"x": 33.3, "y": 50.0}}
+    assert response.json['cover_focus'] is None
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    published = composition(client, headers, saved, [], journey={"layout": saved['layout']}, publish=True)
+    assert published.status_code == 200, published.json
+    public = client.application.test_client().get(f"/api/journeys/{journey['slug']}?public=1").json
+    assert public['layout']['archive_focus']['mobile'] == {"x": 33.3, "y": 50.0}
+    listed = client.application.test_client().get("/api/journeys").json
+    assert next(j for j in listed if j['slug'] == journey['slug'])['layout']['archive_focus']['desktop'] == {"x": 20.0, "y": 80.0}
+    for bad in ({"desktop": {"x": 101, "y": 0}}, {"phone": {"x": 1, "y": 1}}, {"desktop": {"x": "1", "y": 1}}, "centre"):
+        assert client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"layout": {"archive_focus": bad}}).status_code == 400
+    reset = client.patch(f"/api/journeys/{journey['id']}", headers=headers, json={"layout": {}})
+    assert reset.status_code == 200 and 'archive_focus' not in reset.json['layout']
+
+
+def test_layout_contract_frame_wall_and_filmstrip_keys(client):
+    headers = auth(client)
+    journey = upload(client, headers, create(client, headers))
+    photo = journey['photos'][0]
+    modules = [
+        {"id": -1, "kind": "image", "title": "Framed", "layout": {"photo_ids": [photo['id']], "frame": True}},
+        {"id": -2, "kind": "wall", "title": "Wall", "layout": {"wall_mode": "balanced", "wall_center": True, "wall_row": 3,
+                                                               "placements": [{"id": "p1", "photo_id": photo['id'], "size": "l"}]}},
+        {"id": -3, "kind": "filmstrip", "title": "Strip", "layout": {"all_photos": True}},
+    ]
+    response = composition(client, headers, journey, modules)
+    assert response.status_code == 200, response.json
+    image, wall, strip = response.json['chapters']
+    assert image['layout']['frame'] is True
+    assert wall['layout']['wall_row'] == 3 and wall['layout']['placements'][0]['size'] == 'l'
+    assert strip['layout']['all_photos'] is True
+
+
+@pytest.mark.parametrize('layout,key', [({"frame": "yes"}, "frame"), ({"wall_row": 9}, "wall_row"), ({"wall_mode": "masonry"}, "wall_mode"), ({"nonsense": 1}, "nonsense")])
+def test_invalid_layout_names_module_and_key(client, layout, key):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = composition(client, headers, journey, [{"id": -7, "kind": "wall", "title": "Wall", "layout": layout}])
+    assert response.status_code == 400
+    assert response.json['code'] == 'invalid_layout'
+    assert response.json['module_id'] == -7 and response.json['key'] == key

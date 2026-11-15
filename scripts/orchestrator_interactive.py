@@ -43,6 +43,7 @@ class Session:
         self.task_budget = planning.Budget(args.worker_calls + args.max_calls + 1, args.max_tokens, runtime.Stop, label="Auftrag")
         self.report_bytes = None
         self.ready, self.blocked = False, False
+        self.budget_exceeded = False
         self.preview, self.preview_url = None, None
         self.tokens, self.workers = budgets or (
             planning.Budget(getattr(args, "session_calls", 40), getattr(args, "session_tokens", 120000), runtime.Stop, label="Gesamtsitzung"),
@@ -86,7 +87,8 @@ class Session:
                 raise self.rt.Stop("Symlink im Sitzungsbereich: " + str(path))
 
     def status(self):
-        state = "gesperrt" if self.blocked else "geprüft" if self.ready else "offen"
+        state = ("gesperrt" if self.blocked else "budgetüberschritten, manuell prüfbar"
+                 if self.ready and self.budget_exceeded else "geprüft" if self.ready else "offen")
         budget = self.tokens.report()
         print(f"Entwurf: {state} | Aufrufe {budget['calls']}/{budget['max_calls']} | "
               f"Token {budget['observed_tokens']}/{budget['max_observed_tokens']} "
@@ -95,6 +97,7 @@ class Session:
         print("Tests: " + (", ".join(" ".join(c['command']) + "=" + c['status']
                                        for c in self.checks[-3:]) or "noch nicht ausgeführt"))
         if self.calls:
+            print('Letzter Tokenverbrauch: ' + json.dumps(self.calls[-1].get('usage', {}), ensure_ascii=False))
             print("Letzte Modelle: " + ', '.join(dict.fromkeys(
                 c['model'] + '/' + c['reasoning'] for c in self.calls[-2:])))
         if self.preview_url:
@@ -103,13 +106,22 @@ class Session:
 
     def plan(self, request, force_astra=False):
         rt = self.rt
+        self.tokens.check()
+        self.task_budget.check()
         view = SimpleNamespace(ROOT=self.workspace, RULES=rt.RULES, Stop=rt.Stop)
-        dossier = planning.analysis_context(request, self.expected, view, self.context_cache)
-        dossier['recent_feedback'] = self.history[-4:]
         reasons = coordination.escalation(request, failures=self.failures,
                                             negative=self.negative)
         if force_astra:
             reasons.append('Worker kann Aufgabe nicht zuverlässig abschließen')
+        direct = None if reasons else coordination.direct_plan(
+            request, {}, rt, root=self.workspace, files=self.expected, cache=self.context_cache)
+        if direct:
+            print('Lokale Dateisuche: direkte Luna-Low-Umsetzung ohne Planungsaufruf.')
+            self.verify()
+            return planning.decorate(planning.validate_plan(direct, self.expected, rt), request, rt)
+        dossier = planning.analysis_context(request, self.expected, view, self.context_cache)
+        dossier['recent_feedback'] = coordination.feedback_context(self.history)
+        dossier['available_paths'] = sorted(dossier['snippets'])
         phase = self.run / ('planning-' + uuid.uuid4().hex[:8])
         context = phase / 'workspace'
         context.mkdir(parents=True)
@@ -126,10 +138,6 @@ class Session:
             key = json.dumps([request, self.expected, self.history[-4:]], sort_keys=True)
             value = None if reasons else self.plan_cache.get(key)
             if value is None and not reasons:
-                value = coordination.direct_plan(request, dossier, rt)
-                if value:
-                    print('Lokale Dateisuche: direkte Luna-Low-Umsetzung ohne Planungsaufruf.')
-            if value is None and not reasons:
                 budget = PhaseBudget(self)
                 print('Analyse: gpt-6-luna / low', flush=True)
                 value = planning.validate_plan(planning.call_phase(
@@ -137,10 +145,15 @@ class Session:
                 if 'unclear' in value['flags'] and self.args.max_calls > 1:
                     # One bounded follow-up, using targeted terms from the concrete open questions.
                     extra = planning.analysis_context(value['summary'], self.expected, view, self.context_cache)
+                    followup = {**dossier, 'snippets': extra['snippets'],
+                                'open_questions': value['summary']}
+                    (context / 'context.json').write_text(json.dumps(followup, ensure_ascii=False))
                     print('Einmalige gezielte Nachanalyse: Luna Low', flush=True)
                     value = planning.validate_plan(planning.call_phase(
-                        'followup', planning.ANALYST, prompt + '\nOffene Fragen und zusätzliche Evidenz:\n'
-                        + json.dumps({'questions': value['summary'], 'snippets': extra['snippets']}, ensure_ascii=False),
+                        'followup', planning.ANALYST,
+                        'Einzige Nachanalyse zur Klärung der konkreten offenen Fragen. Read-only, keine Tools. '
+                        'Fehlt technische Evidenz weiterhin, konkrete Fragen mit unclear zurückgeben. Kontext:\n'
+                        + json.dumps(followup, ensure_ascii=False, separators=(',', ':')),
                         context, phase, self.args, report, budget, rt), self.expected, rt)
                 reasons.extend(coordination.escalation(request, value['flags']))
             if reasons:
@@ -148,7 +161,7 @@ class Session:
                 brief = {'user_goal': self.goal or request, 'current_request': request,
                          'relevant_files': dossier['snippets'], 'rules': dossier['rules'],
                          'project_memory': dossier['project_memory'],
-                         'attempts_and_feedback': self.history[-4:], 'analysis': value,
+                         'attempts_and_feedback': coordination.feedback_context(self.history), 'analysis': value,
                          'open_questions': value['summary'] if value else reasons}
                 report['escalation_brief'] = brief
                 print('Astra-Eskalation: ' + '; '.join(report['astra_reasons']), flush=True)
@@ -178,6 +191,8 @@ class Session:
             raise self.rt.Stop("Wunsch leer oder zu lang (maximal 12000 Zeichen).")
         self.stop_preview()
         self.verify()
+        if self.tokens.halted:
+            raise self.rt.Stop('Modellaufrufe nach Budgetüberschreitung für diese Sitzung gesperrt; STATUS, DIFF, APPLY oder DISCARD verwenden.')
         if not recovery:
             self.failures = self.failed_requests.get(request.casefold().strip(), 0)
             self.round_workers = planning.Budget(self.args.worker_calls, self.args.max_tokens, self.rt.Stop, label="Coding-Auftrag")
@@ -249,7 +264,7 @@ class Session:
             self.failures += max(1, len(report['calls']))
             self.failed_requests[request.casefold().strip()] = self.failures
             uncertain = any(c.get('result', {}).get('status') in {'blocked', 'needs_sol'} for c in report['calls'])
-            if (self.failures >= 2 or uncertain) and not recovery and not self.last_astra and local_update is None:
+            if (self.failures >= 2 or uncertain) and not recovery and not self.last_astra and local_update is None and not report.get('budget_exceeded'):
                 print('Worker benötigt Unterstützung; Astra prüft den Ansatz vor einem letzten Umsetzungsversuch.')
                 return self.develop(request, input_fn, recovery=True, literal=literal)
             raise self.rt.Stop('Auftrag fehlgeschlagen: ' + report.get('error', '')
@@ -261,6 +276,7 @@ class Session:
         elif self.negative:
             self.revisions += 1
         self.expected = report['result_hashes']
+        self.budget_exceeded = report.get('budget_exceeded', False)
         self.history.append({'request': request[:2000], 'summary': proposed['summary'],
                              'attempts': [{k: c[k] for k in ('model', 'reasoning', 'result') if k in c}
                                           for c in report['calls']]})
@@ -285,10 +301,10 @@ class Session:
         dist = self.run / 'check-workspace/dist'
         if self.ready and dist.is_dir():
             self.rt.shutil.copytree(dist, backup / 'dist', symlinks=False)
-        return backup, self.ready, self.report_bytes
+        return backup, self.ready, self.report_bytes, self.budget_exceeded
 
     def restore(self, checkpoint):
-        backup, ready, report_bytes = checkpoint
+        backup, ready, report_bytes, budget_exceeded = checkpoint
         if self.rt.snapshot(backup) != self.expected:
             self.blocked = True
             raise self.rt.Stop('Checkpoint verändert; Entwurf gesperrt.')
@@ -307,6 +323,7 @@ class Session:
         if ready and (backup / 'dist').is_dir():
             self.rt.shutil.copytree(backup / 'dist', self.run / 'check-workspace/dist', symlinks=False)
         self.ready, self.report_bytes = ready, report_bytes
+        self.budget_exceeded = budget_exceeded
         path = self.run / 'report.json'
         if report_bytes is None:
             path.unlink(missing_ok=True)

@@ -44,3 +44,28 @@ export function moveModule(
   let index = 0;
   return chapters.map((c) => (siblings.includes(c) ? ordered[index++] : c));
 }
+
+/**
+ * Keyboard move (Up/Down at the grip). Inside a day the module steps among its peers and,
+ * at the day's first or last place, out onto the story level before or after the day.
+ * On the story level it steps into a neighbouring day: below into the top of the next
+ * day, above onto the end of the previous one. Days themselves only move among days.
+ */
+export function stepModule(chapters: Chapter[], id: number, dir: -1 | 1): Chapter[] {
+  const source = chapters.find((c) => c.id === id);
+  if (!source) return chapters;
+  const parent = source.layout?.parent_id || null;
+  const peers = chapters.filter((c) => (c.layout?.parent_id || null) === parent);
+  const neighbour = peers[peers.indexOf(source) + dir];
+  if (source.kind === "chapter")
+    return neighbour ? moveModule(chapters, id, neighbour.id, dir > 0) : chapters;
+  if (parent) {
+    if (neighbour) return moveModule(chapters, id, neighbour.id, dir > 0);
+    return moveModule(chapters, id, parent, dir > 0, "transfer");
+  }
+  if (!neighbour) return chapters;
+  if (neighbour.kind !== "chapter") return moveModule(chapters, id, neighbour.id, dir > 0);
+  const children = chapters.filter((c) => c.layout?.parent_id === neighbour.id);
+  if (dir > 0 || !children.length) return moveModule(chapters, id, neighbour.id, true, "inside");
+  return moveModule(chapters, id, children[children.length - 1].id, true, "transfer");
+}

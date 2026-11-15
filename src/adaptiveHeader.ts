@@ -3,10 +3,10 @@ export const headerScrollThresholds = {
   top: 24,
   collapseAfter: 180,
   downTravel: 72,
-  upTravel: 96,
-  upSpeed: 0.75,
-  upSustain: 64,
-  gestureWindow: 220,
+  upTravel: 220,
+  upSpeed: 1.6,
+  upSustain: 80,
+  gestureWindow: 260,
   sampleGap: 120,
   jitter: 2,
   reversal: 8,
@@ -19,6 +19,14 @@ export const headerScrollThresholds = {
   wheelDecayRatio: 0.8,
   wheelAccelerationRatio: 1.35,
 } as const;
+// Journey / story pages: the journey takes the foreground after a few px of scrolling.
+export const storyHeaderThresholds = { collapseAfter: 32, downTravel: 24 } as const;
+export function isStoryPath(path: string | undefined | null): boolean {
+  return !!path && /^\/(journeys|showcase|inspiration)\/[^/]+\/?$/.test(path);
+}
+function currentStoryRoute(): boolean {
+  return typeof location !== "undefined" && isStoryPath(location.pathname);
+}
 export interface HeaderScrollState {
   compact: boolean;
   lastY: number;
@@ -39,24 +47,29 @@ export interface HeaderScrollInput {
   protectedInteraction?: boolean;
   enabled?: boolean;
   menuOpen?: boolean;
+  /** Journey/story route; defaults to the current location. */
+  storyRoute?: boolean;
 }
 export function updateHeaderScroll(
   state: HeaderScrollState,
   scrollY: number,
-  { now, upwardIntent = false, protectedInteraction = false, enabled = true, menuOpen = false }: HeaderScrollInput,
+  { now, upwardIntent = false, protectedInteraction = false, enabled = true, menuOpen = false, storyRoute = currentStoryRoute() }: HeaderScrollInput,
 ): HeaderScrollState {
   const y = Math.max(0, scrollY);
   const reset = resetHeaderGesture(state, y, now);
   if (!enabled || menuOpen) return reset;
   const t = headerScrollThresholds;
-  if (y <= t.top) return { ...reset, compact: false };
+  // Story routes start (and stay) compact, even at the very top of the page.
+  if (y <= t.top) return { ...reset, compact: storyRoute };
   if (protectedInteraction) return reset;
   const delta = y - state.lastY;
   if (!delta) return state;
   // Downward collapse remains distance-based, including a direct anchor jump.
   if (!state.compact) {
     const travel = Math.max(0, state.travel + delta);
-    return y >= t.collapseAfter && travel >= t.downTravel
+    const collapseAfter = storyRoute ? storyHeaderThresholds.collapseAfter : t.collapseAfter;
+    const downTravel = storyRoute ? storyHeaderThresholds.downTravel : t.downTravel;
+    return y >= collapseAfter && travel >= downTravel
       ? { ...reset, compact: true }
       : { ...reset, travel };
   }
@@ -124,5 +137,117 @@ export function updateHeaderWheel(state: HeaderWheelState, deltaY: number, mode:
   return {
     lastTime: now, interval, start, direction, mode, magnitude, peak, tail,
     upward: direction < 0 && !tail && now - start <= t.wheelBurst,
+  };
+}
+
+// ---------- Page transitions (used by viewTransitions.ts) ----------
+// Pure route logic for the "Abblende" between pages, kept here so it stays testable
+// without a DOM.
+
+/** The longest a page change waits for its destination (data + cover decoded). */
+export const PAGE_READY_MAX_MS = 600;
+
+const APP_ROUTE = /^\/(?:$|archive\/?$|about\/?$|journeys\/[^/]+\/?$|showcase\/[^/]+\/?$|inspiration(?:\/[^/]+)?\/?$|studio(?:\/|$))/;
+const STUDIO_ROUTE = /^\/studio(?:\/|$)/;
+
+/** Main navigation entry a path belongs to; story pages belong to none. */
+export type NavTarget = "home" | "archive" | "editions" | "about" | "studio";
+export function navTargetFor(path: string): NavTarget | null {
+  if (path === "/" || path === "") return "home";
+  if (/^\/archive\/?$/.test(path)) return "archive";
+  if (/^\/inspiration(?:\/|$)/.test(path)) return "editions";
+  if (/^\/about\/?$/.test(path)) return "about";
+  if (STUDIO_ROUTE.test(path)) return "studio";
+  return null;
+}
+
+/** Public pages and the way into and out of the studio cross-fade; moves inside the studio cut as before. */
+export function pageTransitionAllowed(from: string, to: string): boolean {
+  if (!APP_ROUTE.test(to)) return false;
+  return !(STUDIO_ROUTE.test(from) && STUDIO_ROUTE.test(to));
+}
+
+export type PopTransitionInput = {
+  fromPath: string;
+  fromSearch?: string;
+  toPath: string;
+  toSearch?: string;
+  /** The entry being left was the photo viewer's own history entry (or the viewer is open). */
+  fromLightbox?: boolean;
+  /** The entry being entered carries history.state.wanderLightbox. */
+  toLightbox?: boolean;
+};
+
+/** Back/Forward only cross-fades between different pages; the photo viewer's own entries never do. */
+export function popTransitionWanted(input: PopTransitionInput): boolean {
+  if (input.fromLightbox || input.toLightbox) return false;
+  if (input.fromPath === input.toPath && (input.fromSearch ?? "") === (input.toSearch ?? "")) return false;
+  return pageTransitionAllowed(input.fromPath, input.toPath);
+}
+
+/** Longest a page transition may keep html.vt-active, even if "finished" never settles. */
+export const TRANSITION_CLASS_MAX_MS = 1500;
+
+function segment(value: string): string {
+  try { return decodeURIComponent(value); } catch { return value; }
+}
+
+/** Public API requests a destination page starts with; warmed when a link is hovered or focused. */
+export function prefetchPathsFor(path: string, locale: string): string[] {
+  const lang = locale === "en" ? "en" : "de";
+  if (path === "/" || path === "") return [
+    "/journeys?public=1",
+    `/showcase/after-hours?lang=${lang}`,
+    `/showcase/quiet-atlas?lang=${lang}`,
+    "/site/hero",
+  ];
+  if (/^\/archive\/?$/.test(path)) return ["/journeys?public=1"];
+  if (/^\/inspiration\/?$/.test(path)) return ["/templates"];
+  let match = /^\/journeys\/([^/]+)\/?$/.exec(path);
+  if (match) return [`/journeys/${segment(match[1])}?public=1`];
+  match = /^\/showcase\/([^/]+)\/?$/.exec(path);
+  if (match) return [`/showcase/${encodeURIComponent(segment(match[1]))}?lang=${lang}`];
+  match = /^\/inspiration\/([^/]+)\/?$/.exec(path);
+  if (match) return [`/templates/${segment(match[1])}/example?lang=${lang}`];
+  return [];
+}
+
+/** Pages without their own ready signal that open on a photograph. */
+export function expectsCoverImage(path: string): boolean {
+  return /^\/(?:about|inspiration)\/?$/.test(path) || isStoryPath(path);
+}
+
+export interface PageReadiness {
+  /** The router has rendered the destination path. */
+  rendered: boolean;
+  /** A main#main element exists. */
+  present: boolean;
+  /** Its data-page-ready attribute, if the page sets one. */
+  flag: string | null;
+  /** Loading placeholder (PageState, aria-busy). */
+  busy: boolean;
+  expectsImage: boolean;
+  hasImage: boolean;
+}
+/** True once the destination may be shown (its cover image is decoded separately). */
+export function pageIsReady(s: PageReadiness): boolean {
+  if (!s.rendered || !s.present || s.busy || s.flag === "false") return false;
+  if (s.flag === "true") return true;
+  return !s.expectsImage || s.hasImage;
+}
+
+/** Scroll positions per history entry, so Back/Forward return to the same place. */
+export function createScrollMemory(limit = 60) {
+  const positions = new Map<string, number>();
+  return {
+    save(key: string, y: number) {
+      positions.delete(key);
+      positions.set(key, Math.max(0, Math.round(y)));
+      if (positions.size > limit) positions.delete(positions.keys().next().value as string);
+    },
+    get(key: string): number | undefined {
+      return positions.get(key);
+    },
+    get size() { return positions.size; },
   };
 }

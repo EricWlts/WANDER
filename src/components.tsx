@@ -2,6 +2,7 @@ import { tr } from "./I18n";
 import {
   cloneElement,
   isValidElement,
+  memo,
   useEffect,
   useLayoutEffect,
   useId,
@@ -11,7 +12,7 @@ import {
   type RefObject,
   type CSSProperties,
 } from "react";
-import { ArrowUpRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { Photo, RevealConfig } from "./types";
 import { t, getLocale } from "./I18n";
 import { imageMotion, useReveal } from "./Reveal";
@@ -39,10 +40,11 @@ export function Compass({ className = "" }: { className?: string }) {
     </svg>
   );
 }
-export function Picture({
+function PictureImpl({
   photo,
   className = "",
   eager = false,
+  priority,
   sizes = "100vw",
   onClick,
   actionLabel,
@@ -54,6 +56,8 @@ export function Picture({
   photo: Photo | null;
   className?: string;
   eager?: boolean;
+  /** Explicit fetch priority. Only the home hero and the story cover use "high"; "low" is for off-screen copies. */
+  priority?: "high" | "low";
   sizes?: string;
   onClick?: () => void;
   actionLabel?: string;
@@ -64,7 +68,8 @@ export function Picture({
 }) {
   const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const source = JSON.stringify([photo?.url, photo?.srcset, sizes]);
+  // Cheap identity of what the browser would load; no JSON.stringify per render.
+  const source = `${photo?.url ?? ""}\n${photo?.srcset ?? ""}\n${sizes}`;
   const [load, setLoad] = useState<{ source: string; status: PictureStatus }>({
     source,
     status: "loading",
@@ -82,6 +87,10 @@ export function Picture({
     motion,
     animate && (!photo || status === "ready"),
   );
+  const photoName = photo?.alt || photo?.description || photo?.title || "";
+  const action =
+    actionLabel ||
+    t("View photograph full size", "Foto in voller Größe ansehen");
   const img = photo ? (
     <img
       key={source}
@@ -89,7 +98,7 @@ export function Picture({
       src={photo.url}
       srcSet={photo.srcset}
       sizes={sizes}
-      alt={photo.alt || ""}
+      alt={photoName}
       style={
         {
           objectFit: photo.edits?.fit || "cover",
@@ -104,7 +113,7 @@ export function Picture({
       width={photo.width}
       height={photo.height}
       loading={eager ? "eager" : "lazy"}
-      fetchPriority={eager ? "high" : "auto"}
+      fetchPriority={priority ?? "auto"}
       decoding="async"
     />
   ) : (
@@ -115,7 +124,11 @@ export function Picture({
   );
   const indicator =
     photo && status !== "ready" ? (
-      <span className="picture-status" role="status">
+      <span
+        className="picture-status"
+        role={status === "error" ? "status" : undefined}
+        aria-hidden={status === "error" ? undefined : true}
+      >
         {status === "error"
           ? t("Could not load photograph", "Foto konnte nicht geladen werden")
           : t("Loading photograph", "Foto wird geladen")}
@@ -130,10 +143,8 @@ export function Picture({
             : ratio === "free"
               ? photo?.edits?.free_ratio || 1.5
               : ratio.replace(":", " / "),
-        "--image-hover-scale":
-          photo?.edits?.hover_zoom === undefined
-            ? undefined
-            : 1 + photo.edits.hover_zoom / 100,
+        // Hover-Zoom ist fest (fixedMotion.ts); ein vollständig gezeigtes Motiv bleibt unangetastet.
+        "--image-hover-scale": photo?.edits?.fit === "contain" ? 1 : undefined,
       } as CSSProperties)
     : undefined;
   return onClick ? (
@@ -146,17 +157,15 @@ export function Picture({
       style={{ ...reveal.style, ...frameStyle }}
       onClick={onClick}
       aria-label={
-        actionLabel ||
-        t("View photograph full size", "Foto in voller Größe ansehen")
+        photoName
+          ? `${photoName}: ${action}`
+          : action
       }
     >
       {pan ? (
         <Parallax image intensity={140} visibilityTarget={parallaxVisibility}>{img}</Parallax>
       ) : img}
       {indicator}
-      <span className="image-expand">
-        <ArrowUpRight size={19} />
-      </span>
     </button>
   ) : (
     <div
@@ -174,6 +183,7 @@ export function Picture({
     </div>
   );
 }
+export const Picture = memo(PictureImpl);
 let modalLocks = 0;
 let previousOverflow = "";
 export function Modal({

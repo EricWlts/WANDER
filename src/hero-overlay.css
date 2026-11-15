@@ -1,0 +1,280 @@
+/* 13.11.2026 – Kopfzeile auf dem Titelbild + Navigationszustände.
+   Abschalten: die Zeile `import "./hero-overlay.css";` in src/main.tsx entfernen.
+
+   1) Seiten mit großem Titelbild (Startseite, Über WANDER): das Bild läuft hinter der Kopfzeile
+      bis an den oberen Rand. Solange das Bild lädt, liegt die Kopfzeile auf dem dunklen Verlauf des Titelbereichs.
+   3) Archiv (Magazin-Ansicht): die oberste Reise der aktuellen Sortierung ist automatisch das Titelbild.
+   4) Editionen (/inspiration): beide Editionsbilder als geteilter erster Bildschirm.
+   2) Alle öffentlichen Seiten: inaktive Punkte 68 % statt 55 %, aktiver Punkt volles Leinenweiß (ohne Strich, ohne Punkt). */
+
+/* Die Kopfzeile rahmt die Seite: sie ist nie heller als die Seite darunter. */
+:root { --brand-frame: #080a08; }
+/* Beim Scrollen bleibt die schmale Leiste leicht durchsichtig (Milchglas, wie bisher). Im Studio lag sie
+   ganz oben auf hellem Grund und wirkte dadurch grau – der reservierte Platz dahinter ist jetzt dunkel. */
+.studio-header-slot { background: var(--brand-frame); }
+
+/* ---------- 1) Bild hinter der Kopfzeile ---------- */
+html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .public-header-slot {
+  display: none;
+}
+/* Ausgeklappt ist der Rahmen durchsichtig; eingeklappt (nach dem Scrollen) bleibt das dunkle Milchglas. */
+html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact):not(.is-scrolled):not(.has-open-menu)::before {
+  /* Dunkler Fade von ganz oben bis unter die Navigation; unten geht er ganz ins Bild über. */
+  bottom: -56px;
+  background: linear-gradient(to bottom, rgba(8, 10, 8, 0.72) 0%, rgba(8, 10, 8, 0.5) 45%, rgba(8, 10, 8, 0.22) 78%, rgba(8, 10, 8, 0) 100%);
+}
+html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact):not(.is-scrolled)::after {
+  opacity: 0;
+}
+/* Sehr weicher Schatten hält die Zeile auch auf hellem Himmel lesbar. */
+html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact) nav:not(.nav-open) > a {
+  text-shadow: 0 1px 14px rgba(10, 13, 10, 0.45);
+}
+.home-page .home-hero {
+  --hero-slot: 0px;
+  height: 100svh;
+}
+/* Weiche Abdunklung oben, damit Logo und Navigation auf dem Foto lesbar bleiben. */
+.home-page .home-hero.has-image .home-hero-shade {
+  background:
+    linear-gradient(to top, rgba(20, 24, 20, 0.82) 0%, rgba(20, 24, 20, 0.6) 32%, rgba(20, 24, 20, 0) 68%),
+    linear-gradient(to bottom, rgba(12, 15, 12, 0.62) 0, rgba(12, 15, 12, 0.34) 150px, rgba(12, 15, 12, 0) 320px);
+}
+/* Über WANDER: bisher 84svh unter der 164px-Kopfzeile; jetzt füllt das Bild den ersten Bildschirm. */
+.about-mag .about-hero {
+  min-height: clamp(600px, 100svh, 1064px);
+}
+
+/* ---------- 2) Navigationszustände (alle öffentlichen Seiten, ausgeklappte Kopfzeile) ---------- */
+html .site-header.public-header:not(.is-compact) nav:not(.nav-open) > a:not(.active):not([aria-current="page"]):not(:hover):not(:focus-visible) {
+  color: color-mix(in srgb, var(--c-linen) 68%, transparent);
+}
+
+/* ---------- 3) Archiv: oberste Reise der Sortierung = Titelbild ----------
+   Rein über :first-child – beim Umsortieren wechselt das Titelbild von selbst.
+   Die Index-Ansicht hat kein .archive-overview und behält die dunkle Kopfzeile. */
+html body main.archive-page:has(> .archive-overview) {
+  position: relative;
+  padding-top: 0;
+  --arch-head: 164px;
+  --arch-hero: max(560px, 100svh);
+  /* Die Leiste sitzt über dem schwebenden „Bewegung“-Knopf (unten rechts), nicht dahinter. */
+  --arch-bar: clamp(72px, 9svh, 88px);
+  --arch-foot: clamp(84px, 10svh, 108px);
+}
+@media (max-width: 699px) {
+  html body main.archive-page:has(> .archive-overview) { --arch-head: 136px; }
+}
+/* Einstieg liegt als ruhige Titelkarte über dem Bild: oben Rubrik + kleine Zeile, unten die Leiste. */
+html body main.archive-page:has(> .archive-overview) > .archive-overview {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  height: var(--arch-hero);
+  min-height: 0;
+  margin: 0;
+  padding: calc(var(--arch-head) + clamp(4px, 1.2svh, 16px)) 0 var(--arch-bar);
+  border: 0;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: visible;
+  pointer-events: none;
+}
+html body main.archive-page:has(> .archive-overview) .archive-overview-top { display: block; }
+html body main.archive-page:has(> .archive-overview) .archive-stats,
+html body main.archive-page:has(> .archive-overview) .archive-masthead .am-lead { display: none; }
+html body main.archive-page:has(> .archive-overview) .archive-masthead h1 {
+  margin: 8px 0 0;
+  font-size: clamp(24px, 2.3vw, 34px);
+  line-height: 1.12;
+  text-shadow: 0 1px 18px rgba(10, 12, 11, 0.4);
+}
+html body main.archive-page:has(> .archive-overview) .archive-toolbar {
+  margin-top: auto;
+  padding: 12px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.26);
+  pointer-events: auto;
+}
+/* Das Titelband: erster Bildschirm, Reisetitel unten links wie auf der Startseite. */
+html body main.archive-page:has(> .archive-overview) .am-grid { border-top: 0; }
+html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-card {
+  height: var(--arch-hero);
+  min-height: 0;
+}
+html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-shade {
+  background:
+    linear-gradient(to bottom, rgba(10, 12, 11, 0.66) 0, rgba(10, 12, 11, 0.34) 170px, rgba(10, 12, 11, 0) 340px),
+    linear-gradient(to top, rgba(10, 12, 11, 0.86) 0%, rgba(10, 12, 11, 0.5) 30%, rgba(10, 12, 11, 0) 62%),
+    linear-gradient(90deg, rgba(10, 12, 11, 0.5) 0%, rgba(10, 12, 11, 0.24) 32%, rgba(10, 12, 11, 0) 62%),
+    rgba(10, 12, 11, 0.1);
+}
+html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-copy {
+  justify-content: flex-end;
+  padding-bottom: var(--arch-foot);
+}
+html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-title {
+  max-width: 16ch;
+  font-size: clamp(40px, 6vw, 88px);
+}
+html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-kicker {
+  bottom: var(--arch-foot);
+}
+/* Ausgabennummer steht in der Zeile über dem Titel („03 — Herbst 2026“), auf allen Bändern. */
+.am-grid .am-when { display: flex; align-items: center; gap: 12px; }
+.am-grid .am-when-no { font-variant-numeric: tabular-nums; }
+.am-grid .am-when-no:not(:last-child)::after {
+  content: "";
+  display: inline-block;
+  width: 22px;
+  height: 1px;
+  margin-left: 12px;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: 0.6;
+}
+/* Leiste ohne Magazin/Index: Anzahl links, Sortierung rechts. */
+html body main.archive-page:has(> .archive-overview) .archive-toolbar .am-meta { width: 100%; justify-content: space-between; }
+html body main.archive-page:has(> .archive-overview) .archive-overview .am-count { display: inline; }
+
+/* ---------- 4) Editionen: geteilter erster Bildschirm (TEST) ----------
+   Links „Erstes Licht“, rechts „Letztes Licht“, Kopfzeile auf der Naht. Gilt nur für die eigene
+   Seite (main), nicht für eingebettete Abschnitte. */
+html body main#main.inspiration-page {
+  position: relative;
+  padding-top: 0;
+  --ed-head: 164px;
+  --ed-edge: max(var(--gutter, 24px), calc((100vw - 1680px) / 2));
+  --ed-bar: clamp(72px, 9svh, 88px);
+}
+html body main#main.inspiration-page .ed-grid {
+  --ed-h: max(560px, 100svh);
+  width: 100vw;
+  max-width: 100vw;
+  margin: 0 calc(50% - 50vw);
+  gap: 0;
+  min-height: var(--ed-h);
+  background: var(--c-night);
+}
+/* Einstieg klein oben links auf dem Bild, wie im Archiv. */
+html body main#main.inspiration-page .inspiration-head {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--ed-head) + clamp(4px, 1.2svh, 16px));
+  left: 0;
+  right: 50%;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  color: var(--c-linen);
+  text-shadow: 0 1px 18px rgba(10, 12, 11, 0.45);
+}
+html body main#main.inspiration-page .inspiration-head .eyebrow { color: color-mix(in srgb, var(--c-linen) 82%, transparent); letter-spacing: 0.28em; }
+html body main#main.inspiration-page .inspiration-head :is(h1, h2) {
+  margin: 8px 0 0;
+  color: var(--c-linen);
+  font-size: clamp(24px, 2.3vw, 34px);
+  line-height: 1.12;
+}
+html body main#main.inspiration-page .inspiration-head :is(h1, h2) em { display: block; color: color-mix(in srgb, var(--c-linen) 72%, transparent); }
+html body main#main.inspiration-page .inspiration-head .page-lead { display: none; }
+/* Abdunklung oben auf beiden Hälften, damit Logo, Navigation und Einstieg lesbar bleiben. */
+html body main#main.inspiration-page .ed-card { box-shadow: none; }
+html body main#main.inspiration-page .ed-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 360px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(10, 12, 11, 0.62) 0, rgba(10, 12, 11, 0.32) 170px, rgba(10, 12, 11, 0) 100%);
+}
+/* Text unten: links bündig zum Seitenrand, unten über dem schwebenden „Bewegung“-Knopf. */
+html body main#main.inspiration-page .ed-type {
+  padding: 0 clamp(24px, 3.2vw, 56px) var(--ed-bar);
+}
+html body main#main.inspiration-page .ed-card:first-child .ed-type { padding-left: var(--ed-edge); }
+html body main#main.inspiration-page .ed-card:last-child .ed-type { padding-right: var(--ed-edge); }
+@media (max-width: 760px) {
+  html body main#main.inspiration-page { --ed-head: 136px; }
+  /* Handy: kein Karussell, die Hälften stehen übereinander (hell oben, dunkel unten). */
+  html body main#main.inspiration-page .ed-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+    padding-inline: 0;
+    margin: 0 calc(50% - 50vw);
+    scroll-snap-type: none;
+  }
+  html body main#main.inspiration-page .ed-card { flex: none; height: max(360px, 50svh); }
+  html body main#main.inspiration-page .ed-card:first-child { height: max(440px, 56svh); }
+  html body main#main.inspiration-page .ed-card:last-child::after { content: none; }
+  html body main#main.inspiration-page .ed-light .ed-image { inset: 0; width: 100%; height: 100%; outline: 0; }
+  html body main#main.inspiration-page .ed-light::before { inset: 0; }
+  html body main#main.inspiration-page .ed-type,
+  html body main#main.inspiration-page .ed-light .ed-type { padding: 0 var(--gutter, 20px) 24px; }
+  html body main#main.inspiration-page .ed-card:last-child .ed-type { padding-bottom: var(--ed-bar); }
+  html body main#main.inspiration-page .inspiration-head { right: 0; }
+  html body main#main.inspiration-page .ed-pager { display: none; }
+}
+
+/* 13.11. nachmittags: Anzahl und Sortierung stehen oben rechts neben dem Einstieg; unten bleibt das Bild frei. */
+html body main.archive-page:has(> .archive-overview) > .archive-overview {
+  height: auto;
+  padding-bottom: 0;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+html body main.archive-page:has(> .archive-overview) .archive-toolbar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+html body main.archive-page:has(> .archive-overview) .archive-toolbar .am-meta {
+  width: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+html body main.archive-page:has(> .archive-overview) .archive-overview .am-count { text-shadow: 0 1px 18px rgba(10, 12, 11, 0.4); }
+@media (max-width: 699px) {
+  html body main.archive-page:has(> .archive-overview) > .archive-overview { flex-direction: column; gap: 6px; }
+  html body main.archive-page:has(> .archive-overview) .archive-toolbar { align-self: stretch; }
+  html body main.archive-page:has(> .archive-overview) .archive-toolbar .am-meta { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+}
+/* Unterlängen („g“, „j“) wurden vom Zeilen-Clamp abgeschnitten. */
+.am-grid .am-title { line-height: 1.12; padding-bottom: 0.12em; }
+
+/* ---------- 5) Leiste beim Scrollen: dunkles Milchglas, ohne Verlauf ----------
+   Gilt für die schmale Leiste und für die aufgeklappte große Kopfzeile weiter unten auf der Seite
+   (Maus über WANDER). Ganz oben auf der Seite bleibt die Kopfzeile, wie sie ist. */
+:root { --header-glass: color-mix(in srgb, var(--brand-frame) 80%, transparent); }
+.site-header.public-header.is-compact::before,
+.site-header.public-header.is-scrolled:not(.is-compact)::before {
+  background: var(--header-glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.site-header.public-header.is-compact::before { transform: scaleY(calc(64 / 164)); }
+.site-header.studio-header.is-compact { background: var(--header-glass); }
+
+/* Archiv: beim Überfahren hellt das Band deutlich auf (vorher kaum sichtbar). */
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-motion="off"]) .archive-page .am-grid .am-card:hover .am-shade { opacity: 0.5; }
+  html:not([data-motion="off"]) .archive-page .am-grid .am-item:first-child .am-card:hover .am-shade { opacity: 0.72; }
+  html:not([data-motion="off"]) .archive-page .am-grid .am-card:hover .am-cover .picture img {
+    transform: scale(1.05);
+    filter: brightness(1.1) saturate(1.06);
+  }
+}
+html:not([data-motion="off"]) .archive-page .am-grid .am-card:focus-visible .am-shade { opacity: 0.5; }
+html:not([data-motion="off"]) .archive-page .am-grid .am-cover .picture img { transition: transform 1400ms cubic-bezier(0.2, 0.6, 0.2, 1), filter 900ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .archive-page .am-grid .am-cover .picture img { transition: none !important; }
+}

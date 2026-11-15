@@ -3,8 +3,8 @@
   "short_name": "WANDER",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ecedeb",
-  "theme_color": "#26312c",
+  "background_color": "#eeece6",
+  "theme_color": "#141712",
   "icons": [
     {
       "src": "/assets/brand/app/android-chrome-192x192.png",

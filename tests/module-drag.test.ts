@@ -100,3 +100,46 @@ test("inside marker inserts before the first visible child even after root reord
   const next = moveModule(initial, 21, 1, true, "inside");
   assert.deepEqual(next.filter((c) => c.layout.parent_id === 1).map((c) => c.id), [21, 11]);
 });
+
+test("below a day's last module, pointer left of the indentation lands after the day", async () => {
+  const { moduleTransferTarget } = await import("../src/moduleDrag.ts");
+  const rows = [
+    { id: 1, top: 0, bottom: 40, chapter: true, parent: null, left: 0 },
+    { id: 11, top: 45, bottom: 85, chapter: false, parent: 1, left: 24 },
+    { id: 3, top: 90, bottom: 130, chapter: false, parent: null, left: 0 },
+  ];
+  // Indented pointer: stays inside the day, after 11.
+  assert.deepEqual(moduleTransferTarget(rows, 99, 88, 40), { id: 99, target: 11, after: true, inside: false });
+  assert.deepEqual(moduleTransferTarget(rows.slice(0, 2), 99, 120, 40), { id: 99, target: 11, after: true, inside: false });
+  // Left of the indentation: after the day on the story level.
+  assert.deepEqual(moduleTransferTarget(rows, 99, 88, 8), { id: 99, target: 1, after: true, inside: false });
+  assert.deepEqual(moduleTransferTarget(rows.slice(0, 2), 99, 120, 8), { id: 99, target: 1, after: true, inside: false });
+  // Without x the old behaviour stays.
+  assert.deepEqual(moduleTransferTarget(rows.slice(0, 2), 99, 120), { id: 99, target: 11, after: true, inside: false });
+});
+
+test("keyboard steps move modules into and out of days at the edges", async () => {
+  const { stepModule } = await import("../src/moduleOrder.ts");
+  const c = (id: number, kind: string, parent_id?: number) => ({ id, kind, title: `${id}`, layout: { parent_id } }) as Chapter;
+  const order = (list: Chapter[]) => list.map((m) => `${m.id}${m.layout?.parent_id ? `<${m.layout.parent_id}` : ""}`).join(" ");
+  const start = [c(5, "text"), c(1, "chapter"), c(11, "image", 1), c(12, "text", 1), c(2, "chapter"), c(6, "quote")];
+  // Root module above a day steps into its top.
+  const a = stepModule(start, 5, 1);
+  assert.equal(a.find((m) => m.id === 5)?.layout.parent_id, 1);
+  assert.ok(a.findIndex((m) => m.id === 5) < a.findIndex((m) => m.id === 11));
+  // First child of a day steps up and out, before the day.
+  const b = stepModule(a, 5, -1);
+  assert.equal(b.find((m) => m.id === 5)?.layout.parent_id, undefined);
+  assert.ok(b.findIndex((m) => m.id === 5) < b.findIndex((m) => m.id === 1));
+  // Last child steps down and out, after the day on the story level.
+  const d = stepModule(start, 12, 1);
+  assert.equal(d.find((m) => m.id === 12)?.layout.parent_id, undefined);
+  // Root module below an empty day steps up into it.
+  const e = stepModule(start, 6, -1);
+  assert.equal(e.find((m) => m.id === 6)?.layout.parent_id, 2);
+  // Within a day: plain swap.
+  assert.equal(order(stepModule(start, 11, 1)), "5 1 12<1 11<1 2 6");
+  // Days only move among days.
+  assert.equal(stepModule(start, 1, 1).find((m) => m.id === 1)?.layout.parent_id, undefined);
+  assert.equal(stepModule(start, 1, -1).find((m) => m.id === 1)?.layout.parent_id, undefined);
+});

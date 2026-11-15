@@ -1,0 +1,329 @@
+/* Focus view: the photograph grows out of the story and the page stays visible
+   behind a veil in the tone of the current edition. No black box. */
+dialog.focus-view {
+  --fv-w: min(72vw, 1180px);
+  --fv-step: calc(var(--fv-w) + 3.2vw);
+  --fv-top: 64px;
+  --fv-h: calc(100svh - 190px);
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100svh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fv-ink);
+  font-family: Manrope, Arial, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  /* All touch input is handled in FocusView: swipe, pinch, double-tap zoom and pan. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+dialog.focus-view[data-tone="light"] {
+  --fv-veil: var(--c-paper);
+  --fv-ink: var(--c-ink);
+  --fv-mute: var(--c-muted);
+  --fv-chip: color-mix(in srgb, var(--c-chalk) 82%, transparent);
+  --fv-chip-hover: var(--c-chalk);
+  --fv-line: color-mix(in srgb, var(--c-ink) 16%, transparent);
+  --fv-shadow: 0 34px 80px -44px color-mix(in srgb, var(--c-ink-black) 70%, transparent);
+}
+dialog.focus-view[data-tone="dark"] {
+  --fv-veil: var(--c-night);
+  --fv-ink: var(--c-linen);
+  --fv-mute: var(--c-mist);
+  --fv-chip: color-mix(in srgb, var(--c-forest-raised) 72%, transparent);
+  --fv-chip-hover: var(--c-forest-raised);
+  --fv-line: color-mix(in srgb, var(--c-linen) 18%, transparent);
+  --fv-shadow: 0 34px 90px -40px rgb(0 0 0 / 0.85);
+}
+dialog.focus-view::backdrop {
+  background: transparent;
+}
+/* While the viewer is open the page behind does not scroll; the gutter stays reserved so nothing shifts. */
+:root:has(dialog.focus-view[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+.focus-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--fv-veil);
+}
+
+.focus-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--fv-top);
+  height: var(--fv-h);
+  overflow: hidden;
+}
+.focus-slide {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--fv-w);
+  height: 100%;
+  margin-left: calc(var(--fv-w) / -2);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  --fv-s: 1;
+  --fv-a: 1;
+  transform: translate3d(calc(var(--o) * var(--fv-step) + var(--fv-drag, 0px)), 0, 0)
+    scale(var(--fv-s));
+  opacity: var(--fv-a);
+  /* One soft glide for the whole band (same curve as the scroll-close). A new
+     target retargets the running transition from where it is, so quick
+     repeated steps continue instead of restarting. */
+  transition:
+    transform 700ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.focus-stage[data-dragging] .focus-slide {
+  transition: none;
+}
+.focus-slide[data-offset="-1"],
+.focus-slide[data-offset="1"] {
+  --fv-s: 0.96;
+  --fv-a: 0.6;
+}
+.focus-slide[data-offset="-2"],
+.focus-slide[data-offset="2"] {
+  --fv-s: 0.9;
+  --fv-a: 0;
+}
+.focus-media {
+  position: relative;
+  width: min(var(--fv-w), calc(var(--fv-h) * var(--ar)));
+  aspect-ratio: var(--ar);
+  pointer-events: auto;
+  box-shadow: var(--fv-shadow);
+  background: color-mix(in srgb, var(--fv-ink) 8%, transparent);
+}
+.focus-slide:not([data-center]) .focus-media {
+  cursor: pointer;
+}
+/* Carries the enlargement; the media box itself stays put so the open/close flight keeps measuring it. */
+.focus-zoom {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.focus-slide[data-center] .focus-zoom {
+  transform: translate(var(--fv-zx, 0px), var(--fv-zy, 0px)) scale(var(--fv-zoom, 1));
+}
+.focus-stage[data-gesture] .focus-zoom {
+  transition: none;
+}
+.focus-stage[data-zoomed] .focus-slide[data-center] .focus-zoom {
+  will-change: transform;
+}
+.focus-slide[data-center] .focus-media {
+  cursor: zoom-in;
+}
+.focus-stage[data-zoomed] .focus-slide[data-center] .focus-media {
+  cursor: grab;
+}
+.focus-stage[data-zoomed][data-gesture] .focus-slide[data-center] .focus-media {
+  cursor: grabbing;
+}
+.focus-media img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.focus-media .focus-large {
+  animation: focus-large-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes focus-large-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Same place as the page masthead wordmark: top centre, clear of the close control. */
+.focus-wordmark {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: auto;
+  aspect-ratio: 736 / 84;
+  pointer-events: none;
+  animation: focus-chrome-in 360ms 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.focus-close,
+.focus-arrow,
+.focus-zoom-reset {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--fv-line);
+  border-radius: 50%;
+  background: var(--fv-chip);
+  color: var(--fv-ink);
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ui-ease-exit, ease),
+    border-color 160ms var(--ui-ease-exit, ease);
+  animation: focus-chrome-in 360ms 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (hover: hover) and (pointer: fine) {
+  .focus-close:hover,
+  .focus-arrow:hover,
+  .focus-zoom-reset:hover {
+    background: var(--fv-chip-hover);
+  }
+}
+.focus-close:focus-visible,
+.focus-arrow:focus-visible,
+.focus-zoom-reset:focus-visible,
+.focus-caption a:focus-visible,
+.focus-retry:focus-visible {
+  outline: 2px solid var(--fv-ink);
+  outline-offset: 3px;
+}
+.focus-close {
+  top: 16px;
+  right: 16px;
+}
+.focus-zoom-reset {
+  top: 16px;
+  left: 16px;
+}
+.focus-arrow {
+  top: calc(var(--fv-top) + var(--fv-h) / 2 - 22px);
+}
+.focus-arrow-prev { left: 16px; }
+.focus-arrow-next { right: 16px; }
+
+.focus-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: min(640px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fv-mute);
+  animation: focus-chrome-in 360ms 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.focus-caption p {
+  margin: 0;
+}
+.focus-title {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 1.15;
+  color: var(--fv-ink);
+  margin-bottom: 4px !important;
+}
+.focus-text {
+  max-width: 56ch;
+  margin-inline: auto !important;
+  text-wrap: pretty;
+}
+.focus-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 18px;
+  margin-top: 8px !important;
+  font-size: 12px;
+}
+.focus-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: var(--fv-ink);
+}
+.focus-caption a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--fv-line);
+}
+.focus-status {
+  margin-top: 6px !important;
+  font-size: 12px;
+  animation: focus-chrome-in 300ms 500ms ease both;
+}
+.focus-retry {
+  color: inherit;
+  text-decoration: underline;
+  min-height: 32px;
+  cursor: pointer;
+}
+.focus-caption-body {
+  animation: focus-caption-swap 360ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes focus-caption-swap {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes focus-chrome-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Leaving: chrome and neighbours step back first, the photograph then flies home. */
+dialog.focus-view[data-leaving] {
+  pointer-events: none;
+}
+dialog.focus-view[data-leaving] :is(.focus-close, .focus-arrow, .focus-zoom-reset, .focus-caption, .focus-wordmark) {
+  opacity: 0;
+  animation: none;
+  transition: opacity 140ms cubic-bezier(0.4, 0, 1, 1);
+}
+dialog.focus-view[data-leaving] .focus-slide:not([data-center]) {
+  --fv-a: 0;
+}
+dialog.focus-view[data-leaving] .focus-slide {
+  transition-duration: 320ms;
+}
+
+@media (max-width: 760px) {
+  dialog.focus-view {
+    --fv-w: 86vw;
+    --fv-step: calc(var(--fv-w) + 4vw);
+    --fv-top: 60px;
+    --fv-h: calc(100svh - 210px);
+  }
+  .focus-close { top: 10px; right: 10px; }
+  .focus-zoom-reset { top: 10px; left: 10px; }
+  .focus-title { font-size: 21px; }
+  .focus-caption { bottom: 16px; }
+  .focus-wordmark { top: 14px; width: 146px; }
+}
+@media (hover: none), (pointer: coarse) {
+  .focus-arrow { display: none; }
+}
+
+/* No travel at all when movement is off: the view simply appears and disappears. */
+html[data-motion="off"] :is(.focus-caption-body, .focus-slide, .focus-zoom, .focus-close, .focus-arrow, .focus-zoom-reset, .focus-caption, .focus-status, .focus-large, .focus-wordmark) {
+  transition: none;
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.focus-caption-body, .focus-slide, .focus-zoom, .focus-close, .focus-arrow, .focus-zoom-reset, .focus-caption, .focus-status, .focus-large, .focus-wordmark) {
+    transition: none;
+    animation: none;
+  }
+}

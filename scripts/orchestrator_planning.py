@@ -147,29 +147,35 @@ class Budget:
         self.max_calls, self.max_tokens, self.stop = calls, tokens, stop
         self.label = label
         self.calls, self.tokens, self.unknown = 0, 0, False
+        self.halted = False
 
     def check(self):
-        if self.calls >= self.max_calls or self.tokens >= self.max_tokens or self.unknown:
+        if self.calls >= self.max_calls or self.tokens >= self.max_tokens or self.unknown or self.halted:
             raise self.stop(self.label + ": Aufruf-/Tokenbudget erreicht oder Tokenverbrauch unknown; kein weiterer Aufruf.")
 
     def admit(self):
         self.check()
         self.calls += 1
 
+    def check_overrun(self):
+        if self.tokens > self.max_tokens:
+            raise self.stop(self.label + ': Tokenbudget überschritten; Auftrag kontrolliert gestoppt.')
+
     def report(self):
         return {"calls": self.calls, "observed_tokens": self.tokens,
                 "unknown_usage": self.unknown, "max_calls": self.max_calls,
                 "max_observed_tokens": self.max_tokens,
-                "limit_reached": self.tokens >= self.max_tokens or self.calls >= self.max_calls or self.unknown,
+                "limit_reached": self.tokens >= self.max_tokens or self.calls >= self.max_calls or self.unknown or self.halted,
+                "model_calls_stopped": self.halted,
                 "over_budget": self.tokens > self.max_tokens,
                 "overrun_tokens": max(0, self.tokens - self.max_tokens),
                 "hard_cost_limit": False}
 
     def record(self, usage):
         total = usage["total_tokens"]
-        if type(total) is not int:
+        if type(total) is not int or total < 0:
             a, b = usage["input_tokens"], usage["output_tokens"]
-            total = a + b if type(a) is int and type(b) is int else None
+            total = a + b if type(a) is int and a >= 0 and type(b) is int and b >= 0 else None
         if total is None:
             self.unknown = True
         else:
@@ -224,6 +230,7 @@ def call_phase(phase, model, prompt, workspace, run, args, report, budget, runti
         report["budget"] = budget.report()
     if runtime.snapshot(workspace) != before:
         raise runtime.Stop("Read-only-Agent hat Projektkopie verändert.")
+    budget.check_overrun()
     if code:
         raise runtime.Stop("Planungsaufruf fehlgeschlagen; kein Modell-Fallback.")
     try:
@@ -367,7 +374,8 @@ def analysis_context(request, files, runtime, cache=None):
         re.search(r"\b" + re.escape(t) + r"\b", s, re.I)
         for t in re.findall(r"\b[TAP]\d+\b", request, re.I)))[:4000]
     search = request + " " + relevant_tasks
-    terms = set(re.findall(r"[\w-]{4,}", search.casefold())) - {
+    literal = coordination.text_literal(request)
+    terms = set(re.findall(r"[\w-]{4,}", (literal or search).casefold())) - {
         "eine", "einen", "einer", "einem", "soll", "sollen", "with", "that", "dieser"}
     explicit = set(re.findall(r"[\w./-]+\.(?:tsx?|css|json|py|md)", search))
     candidates = [n for n in files if n not in runtime.RULES

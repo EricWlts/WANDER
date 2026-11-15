@@ -36,6 +36,7 @@ class Journey(db.Model):
     published = db.Column(db.Boolean, default=False)
     demo = db.Column(db.Boolean, default=False)
     cover_id = db.Column(db.Integer, nullable=True)
+    cover_focus = db.Column(db.JSON, nullable=True)
     chapters = db.relationship("Chapter", cascade="all, delete-orphan", backref="journey", order_by="Chapter.position")
     photos = db.relationship("Photo", cascade="all, delete-orphan", backref="journey", order_by="Photo.position")
 
@@ -73,3 +74,11 @@ class Photo(db.Model):
     upload_key = db.Column(db.String(80), nullable=True)
     edits = db.Column(db.JSON, default=dict, nullable=False)
     has_master = db.Column(db.Boolean, default=False, nullable=False)
+    # Capture time from EXIF (naive local wall-clock time); the only metadata kept.
+    taken_at = db.Column(db.DateTime, nullable=True)
+
+
+class SiteSetting(db.Model):
+    """Small key-value store for site-wide settings (e.g. the home hero). Created additively by db.create_all()."""
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.JSON, default=dict, nullable=False)

@@ -1,0 +1,52 @@
+/* Overview: a slim bar (count, note, actions) pinned beneath the studio masthead. */
+.studio-page.studio-page {
+  padding-top: 0;
+}
+.studio-page .studio-toolbar {
+  position: sticky;
+  top: 64px; /* studio masthead (compact) height */
+  z-index: 5;
+  background: var(--paper);
+}
+.studio-page .studio-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.studio-page .studio-bar-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  min-width: 0;
+}
+.studio-page .studio-bar-count {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.studio-page .studio-bar-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.studio-page .studio-actions {
+  margin: 0;
+  padding: 0;
+  gap: 28px;
+}
+.studio-page .studio-journey { padding-block: 24px; }
+
+@media (max-width: 760px) {
+  .studio-page .studio-bar { padding: 10px 0; gap: 6px 12px; }
+  .studio-page .studio-bar-note { display: none; }
+  .studio-page .studio-actions { gap: 14px; margin: 0; }
+  .studio-page .studio-actions > .text-link { font-size: 11px; gap: 6px; }
+  .studio-page .studio-actions > .text-link svg { display: none; }
+  .studio-page .studio-actions > .button { padding: 10px 14px; font-size: 11px; min-height: 44px; }
+  .studio-page .studio-journey { padding-block: 20px; }
+}

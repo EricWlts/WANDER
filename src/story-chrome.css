@@ -1,0 +1,1249 @@
+/* Owner of .story-*, .title-dock* and .journal-cover* rules (14b): reading progress,
+   running line, closing links, next journey, journey cover. Mirrors the masthead's
+   language: small capitals, wide tracking, hairlines and light glass.
+   Chapter bar (.chapter-*) rules live in chapter-rail.css.
+   Studio-only .story-draft-* rules stay in builder.css / editor-simplify.css. */
+html .story-running-line::before,
+html body:has(.chapter-bar.is-docked) .story-running-line::before {
+  height: 26px !important;
+  transform: none !important;
+  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: none;
+}
+@media (min-width: 900px) {
+  html body:has(.chapter-bar.is-docked) .story-running-line::before {
+    height: 100% !important;
+  }
+}
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  html body:has(.chapter-bar.is-docked) .story-running-line {
+    justify-content: flex-end;
+    padding-right: var(--gutter, 32px);
+  }
+}
+@media (min-width: 900px) {
+  html .story-running-line,
+  html body:has(.chapter-bar.is-docked) .story-running-line {
+    height: 54px;
+  }
+  html .story-running-line::before {
+    height: 100% !important;
+  }
+  html .story-experience[data-scrolled="true"] {
+    --story-line-h: 54px;
+  }
+}
+.story-chapter {
+  padding-top: 85px;
+  padding-bottom: 0;
+}
+.story-form {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 8vw;
+}
+@media (max-width: 1100px) {
+  .story-form {
+    gap: 45px;
+  }
+}
+@media (max-width: 760px) {
+  .story-chapter {
+    padding-top: 47px;
+  }
+  .story-form {
+    display: block;
+  }
+}
+.story-experience {
+  overflow-x: clip;
+}
+.story-hero {
+  position: relative;
+  height: min(850px, 86svh);
+  min-height: 580px;
+  margin: 30px var(--gutter) 0;
+}
+.story-hero-photo {
+  height: 100%;
+  width: 82%;
+  margin-left: 18%;
+}
+.story-hero-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.story-hero-shade {
+  display: none;
+}
+.story-hero-top {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.story-hero-top a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.story-hero-top > span {
+  color: var(--c-white);
+  text-shadow: 0 1px 10px var(--c-night-deep);
+}
+.story-hero-title {
+  position: absolute;
+  bottom: 65px;
+  left: 0;
+  width: 39%;
+  background: var(--paper);
+  padding: 32px 35px 30px 0;
+}
+.story-hero-title .eyebrow {
+  font-size: var(--fs-xs);
+  color: var(--olive);
+}
+.story-hero-title h1 {
+  font-size: clamp(58px, 6.2vw, 96px);
+  margin: 22px 0;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+.story-hero-title > p {
+  font-size: 14px;
+  max-width: 300px;
+}
+.story-start {
+  position: absolute;
+  left: 0;
+  bottom: 14px;
+  font-size: var(--fs-xs);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  letter-spacing: 0.08em;
+}
+.story-facts {
+  padding: 23px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.story-facts > div {
+  display: flex;
+  gap: 25px;
+  align-items: center;
+}
+.story-facts button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.story-prologue {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  padding-top: 85px;
+  padding-bottom: 85px;
+  gap: 50px;
+}
+.story-prologue p {
+  font-family: var(--serif);
+  font-size: clamp(25px, 2.3vw, 34px);
+  line-height: 1.45;
+  max-width: 700px;
+  white-space: pre-wrap;
+}
+.story-postscript {
+  padding: 80px 0 65px;
+  max-width: 740px;
+  text-align: center;
+}
+.story-postscript p {
+  font-family: var(--serif);
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.45;
+  margin-top: 22px;
+  white-space: pre-wrap;
+}
+.story-end {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+  padding: 35px 0 65px;
+  border-top: 1px solid var(--line);
+}
+.story-experience > .reference-note {
+  text-align: center;
+}
+
+.story-cover-preview {
+  height: 420px;
+  position: relative;
+  overflow: hidden;
+}
+.story-cover-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 10%, color-mix(in srgb, var(--c-night-deep) 70%, transparent));
+}
+.story-cover-preview > div:last-child {
+  position: absolute;
+  bottom: 28px;
+  left: 30px;
+  right: 30px;
+  color: var(--c-white);
+  z-index: 1;
+}
+.story-cover-preview h2 {
+  font-size: clamp(38px, 3.8vw, 58px);
+  margin: 10px 0;
+}
+.story-cover-preview p {
+  font-size: 12px;
+}
+@media (min-width: 1700px) {
+  .story-hero {
+    max-width: 1680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+@media (max-width: 1050px) {
+  .story-hero-title {
+    width: 48%;
+  }
+}
+@media (max-width: 760px) {
+  .story-hero {
+    height: 75svh;
+    min-height: 580px;
+    margin: 20px var(--gutter) 0;
+  }
+  .story-hero-photo {
+    width: 100%;
+    margin: 0;
+    height: 75%;
+  }
+  .story-hero-top {
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    color: var(--c-white);
+  }
+  .story-hero-top > span {
+    display: none;
+  }
+  .story-hero-title {
+    bottom: 35px;
+    left: -1px;
+    width: 88%;
+    padding: 24px 22px 18px 0;
+  }
+  .story-hero-title h1 {
+    font-size: clamp(49px, 13vw, 70px);
+    margin: 17px 0;
+  }
+  .story-hero-title p {
+    font-size: 12px;
+  }
+  .story-start {
+    bottom: 5px;
+  }
+  .story-facts {
+    align-items: start;
+  }
+  .story-facts > span {
+    max-width: 60%;
+    line-height: 1.8;
+  }
+  .story-facts > div {
+    gap: 10px;
+    flex-direction: column;
+    align-items: end;
+  }
+  .story-prologue {
+    grid-template-columns: 1fr;
+    gap: 19px;
+    padding-top: 45px;
+    padding-bottom: 45px;
+  }
+  .story-prologue p {
+    font-size: 25px;
+  }
+  .story-postscript {
+    padding-top: 45px;
+    padding-bottom: 45px;
+  }
+  .story-end {
+    padding-bottom: 35px;
+    align-items: start;
+  }
+  .story-end .text-link {
+    gap: 10px;
+  }
+
+  
+  
+  .story-cover-preview {
+    height: 430px;
+  }
+  .story-cover-preview h2 {
+    font-size: 47px;
+  }
+}
+/* Route continuity keeps the public cover visible without implying a matching crop. */
+.story-cover-loading {
+  padding: 24px clamp(20px, 4vw, 72px) 48px;
+}
+.story-cover-loading-status {
+  min-height: 84px;
+}
+.story-cover-loading-status h1 {
+  margin: 0 0 8px;
+  font: 400 24px/1.2 var(--serif);
+}
+.story-cover-loading-status p {
+  margin: 0;
+  font-size: 12px;
+}
+.story-cover-loading-frame {
+  height: min(780px, 74svh);
+  min-height: 320px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.story-cover-loading-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+@media (max-width: 760px) {
+  .story-cover-loading {
+    padding: 16px 18px 32px;
+  }
+}
+.story-facts {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.journal-cover {
+  position: relative;
+  margin: 24px clamp(20px, 4vw, 72px) 0;
+  min-height: 520px;
+  height: min(780px, 82svh);
+}
+.journal-cover > .parallax-frame {
+  height: 100%;
+  width: 90%;
+  margin-left: 10%;
+}
+.journal-cover-photo,
+.journal-cover-photo[style*="aspect-ratio"] {
+  height: 100% !important;
+  aspect-ratio: auto !important;
+  width: 100%;
+}
+.journal-cover-copy {
+  position: absolute;
+  left: 0;
+  bottom: 38px;
+  width: min(57%, 680px);
+  z-index: 2;
+}
+.journal-cover-copy .eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+.journal-cover h1 {
+  font: 400 clamp(28px, var(--cover-title-size, 100px), 160px)/0.97 var(--serif);
+  letter-spacing: -0.035em;
+  margin: 18px 0;
+}
+.journal-cover-copy p {
+  max-width: 470px;
+  line-height: 1.7;
+  font-size: 16px;
+}
+.cover-overlap .journal-cover-copy {
+  padding: 25px 30px 16px 0;
+  width: min(48%, 620px);
+  bottom: -12px;
+}
+.cover-overlay .journal-cover-copy {
+  width: 80%;
+}
+
+.cover-overlay .journal-cover-copy {
+  z-index: 2;
+}
+.cover-below .journal-cover-copy {
+  position: relative;
+  width: 100%;
+  padding: 26px 0;
+  bottom: auto;
+}
+@media (max-width: 760px) {
+  .journal-cover {
+    min-height: 450px;
+    height: 74svh;
+    margin: 16px 18px 0;
+  }
+  .journal-cover > .parallax-frame {
+    width: 100%;
+    margin-left: 0;
+  }
+  .journal-cover-copy {
+    width: 100%;
+    bottom: 0;
+  }
+  .cover-overlap .journal-cover-copy {
+    width: 87%;
+    padding: 20px 20px 8px 0;
+    bottom: -10px;
+  }
+  .journal-cover h1 {
+    font-size: clamp(28px, calc(28px + (var(--cover-title-size, 100px) - 28px) * 0.2575758), 62px);
+  }
+  .journal-cover-copy .eyebrow {
+    letter-spacing: 0.04em;
+  }
+  .journal-cover-copy p {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .cover-overlay .journal-cover-copy {
+    width: 85%;
+  }
+  .cover-below .journal-cover-copy {
+    padding: 22px 0;
+  }
+}
+.cover-overlap .journal-cover-copy {
+  background: var(--canvas-paper);
+}
+.cover-overlay .journal-cover-copy {
+  color: var(--c-linen);
+  text-shadow: 0 2px 22px color-mix(in srgb, var(--c-night-deep) 40%, transparent);
+  bottom: 10%;
+  left: 6%;
+  max-width: 80%;
+}
+@media (min-width: 761px) {
+  .cover-overlay .journal-cover-copy {
+    bottom: 10%;
+    left: 6%;
+  }
+}
+@media (max-width: 760px) {
+  .cover-overlay .journal-cover-copy {
+    left: 22px;
+    bottom: 32px;
+    max-width: 85%;
+  }
+  .cover-overlay .journal-cover-copy p {
+    font-size: 14px;
+  }
+}
+/* The terminal credit paragraph's 45px margin used to collapse past the dark
+   story wrapper onto the pale body. Contain it without altering its spacing. */
+.story-experience.template-after-hours {
+  display: flow-root;
+}
+.showcase-story .story-end {
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+/* The showcase title should land within the opening screen, below the edition bar. */
+.showcase-story .journal-cover {
+  min-height: 420px;
+  height: min(680px, 65svh);
+}
+@media (max-width: 760px) {
+  .showcase-story .journal-cover {
+    min-height: 360px;
+    height: 52svh;
+  }
+  .showcase-story .cover-overlay .journal-cover-copy {
+    bottom: 58px;
+  }
+}
+/* Without the former facts bar, keep the cover's top margin inside the canvas
+   colour instead of letting it collapse onto the pale page. */
+.story-experience > .journal-canvas {
+  display: flow-root;
+}
+/* The edition note under the masthead belongs to the frame, not the page:
+   same deep ink, a hairline below, quiet small capitals. */
+.story-experience .example-banner,
+.story-experience .draft-banner {
+  background: var(--brand-frame);
+  color: var(--c-mist);
+  border-bottom: 1px solid color-mix(in srgb, var(--c-linen) 10%, transparent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.story-experience :is(.example-banner, .draft-banner) a {
+  color: var(--c-fog);
+}
+@media (hover: hover) and (pointer: fine) {
+  .story-experience :is(.example-banner, .draft-banner) a:hover {
+    color: var(--c-linen);
+  }
+}
+.journal-cover h1 {
+  overflow-wrap: anywhere;
+}
+/* ---------- 4. Cover ---------- */
+.journal-cover h1 {
+  line-height: 0.98;
+  text-wrap: balance;
+}
+@media (min-width: 761px) {
+  .journal-cover h1 {
+    font-size: clamp(28px, var(--cover-title-size, clamp(56px, 7.2vw, 100px)), 160px);
+  }
+  /* After Hours: immersive, edge-to-edge opening that fills the first screen. */
+
+  
+}
+.journal-cover .journal-cover-copy p {
+  font: italic 400 clamp(18px, calc(11px + 1.1vw), 28px) / 1.3 var(--serif);
+  max-width: 34ch;
+}
+.journal-cover .journal-cover-copy .eyebrow {
+  font-size: 12px;
+}
+.story-experience .example-banner {
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .story-hero-top {
+    font-size: 12px;
+  }
+  .story-hero-title .eyebrow {
+    font-size: 12px;
+  }
+  .story-start {
+    font-size: 12px;
+  }
+  .story-facts {
+    font-size: 12px;
+  }
+  .story-end .text-link {
+    font-size: 12px;
+  }
+  .journal-cover-copy .eyebrow {
+    font-size: 12px;
+  }
+}
+/* ---------- Visible masthead height (single source) ---------- */
+:root {
+  --header-visible: 164px;
+  --header-ease: cubic-bezier(0.16, 0.84, 0.24, 1);
+  --header-time: 780ms;
+}
+@media (max-width: 760px) {
+  :root {
+    --header-visible: 136px;
+  }
+}
+body:has(.public-header.is-compact) {
+  --header-visible: 64px;
+  --header-ease: cubic-bezier(0.55, 0, 0.3, 1);
+  --header-time: 700ms;
+}
+.story-experience .example-banner {
+  transition: top var(--header-time) var(--header-ease);
+}
+[data-motion="off"] .story-experience .example-banner {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-experience .example-banner {
+    transition: none;
+  }
+}
+/* ---------- Reading progress ---------- */
+.story-progress {
+  position: fixed;
+  z-index: 39;
+  inset: var(--header-visible) 0 auto;
+  height: 2px;
+  pointer-events: none;
+  transition: top var(--header-time) var(--header-ease);
+}
+.story-progress-bar {
+  height: 100%;
+  background: var(--c-moss);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  transition: transform 120ms linear, opacity 240ms ease;
+  will-change: transform;
+}
+.template-after-hours .story-progress-bar {
+  background: var(--ed-accent);
+}
+.story-progress-bar[data-idle="true"] {
+  opacity: 0;
+}
+[data-motion="off"] .story-progress,
+[data-motion="off"] .story-progress-bar {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-progress,
+  .story-progress-bar {
+    transition: none;
+  }
+}
+/* ---------- Back to top ---------- */
+.story-end {
+  flex-wrap: wrap;
+}
+.story-to-top {
+  flex: 0 0 100%;
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+.story-to-top .text-link {
+  gap: 10px;
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  min-width: 44px;
+  padding: 0 12px;
+}
+.story-to-top .text-link svg {
+  transition: translate 240ms ease;
+}
+[data-motion="off"] .story-to-top .text-link svg {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-to-top .text-link svg {
+    transition: none;
+  }
+}
+/* ---------- Next journey ---------- */
+.next-journey {
+  padding: clamp(48px, 8vw, 112px) var(--gutter) clamp(56px, 8vw, 120px);
+  border-top: 1px solid var(--line, var(--c-line));
+}
+.next-journey-link {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  max-width: 1280px;
+  margin-inline: auto;
+  color: inherit;
+  text-decoration: none;
+}
+.next-journey-kicker {
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.next-journey-title {
+  margin: 0;
+  font: 400 clamp(40px, 6.5vw, 96px) / 1.04 var(--serif);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.next-journey-meta {
+  font: 500 12px/1.6 Manrope, Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.next-journey-image {
+  display: block;
+  margin-top: clamp(14px, 2vw, 28px);
+  aspect-ratio: 21 / 9;
+  overflow: hidden;
+  background: var(--c-stone);
+}
+.next-journey-image .picture,
+.next-journey-image .picture[style*="aspect-ratio"] {
+  width: 100%;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+}
+.next-journey-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.next-journey-link:focus-visible .next-journey-image img {
+  transform: scale(1.025);
+}
+@media (hover: hover) and (pointer: fine) {
+  .next-journey-link:hover .next-journey-image img {
+    transform: scale(1.025);
+  }
+}
+.next-journey-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.next-journey-link:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 10px;
+}
+@media (max-width: 760px) {
+  .next-journey-image {
+    aspect-ratio: 4 / 3;
+  }
+  .next-journey-cta {
+    justify-self: start;
+  }
+}
+[data-motion="off"] .next-journey-image img {
+  transition: none;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .next-journey-image img {
+    transition: none;
+    transform: none !important;
+  }
+}
+/* ======================================================================
+   Chapter bar docked into the masthead (all widths)
+   At the top of the story the list rests in the page as before. Once it
+   reaches the masthead it slims down to a glass line of the same material
+   as the header; the hairline glides to the current chapter. On narrow
+   screens the journey name sits as a fine line between header and bar.
+   ====================================================================== */
+/* The edition note belongs to the page start only; it no longer follows. */
+.story-experience .example-banner {
+  letter-spacing: 0.18em;
+}
+/* Running line: journey name under the masthead on tablet and phone. */
+.story-experience[data-scrolled="true"] {
+  --story-line-h: 26px;
+}
+.story-running-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  z-index: 25;
+  inset: var(--header-visible) 0 auto;
+  height: 26px;
+  padding-inline: 16px;
+  color: var(--c-fog);
+  --bar-glass: color-mix(in srgb, var(--brand-frame) 80%, transparent);
+  background: transparent;
+  font: 500 var(--fs-xs)/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* Scroll-coupled: --title-p (0..1) is written by StoryExperience. */
+  /* No opacity on the glass element: the glass grows via ::before, the text fades. */
+  visibility: hidden;
+  pointer-events: none;
+}
+.story-running-line[data-on] {
+  visibility: visible;
+}
+.story-running-line > span {
+  transform: translate3d(0, calc((1 - var(--title-p, 0)) * 8px), 0);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.story-running-place {
+  color: var(--c-mist);
+}
+/* Title docking: the cover title is replaced by a fixed clone while it flies to the running line. */
+.title-dock-clone {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 24;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  transition: none;
+}
+.story-experience[data-title-flight] .journal-cover h1 {
+  opacity: 0 !important;
+}
+/* Chapter headings stay put when they reach the bar. */
+.dock-heading {
+  /* Magazine headings stay fully opaque while scrolling on (no fade-out). */
+  opacity: 1;
+  translate: none;
+}
+[data-motion="off"] .story-running-line,
+[data-motion="off"] .story-running-line > span {
+  transition: opacity 200ms ease !important;
+}
+[data-motion="off"] .story-running-line > span {
+  transform: none;
+  translate: none;
+}
+[data-motion="off"] .dock-heading {
+  transform: none;
+  translate: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-running-line > span {
+    transform: none;
+    translate: none;
+  }
+  .dock-heading {
+    transform: none;
+    translate: none;
+  }
+}
+/* 08.11.: cover kicker/subtitle fade out quickly as the title flies into the line. */
+.journal-cover h1 ~ p,
+.journal-cover .eyebrow {
+  opacity: clamp(0, calc(1 - var(--title-p, 0) * 2.2), 1);
+  transform: translate3d(0, calc(var(--title-p, 0) * -10px), 0);
+}
+/* Studio-set cover crop of an edition story (object-position per breakpoint; no transform involved). */
+.story-experience.has-cover-focus .journal-cover .journal-cover-photo img {
+  object-position: var(--cover-pos-desktop, 50% 50%) !important;
+}
+@media (max-width: 1100px) {
+  .story-experience.has-cover-focus .journal-cover .journal-cover-photo img {
+    object-position: var(--cover-pos-tablet, 50% 50%) !important;
+  }
+}
+@media (max-width: 760px) {
+  .story-experience.has-cover-focus .journal-cover .journal-cover-photo img {
+    object-position: var(--cover-pos-mobile, 50% 50%) !important;
+  }
+}
+/* Edition note: the middle label sits on the true page centre (equal side columns). */
+html body .story-experience .example-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 8px;
+}
+html body .story-experience .example-banner > :first-child {
+  justify-self: start;
+  min-width: 0;
+}
+html body .story-experience .example-banner > span {
+  justify-self: center;
+  order: 0;
+  width: auto;
+  max-width: 100%;
+  text-align: center;
+  text-wrap: balance;
+}
+html body .story-experience .example-banner > :last-child {
+  justify-self: end;
+  margin-left: 0;
+  min-width: 0;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  /* Links on the first row (left / right), the centred label beneath them. */
+  html body .story-experience .example-banner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  html body .story-experience .example-banner > span {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+  }
+}
+.story-running-line::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  background: var(--bar-glass);
+  pointer-events: none;
+}
+.story-running-line::before {
+  inset: 0 0 auto 0;
+  opacity: 0;
+}
+.story-running-line[data-on]::before,
+body:has(.chapter-bar.is-docked) .story-running-line::before {
+  opacity: 1;
+}
+body:has(.chapter-bar.is-docked) .story-running-line {
+  visibility: visible;
+}
+.story-running-line > span {
+  opacity: clamp(0, calc((var(--title-p, 0) - 0.4) / 0.6), 1);
+}
+.title-dock-clone {
+  background-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.journal-cover.has-cover-focus .journal-cover-photo img {
+  object-position: var(--cover-pos-desktop, 50% 50%) !important;
+}
+/* Studio-set cover crop of a normal journey: the story cover (editor canvas) and the journey cards. */
+.home-more-entry.has-cover-focus .picture img {
+  object-position: var(--cover-pos-desktop, 50% 50%) !important;
+}
+@media (max-width: 1100px) {
+  .journal-cover.has-cover-focus .journal-cover-photo img {
+    object-position: var(--cover-pos-tablet, 50% 50%) !important;
+  }
+  .home-more-entry.has-cover-focus .picture img {
+    object-position: var(--cover-pos-tablet, 50% 50%) !important;
+  }
+}
+@media (max-width: 760px) {
+  .journal-cover.has-cover-focus .journal-cover-photo img {
+    object-position: var(--cover-pos-mobile, 50% 50%) !important;
+  }
+  .home-more-entry.has-cover-focus .picture img {
+    object-position: var(--cover-pos-mobile, 50% 50%) !important;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .story-to-top .text-link:hover {
+    gap: 10px;
+  }
+}
+@media (max-width: 760px) {
+  @media (hover: hover) and (pointer: fine) {
+    .story-end .text-link:hover {
+      gap: 10px;
+    }
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .story-to-top .text-link:hover svg {
+    translate: 0 -3px;
+  }
+}
+html body .journal-cover .picture {
+  --active-hover: 1 !important;
+}
+/* The shared glass grows by scaling (compositor), not by animating its height. */
+html .story-running-line::before,
+html body:has(.chapter-bar.is-docked) .story-running-line::before {
+  height: 66px;
+  transform-origin: 50% 0;
+  transform: scaleY(0.3939);
+  transition: opacity 280ms ease-out, transform 280ms ease-out;
+}
+html[data-motion="off"] .story-running-line::before,
+[data-motion="off"] .story-running-line::before {
+  transition: none !important;
+}
+/* The line element itself never gets opacity (it would switch off the glass' backdrop blur); the glass
+   fades and settles, the title text follows the scroll-coupled --title-p. Visibility only switches
+   off after the fade-out, so nothing is cut. */
+html .story-running-line {
+  transition: top var(--header-time) var(--header-ease), visibility 0s linear 420ms;
+}
+html .story-running-line[data-on],
+html body:has(.chapter-bar.is-docked) .story-running-line {
+  transition: top var(--header-time) var(--header-ease), visibility 0s linear 0s;
+}
+html .story-running-line::before {
+  transform: translate3d(0, -8px, 0) scaleY(0.3939);
+  transition: opacity 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+html .story-running-line[data-on]::before {
+  transform: translate3d(0, 0, 0) scaleY(0.3939);
+}
+html body:has(.chapter-bar.is-docked) .story-running-line::before {
+  transform: none;
+}
+html[data-motion="off"] .story-running-line,
+html[data-motion="off"] .story-running-line::before {
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html .story-running-line,
+  html .story-running-line::before {
+    transition: none !important;
+  }
+}
+/* The banner is in the normal flow (position: static, so z-index never applied) and was painted
+   below the fixed running line (z 25) and its glass; scrolling back up, that strip crossed the
+   banner. The banner now sits above both and below the masthead (z 40). */
+html body .story-experience .example-banner {
+  position: relative;
+  top: auto;
+  /* the old sticky offset (--header-visible) would push a relative banner down */
+  z-index: 28;
+}
+/* Fallback until StoryExperience writes the measured canvas offset inline (it covers banners, the
+   motion row, anything above the cover). Not set on .journal-canvas: that would shadow the measurement. */
+.story-experience {
+  --story-top: calc(var(--compact-header) + var(--banner-h, 0px));
+  /* Visible reading area starts below ALL fixed story chrome: masthead 64 + running line 26 + chapter bar 38. */
+  --story-read-top: calc(var(--compact-header) + 26px + 48px);
+}
+@media (max-width: 860px) {
+  .story-experience {
+    --story-read-top: calc(var(--compact-header) + 26px + 48px);
+  }
+}
+
+/* Reisetitel: frei positionierbarer Ankerpunkt (x/y in %), bleibt immer im Bild. */
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy {
+  --title-inset-x: clamp(20px, 5vw, 64px);
+  --title-inset-y: clamp(24px, 5svh, 48px);
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  left: calc(var(--title-inset-x) + (100% - 2 * var(--title-inset-x)) * var(--title-x, 0) / 100);
+  top: calc(var(--title-inset-y) + (100% - 2 * var(--title-inset-y)) * var(--title-y, 100) / 100);
+  translate: calc(var(--title-x, 0) * -1%) calc(var(--title-y, 100) * -1%);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--title-inset-x));
+  margin: 0;
+}
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy[data-title-align="center"] {
+  text-align: center;
+}
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy[data-title-align="right"] {
+  text-align: right;
+}
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy[data-title-align="center"] p,
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy[data-title-align="right"] p {
+  margin-inline: auto 0;
+}
+html body .journal-canvas .journal-cover.has-title-pos .journal-cover-copy[data-title-align="center"] p {
+  margin-inline: auto;
+}
+
+/* J3: the running title line is a single centred 26px row at every width; the chapter bar
+   sits beneath it (see chapter-rail.css). */
+html body .story-experience[data-scrolled="true"] {
+  --story-line-h: 26px;
+}
+@media (min-width: 900px) {
+  html body:has(.chapter-bar) main.story-experience .story-running-line {
+    height: 26px;
+    justify-content: center;
+    padding-inline: 16px;
+  }
+  html body:has(.chapter-bar) main.story-experience .story-running-line::before {
+    height: 26px !important;
+  }
+}
+
+/* ---------- Closing page of the edition examples: invitation to the other edition ---------- */
+.story-end-editions {
+  justify-content: center;
+  gap: 16px 40px;
+}
+.other-edition {
+  background: var(--ed-surface);
+  color: var(--ed-ink);
+  padding: clamp(56px, 9vw, 128px) var(--gutter) clamp(56px, 9vw, 120px);
+}
+.other-edition-link {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 1280px;
+  margin-inline: auto;
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
+  letter-spacing: 0;
+}
+.other-edition-kicker {
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.other-edition-name {
+  font: 400 clamp(28px, 3.4vw, 46px) / 1.1 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--ed-ink-muted);
+}
+.other-edition-title {
+  margin: 0;
+  font: 400 clamp(40px, 6.5vw, 96px) / 1.04 var(--serif);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.other-edition-image {
+  display: block;
+  width: 100%;
+  margin-top: clamp(18px, 3vw, 40px);
+  aspect-ratio: 21 / 9;
+  overflow: hidden;
+  background: var(--ed-image-frame);
+}
+.other-edition.template-quiet-atlas .other-edition-image {
+  /* Erstes Licht: framed on pale ground */
+  box-sizing: border-box;
+  padding: clamp(10px, 1.6vw, 22px);
+  background: var(--c-stone);
+  border: 1px solid var(--ed-line);
+}
+.other-edition-image .picture,
+.other-edition-image .picture[style*="aspect-ratio"] {
+  width: 100%;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+}
+.other-edition-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.other-edition-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 4px;
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+.other-edition-link:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 10px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .other-edition-link:hover .other-edition-image img {
+    transform: scale(1.025);
+  }
+}
+@media (max-width: 760px) {
+  .other-edition-image {
+    aspect-ratio: 4 / 3;
+  }
+}
+[data-motion="off"] .other-edition-image img {
+  transition: none;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .other-edition-image img {
+    transition: none;
+    transform: none !important;
+  }
+}
+
+/* ---------- Weitere Reisen (13.11.): hohe Bildkarten, Titel im Bild – wie „Was du gestalten kannst“ ---------- */
+.more-journeys-inner { max-width: 1280px; margin-inline: auto; }
+.more-journeys-title {
+  margin: 0;
+  font: 400 clamp(34px, 4.4vw, 60px) / 1.05 var(--serif);
+  letter-spacing: -0.02em;
+}
+.more-journeys-grid {
+  list-style: none;
+  margin: clamp(28px, 3.4vw, 48px) 0 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(8px, 1vw, 14px);
+}
+.more-journeys-item { margin: 0; padding: 0; min-width: 0; }
+.more-journeys-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  aspect-ratio: 16 / 10;
+  color: var(--c-linen);
+  background: #101311;
+  text-decoration: none;
+}
+.more-journeys-image { position: absolute; inset: 0; z-index: -2; display: block; }
+.more-journeys-image .picture,
+.more-journeys-image .picture[style*="aspect-ratio"] {
+  width: 100%;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+}
+.more-journeys-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.more-journeys-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(10, 12, 11, 0.86) 0%, rgba(10, 12, 11, 0.55) 32%, rgba(10, 12, 11, 0) 62%);
+}
+.more-journeys-copy {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: clamp(18px, 2.2vw, 30px);
+}
+.more-journeys-name {
+  font: italic 400 clamp(28px, 3vw, 42px) / 1.12 var(--serif);
+  overflow-wrap: anywhere;
+}
+.more-journeys-meta {
+  font: 500 12px / 1.6 Manrope, Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.more-journeys-card:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.more-journeys-card:focus-visible .more-journeys-image img { transform: scale(1.03); }
+@media (hover: hover) and (pointer: fine) {
+  .more-journeys-card:hover .more-journeys-image img { transform: scale(1.03); }
+}
+@media (min-width: 761px) {
+  .more-journeys-grid[data-count="1"] .more-journeys-card { aspect-ratio: 21 / 9; }
+  .more-journeys-grid[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .more-journeys-grid[data-count="2"] .more-journeys-card { aspect-ratio: 5 / 4; }
+  .more-journeys-grid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .more-journeys-grid[data-count="3"] .more-journeys-card { aspect-ratio: 2 / 3; }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .more-journeys-grid[data-count="3"] .more-journeys-card { aspect-ratio: 3 / 4; }
+}
+[data-motion="off"] .more-journeys-image img { transition: none; transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .more-journeys-image img { transition: none; transform: none !important; }
+}

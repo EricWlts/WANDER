@@ -1,0 +1,138 @@
+:root {
+  /* WANDER palette — earthy stone, sage and forest. Every colour in the
+     stylesheets resolves to one of these tokens (alpha via color-mix). */
+
+  /* Light surfaces */
+  --c-white: #ffffff;
+  --c-chalk: #f6f5f1;
+  --c-paper: #eeece6;
+  --c-stone: #e3e2dc;
+  --c-stone-deep: #d6d6cf;
+  --c-line: #cfd0c8;
+  --c-line-strong: #b3bcb3;
+
+  /* Text and green details on light */
+  --c-sage: #8f9c91;
+  --c-muted: #5e6862;
+  --c-olive: #506055;
+  --c-moss: #3e5545;
+  --c-ink-soft: #3c4741;
+  --c-ink: #26302b;
+
+  /* Dark surfaces */
+  --c-forest: #202b26;
+  --c-ink-black: #10130f;  /* masthead & footer: deepest tone, warm olive-black */
+  --c-night: #1a1d18;
+  --c-night-deep: #161c18;
+  --c-forest-raised: #2c3731;
+  --c-forest-line: #3b4740;
+
+  /* Text on dark */
+  --c-mist: #b1bdb3;
+  --c-fog: #d1d9d2;
+  --c-linen: #f2f3ef;
+
+  /* Accents — states only */
+  --c-clay: #8a4b3a;
+  --c-clay-soft: #efe3dc;
+  --c-ochre: #a5804f;
+  --c-ochre-soft: #f0e7d9;
+}
+
+/* WANDER design tokens — type scale, spacing, stacking order.
+   Only defined here for now; stylesheets adopt them step by step.
+
+   Breakpoint convention (mobile-first, min-width): 480 / 760 / 1100 / 1600 px.
+   Custom properties cannot be used inside @media, so write the numbers out:
+     @media (min-width: 480px)  — large phones
+     @media (min-width: 760px)  — tablets
+     @media (min-width: 1100px) — laptops
+     @media (min-width: 1600px) — large desktops
+   Hover styles belong in @media (hover: hover) and (pointer: fine). */
+:root {
+  /* Type scale — never below 0.75rem (12 px) */
+  --fs-xs: 0.75rem;    /* 12 px  captions, kickers, micro labels */
+  --fs-sm: 0.8125rem;  /* 13 px  secondary UI text */
+  --fs-md: 0.9375rem;  /* 15 px  UI and body text */
+  --fs-lg: 1.125rem;   /* 18 px  lead text */
+  --fs-xl: 1.5rem;     /* 24 px  small headings */
+
+  /* Spacing scale */
+  --space-1: 0.25rem;  /*  4 px */
+  --space-2: 0.5rem;   /*  8 px */
+  --space-3: 0.75rem;  /* 12 px */
+  --space-4: 1rem;     /* 16 px */
+  --space-5: 1.5rem;   /* 24 px */
+  --space-6: 2rem;     /* 32 px */
+  --space-7: 3rem;     /* 48 px */
+  --space-8: 4rem;     /* 64 px */
+
+  /* Stacking order */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-header: 200;
+  --z-overlay: 1000;
+  --z-modal: 1100;
+  --z-toast: 1200;
+}
+
+/* ==========================================================================
+   Editions-Tokens — eine Stimmung = ein Block. Gilt je Edition für die drei
+   Klassen, die die Komponenten ausgeben:
+     .template-<id>      Story-Seite (StoryExperience.tsx)
+     .canvas-theme-<id>  Journal-Canvas (JournalCanvas.tsx)
+     .module-theme-<id>  einzelnes Modul (ein Modul darf die Stimmung wechseln)
+   Der Präfix --ed- vermeidet Kollisionen: --ink, --line und --accent sind
+   global schon anders belegt (styles.css, journal.css).
+
+   Token            Bedeutung
+   --ed-surface         Hauptfläche (Seite, Modul)
+   --ed-surface-raised  abgesetzte Fläche (Übersicht, Filmstreifen im Modul)
+   --ed-ink             Haupttext
+   --ed-ink-muted       zurückgenommener Text (Datum, Nebentext)
+   --ed-line            Linien und Rahmen
+   --ed-accent          Detailfarbe (Fortschritt, Kapitel-Marker, Akzenttext)
+   --ed-image-frame     Grund hinter und um Bilder
+   --ed-overlay         dunkle Grundfarbe für Verläufe und tiefe Bänder
+
+   Anleitung: dritte Edition anlegen (Beispiel „dusk“)
+   1. Diesen Block kopieren, die drei Selektoren auf .template-dusk,
+      .canvas-theme-dusk, .module-theme-dusk ändern und alle acht Werte setzen.
+      Nur --c-* Farben aus dem Block ganz oben verwenden, keine Hex-Werte.
+   2. Brücken zu den bestehenden Variablen je Edition ergänzen:
+      .template-dusk  in experience.css (Fläche, Text, --line/--muted/--olive),
+      .canvas-theme-dusk in journal.css (--canvas-paper/--canvas-ink),
+      .module-theme-dusk in journal.css (--canvas-ink/--module-bg, Fläche).
+      Die Werte kommen immer aus den --ed-* Tokens, nie direkt aus --c-*.
+   3. Weicht die Edition bei Layout, Rahmen oder Typografie ab, gehört die
+      Regel in src/story-fixes.css, Abschnitt „Editions-Regeln“. Umfärbungen
+      gehören nie dorthin.
+   4. Edition-ID eintragen: Typ EditionId in src/editionCopy.ts, Liste in
+      src/EditionEditor.tsx, erlaubte story_template-Werte im Backend.
+   5. Prüfen: npm run e2e, Snapshots für die neue Edition anlegen.
+   ========================================================================== */
+.template-quiet-atlas,
+.canvas-theme-quiet-atlas,
+.module-theme-quiet-atlas {
+  --ed-surface: var(--c-paper);
+  --ed-surface-raised: var(--c-stone);
+  --ed-ink: var(--c-ink);
+  --ed-ink-muted: var(--c-muted);
+  --ed-line: var(--c-line);
+  --ed-accent: var(--c-olive);
+  --ed-image-frame: var(--c-stone);
+  --ed-overlay: var(--c-night-deep);
+}
+.template-after-hours,
+.canvas-theme-after-hours,
+.module-theme-after-hours {
+  --ed-surface: var(--c-night);
+  --ed-surface-raised: var(--c-ink);
+  --ed-ink: var(--c-linen);
+  --ed-ink-muted: var(--c-mist);
+  --ed-line: var(--c-forest-line);
+  --ed-accent: var(--c-fog);
+  --ed-image-frame: var(--c-night);
+  --ed-overlay: var(--c-night-deep);
+}

@@ -1,0 +1,925 @@
+/* WANDER header — single owner of the masthead: .site-header, .public-header,
+   .studio-header, main navigation, menu toggle, brand mark and header actions.
+   Rules appear in the order of their former cascade (file import order, then line). */
+
+.site-header {
+  margin: 0;
+  padding-inline: var(--gutter);
+  height: 99px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 40px;
+  position: relative;
+  z-index: 10;
+  background: var(--c-ink);
+  color: var(--c-fog);
+  border-color: var(--c-forest-line);
+}
+.site-header nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  font-size: 13px;
+}
+.site-header nav > a {
+  position: relative;
+  padding: 13px 0;
+}
+.site-header nav > a:not(.studio-link):after {
+  position: absolute;
+  content: "";
+  bottom: 6px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width 0.25s;
+}
+.site-header nav > a.active:after {
+  width: 100%;
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-header nav > a:hover:after {
+    width: 100%;
+  }
+}
+.site-header .studio-link {
+  margin-left: 15px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--c-mist);
+}
+.site-header a:focus-visible,
+.site-header button:focus-visible,
+.site-header select:focus-visible {
+  outline-color: var(--c-line);
+}
+.menu-toggle {
+  display: none;
+}
+@media (min-width: 1800px) {
+  .site-header {
+    padding-inline: calc(var(--gutter) + max(0px, (100vw - 1840px) / 2));
+  }
+}
+@media (max-width: 699px) {
+  .site-header {
+    height: 79px;
+  }
+  .site-header nav {
+    display: none;
+    position: absolute;
+    top: 78px;
+    left: 0;
+    right: 0;
+    padding: 30px 22px 35px;
+    background: var(--c-ink);
+    color: var(--c-fog);
+    border-bottom: 1px solid var(--c-forest-line);
+    font-size: 18px;
+    box-shadow: 0 20px 25px color-mix(in srgb, var(--c-night) 6%, transparent);
+  }
+  .site-header nav.nav-open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .site-header nav > a {
+    padding: 12px 0;
+  }
+  .site-header nav > a.active:after {
+    width: 24px;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .site-header nav > a:hover:after {
+      width: 24px;
+    }
+  }
+  .site-header .studio-link {
+    margin: 10px 0 0;
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+  }
+  .menu-toggle {
+    display: flex;
+    margin-left: auto;
+  }
+}
+.studio-header-label {
+  --studio-label-gap: 46px;
+  --studio-label-track: 0.14em;
+  position: absolute;
+  left: 50%;
+  top: var(--studio-label-gap);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: var(--studio-label-track);
+  text-transform: none;
+  /* The last letter carries trailing tracking: pad the start so the word sits optically centred. */
+  padding-left: var(--studio-label-track);
+  color: color-mix(in srgb, var(--paper) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 260ms ease;
+}
+/* Short, fine hairlines either side, like a printed running head. */
+.studio-header-label::before,
+.studio-header-label::after {
+  content: "";
+  width: 12px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.4;
+}
+.studio-header-label::after { margin-left: calc(var(--studio-label-track) * -1); }
+/* The expanded masthead already shows the full navigation: step the label aside. */
+.site-header.studio-header:not(.is-compact) .studio-header-label { opacity: 0; }
+@media (max-width: 699px) {
+  .studio-header-label { --studio-label-gap: 45px; font-size: 13px; gap: 8px; }
+  .studio-header-label::before,
+  .studio-header-label::after {
+    width: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-header-label { transition: none; }
+}
+[data-motion="off"] .studio-header-label { transition: none; }
+@media (max-width: 960px) {
+  .site-header nav {
+    gap: 20px;
+  }
+}
+.site-header .language-switch {
+  z-index: 25;
+}
+.site-header {
+  align-items: center;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+@media (max-width: 699px) {
+  .site-header {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    gap: 8px;
+  }
+}
+/* WB2: the reserved masthead space never changes when the fixed layer folds. */
+.public-header-slot {
+  height: 164px;
+}
+.site-header:is(.public-header, .studio-header) {
+  /* Masthead choreography: the mountain W settles into the wordmark as its
+     initial. Mark and lettering use separate curves per axis so their paths
+     never cross;
+  transitions (not keyframes) keep interruptions continuous. */
+  --mast-out: cubic-bezier(0.16, 0.84, 0.24, 1);
+  --mast-inout: cubic-bezier(0.55, 0, 0.3, 1);
+  --mast-collapse: 700ms;
+  --mast-expand: 780ms;
+  background: var(--brand-frame);
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  height: 164px;
+  overflow: clip;
+  padding: 0 var(--gutter);
+  transition: height var(--mast-expand) var(--mast-out);
+}
+.site-header:is(.public-header, .studio-header).has-open-menu {
+  overflow: visible;
+}
+:is(.public-header, .studio-header) .editorial-brand {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 268px;
+  height: 84px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+:is(.public-header, .studio-header) .editorial-brand svg {
+  display: block;
+  position: absolute;
+  transform-origin: top left;
+  pointer-events: auto;
+  backface-visibility: hidden;
+}
+/* Expanding: the mark lifts out on one arc while the wordmark settles. */
+:is(.public-header, .studio-header) .editorial-brand .header-monogram {
+  width: 78px;
+  height: 40.54px;
+  left: 0;
+  top: 0;
+  margin-left: 89.5px;
+  /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+  transform: translateY(-1px) scale(1.14);
+  transition:
+    margin-left var(--mast-expand) var(--mast-inout),
+    transform var(--mast-expand) var(--mast-inout);
+}
+/* The serif initial travels glued to ANDER: both scale from their shared seam. */
+:is(.public-header, .studio-header) .editorial-brand :is(.header-initial, .header-remainder) {
+  height: 31.96px;
+  top: 52px;
+  margin-left: 0;
+  /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+  transform: translateY(0) scale(1);
+  transition:
+    margin-left var(--mast-expand) var(--mast-out),
+    transform var(--mast-expand) var(--mast-out),
+    opacity 380ms var(--mast-out) 180ms;
+}
+:is(.public-header, .studio-header) .editorial-brand .header-initial {
+  width: 55.448px;
+  left: 0;
+  opacity: 1;
+  transform-origin: 55.448px 0;
+}
+:is(.public-header, .studio-header) .editorial-brand .header-remainder {
+  width: 214.092px;
+  left: 55.448px;
+}
+.site-header:is(.public-header, .studio-header) nav {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  gap: 30px;
+  white-space: nowrap;
+}
+/* Navigation returns once the bar has room again and leaves before it folds. */
+.site-header:is(.public-header, .studio-header) nav:not(.nav-open) {
+  translate: 0 0;
+  transition:
+    opacity 360ms var(--mast-out) 240ms,
+    translate 520ms var(--mast-out) 200ms,
+    visibility 0s;
+}
+:is(.public-header, .studio-header) .language-switch {
+  position: absolute;
+  top: 10px;
+  right: var(--gutter);
+  margin: 0;
+}
+:is(.public-header, .studio-header) .menu-toggle {
+  display: flex;
+  position: absolute;
+  left: var(--gutter);
+  top: 10px;
+  margin: 0;
+  min-width: 44px;
+  min-height: 44px;
+  z-index: 1;
+}
+.site-header:is(.public-header, .studio-header) nav.nav-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  top: 100%;
+  left: var(--gutter);
+  right: auto;
+  width: min(320px, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100dvh - 164px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: none;
+  padding: 24px;
+  background: var(--brand-frame);
+  color: var(--c-fog);
+  border: 1px solid var(--c-forest-line);
+  border-top: 0;
+  white-space: normal;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+:is(.public-header, .studio-header) nav.nav-open > a {
+  padding-block: 13px;
+}
+:is(.public-header, .studio-header) nav.nav-open .studio-link {
+  margin: 8px 0 0;
+  border-top: 1px solid var(--c-forest-line);
+  padding-top: 20px;
+}
+.site-header:is(.public-header, .studio-header).is-compact {
+  height: 64px;
+  transition: height var(--mast-collapse) var(--mast-inout);
+}
+/* The panel follows the actual compact edge and uses its available viewport. */
+.site-header:is(.public-header, .studio-header).is-compact nav.nav-open {
+  max-height: calc(100dvh - 64px);
+  padding: 16px 24px;
+  gap: 4px;
+}
+:is(.public-header, .studio-header).is-compact nav.nav-open > a {
+  padding-block: 10px;
+}
+:is(.public-header, .studio-header).is-compact nav.nav-open .studio-link {
+  margin-top: 4px;
+  padding-top: 14px;
+}
+:is(.public-header, .studio-header).is-compact .editorial-brand .header-monogram {
+  margin-left: 38.98px;
+  /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+  transform: translateY(8.785px) scale(0.50915);
+  transition:
+    margin-left var(--mast-collapse) var(--mast-out),
+    transform var(--mast-collapse) var(--mast-inout);
+}
+:is(.public-header, .studio-header).is-compact .editorial-brand :is(.header-initial, .header-remainder) {
+  margin-left: 30.98px;
+  /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+  transform: translateY(-43.475px) scale(0.66971);
+  transition:
+    margin-left var(--mast-collapse) var(--mast-out),
+    transform var(--mast-collapse) var(--mast-inout),
+    opacity 220ms var(--mast-out);
+}
+:is(.public-header, .studio-header).is-compact .editorial-brand .header-initial {
+  opacity: 0;
+  pointer-events: none;
+}
+.site-header:is(.public-header, .studio-header).is-compact nav:not(.nav-open) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  translate: 0 -6px;
+  transition:
+    opacity 160ms var(--ui-ease-exit),
+    translate 200ms var(--ui-ease-exit),
+    visibility 0s 200ms;
+}
+:is(.public-header, .studio-header) .editorial-brand:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+:is(.public-header, .studio-header).is-compact .editorial-brand:focus-visible::after {
+  inset: 4px calc(50% - 98px) 58px;
+}
+html:has(.public-header) {
+  scroll-padding-top: 176px;
+}
+@media (max-width: 699px) {
+  .public-header-slot,
+  .site-header.public-header {
+    height: 136px;
+  }
+  .site-header.studio-header { height: 136px; }
+  :is(.public-header, .studio-header) .editorial-brand {
+    width: 218px;
+    height: 80px;
+  }
+  :is(.public-header, .studio-header) .editorial-brand .header-monogram {
+    margin-left: 71.4px;
+    /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+    transform: translateY(-1px) scale(0.9646);
+  }
+  :is(.public-header, .studio-header) .editorial-brand :is(.header-initial, .header-remainder) {
+    margin-left: -10.345px;
+    /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+    transform: translateY(2px) scale(0.81343);
+  }
+  :is(.public-header, .studio-header).is-compact .editorial-brand .header-monogram {
+    margin-left: 28.66px;
+    /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+    transform: translateY(10.395px) scale(0.43082);
+  }
+  :is(.public-header, .studio-header).is-compact .editorial-brand :is(.header-initial, .header-remainder) {
+    margin-left: 13.36px;
+    /* statt translate: Lightning CSS verwirft translate neben transform im Build */
+    transform: translateY(-41.825px) scale(0.56668);
+  }
+  :is(.public-header, .studio-header) .language-switch {
+    top: 10px;
+    left: auto;
+    right: 16px;
+  }
+  :is(.public-header, .studio-header) .menu-toggle {
+    display: flex;
+    position: absolute;
+    left: 16px;
+    right: auto;
+    top: 10px;
+    margin: 0;
+  }
+  .site-header:is(.public-header, .studio-header) nav {
+    display: none;
+    top: 100%;
+    left: 0;
+    right: 0;
+    transform: none;
+    white-space: normal;
+    max-height: calc(100dvh - 136px);
+    overflow-y: auto;
+  }
+  .site-header:is(.public-header, .studio-header) nav.nav-open {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    gap: 10px;
+    max-height: calc(100dvh - 136px);
+  }
+  html:has(.public-header) {
+    scroll-padding-top: 148px;
+  }
+}
+/* Studio reserves only the compact masthead and keeps editing controls below it. */
+.studio-header-slot {
+  height: 64px;
+}
+/* Size the indicator to the label while keeping the full navigation hit area. */
+.site-header nav > a:not(.studio-link)::after {
+  content: none;
+}
+.site-header .nav-label {
+  position: relative;
+  display: inline-block;
+}
+.site-header .nav-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0.72;
+}
+.site-header a.active .nav-label::after {
+  transform: scaleX(1);
+  opacity: 0.62;
+}
+.site-header a:focus-visible .nav-label::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-header a:hover .nav-label::after {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@media (max-width: 699px) {
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) {
+    left: 10px;
+    right: 10px;
+    gap: 16px;
+    justify-content: center;
+    overflow: visible;
+    font-size: var(--fs-xs);
+  }
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) .studio-link { display: none; }
+}
+[data-motion="off"] .site-header .nav-label::after {
+  transition: none;
+}
+/* Doubled class weight outranks every masthead state rule above. */
+[data-motion="off"] .site-header.site-header:is(.public-header, .studio-header),
+[data-motion="off"] .site-header.site-header:is(.public-header, .studio-header) *,
+[data-motion="off"] body:has(.public-header) .chapter-compass {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header.site-header.site-header:is(.public-header, .studio-header),
+  .site-header.site-header.site-header:is(.public-header, .studio-header) *,
+  body:has(.public-header) .chapter-compass {
+    transition: none;
+  }
+}
+body:has(.home-page) .public-header nav {
+  border-color: transparent;
+}
+/* Editorial glass masthead (public pages).
+   Folding is compositor-only: the header box keeps its height and the frame
+   (::before) scales from the top edge, so no layout or full repaint happens per
+   frame. The hairline (::after) travels with the frame's lower edge. Folded,
+   the frame becomes darker frosted glass, still full width with straight edges. */
+.site-header.public-header,
+.site-header.public-header.is-compact {
+  height: 164px;
+  overflow: visible;
+  background: transparent;
+  border-bottom: 0;
+  transition: none;
+}
+.site-header.public-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--brand-frame);
+  transform-origin: 50% 0;
+  transform: scaleY(1);
+  pointer-events: none;
+  transition:
+    transform var(--mast-expand) var(--mast-out),
+    background-color var(--mast-expand) var(--mast-out);
+}
+.site-header.public-header.is-compact::before,
+.site-header.studio-header.is-compact {
+  /* 10.11.: darker but still translucent (user feedback). */
+  background: color-mix(in srgb, var(--brand-frame) 90%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.site-header.public-header.is-compact::before {
+  transform: scaleY(calc(64 / 164));
+  transition:
+    transform var(--mast-collapse) var(--mast-inout),
+    background-color var(--mast-collapse) var(--mast-inout);
+}
+.site-header.public-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--c-linen) 14%, transparent);
+  opacity: 0.6;
+  transform: translateY(163px);
+  pointer-events: none;
+  transition:
+    transform var(--mast-expand) var(--mast-out),
+    opacity var(--mast-expand) var(--mast-out);
+}
+.site-header.public-header.is-compact::after {
+  opacity: 1;
+  transform: translateY(63px);
+  transition:
+    transform var(--mast-collapse) var(--mast-inout),
+    opacity var(--mast-collapse) var(--mast-inout);
+}
+/* Folded, only the 64px bar is interactive; the page below stays clickable. */
+.site-header.public-header.is-compact:not(.has-open-menu) { pointer-events: none; }
+.site-header.public-header.is-compact :is(.menu-toggle, .language-switch, .header-actions, nav.nav-open) {
+  pointer-events: auto;
+}
+.site-header.public-header.is-compact nav.nav-open {
+  top: 64px;
+  max-height: calc(100dvh - 64px);
+}
+@media (max-width: 699px) {
+  .site-header.public-header,
+  .site-header.public-header.is-compact {
+    height: 136px;
+  }
+  .site-header.public-header.is-compact::before { transform: scaleY(calc(64 / 136)); }
+  .site-header.public-header::after { transform: translateY(135px); }
+  .site-header.public-header.is-compact::after { transform: translateY(63px); }
+}
+[data-motion="off"] .site-header.public-header::before,
+[data-motion="off"] .site-header.public-header::after {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header.public-header::before,
+  .site-header.public-header::after {
+    transition: none;
+  }
+}
+/* Journey actions in the masthead, left of the language switch. */
+.site-header .header-actions {
+  position: absolute;
+  top: 10px;
+  right: calc(var(--gutter) + 58px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.site-header .header-actions:empty { display: none; }
+.site-header .header-action {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-fog);
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-header .header-action:hover {
+    color: var(--c-linen);
+    background: color-mix(in srgb, var(--c-linen) 8%, transparent);
+  }
+}
+@media (max-width: 699px) {
+  .site-header .header-actions { right: 64px; }
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) {
+    top: 100px;
+    padding: 0;
+    background: transparent;
+    align-items: center;
+    min-height: 32px;
+  }
+}
+/* Running head: in the slim bar a journey names itself in small capitals,
+   like the head of a magazine page. Hidden while the masthead is open. */
+.site-header .header-running {
+  position: absolute;
+  top: 0;
+  left: calc(var(--gutter) + 60px);
+  height: 64px;
+  max-width: calc(50% - var(--gutter) - 190px);
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--c-fog);
+  font: 500 var(--fs-xs) / 1 Manrope, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none;
+  transition:
+    opacity 240ms var(--ui-ease-exit),
+    translate 240ms var(--ui-ease-exit);
+}
+.site-header .header-running:empty { display: none; }
+.site-header .header-running > span { overflow: hidden; text-overflow: ellipsis; }
+.site-header .header-running-place { color: var(--c-mist); }
+.site-header.public-header.is-compact .header-running {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 520ms var(--mast-out) 260ms,
+    translate 520ms var(--mast-out) 260ms;
+}
+/* The W is built once when the site opens, from the ground up: first the
+   mountain ridge inside it is drawn in one clean stroke, then the letter
+   grows upward out of that ridge, and the line dissolves into the finished
+   mark. Resting state (and reduced motion): the filled W only. */
+.header-monogram .mono-ridge { stroke-dasharray: 1; stroke-dashoffset: 0; stroke-opacity: 0; }
+.header-monogram .mono-riser { transform: translateY(-160px); }
+.site-header.public-header.brand-intro .header-monogram .mono-ridge {
+  animation: wander-ridge-draw 3300ms cubic-bezier(0.4, 0, 0.3, 1) 600ms both;
+}
+.site-header.public-header.brand-intro .header-monogram .mono-riser {
+  animation: wander-w-grow 1200ms cubic-bezier(0.1, 0.75, 0.25, 1) 1950ms both;
+}
+[data-motion="off"] .site-header .header-monogram :is(.mono-ridge, .mono-riser),
+[data-motion="off"] .site-header .header-running {
+  animation: none;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .header-monogram :is(.mono-ridge, .mono-riser) { animation: none; }
+  .site-header .header-running { transition: none; }
+}
+/* Elastic overscroll (macOS/iOS) reveals the canvas above the page. Give the
+   root the masthead colour so the bounce continues the header instead of
+   opening a pale strip; the body keeps painting the page paper. */
+html:has(.public-header) { background: var(--brand-frame); }
+html:has(.public-header) body {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+/* Masthead: the serif initial and the arriving mountain W hand over to each
+   other while ANDER stays continuous, so no "W ANDER" gap or double W shows. */
+.site-header:is(.public-header, .studio-header) .editorial-brand .header-initial {
+  transition:
+    margin-left var(--mast-expand) var(--mast-out),
+    transform var(--mast-expand) var(--mast-out),
+    opacity 360ms var(--ease-out-soft) 240ms;
+}
+.site-header:is(.public-header, .studio-header).is-compact .editorial-brand .header-initial {
+  transition:
+    margin-left var(--mast-collapse) var(--mast-out),
+    transform var(--mast-collapse) var(--mast-inout),
+    opacity 240ms var(--ease-in-out-soft) 300ms;
+}
+[data-motion="off"] .site-header .editorial-brand svg,
+[data-motion="off"] .site-header {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header, .site-header .editorial-brand svg { transition: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Page change: the bar is its own layer, the WANDER mark a second one that stands still. */
+  html.vt-active .site-header { view-transition-name: site-header; }
+  html.vt-active .site-header .editorial-brand { view-transition-name: site-brand; }
+}
+/* The clicked navigation item becomes current at once, before the next page has loaded.
+   Same two states as always (55 % linen / full linen), no stroke, no dot, no fade. */
+html[data-vt-nav] .site-header:is(.public-header, .studio-header) nav > a:not(.studio-link) {
+  color: color-mix(in srgb, var(--c-linen) 55%, transparent) !important;
+  transition: none !important;
+}
+html[data-vt-nav] .site-header:is(.public-header, .studio-header) nav > a:not(.studio-link)[data-vt-current] {
+  color: var(--c-linen) !important;
+}
+/* 08.11.: centred running line at every width; the left header slot is retired. */
+.site-header .header-running { display: none; }
+/* The in-flow masthead reserve takes the masthead colour, so no paper-coloured
+   strip can show between the fixed header and the page content. */
+.public-header-slot {
+  background: var(--brand-frame);
+}
+/* Round header actions keep their ring inside the 36px target. */
+.site-header .header-action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.site-header .nav-label::after {
+  transition:
+    transform var(--dur-base) var(--ease-out-soft),
+    opacity var(--dur-base) var(--ease-out-soft);
+}
+.site-header :is(nav a, .header-action, .menu-toggle) {
+  transition-timing-function: var(--ease-out-soft);
+}
+.site-header .header-action {
+  transition-duration: var(--dur-quick);
+  transition-timing-function: var(--ease-out-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .nav-label::after {
+    transition: none;
+  }
+}
+/* Public and studio navigation share the same link states.
+   Inactive links use 55% linen. Hover and current links use full linen. */
+/* Same type size everywhere (previously only the home page set it). */
+.site-header:is(.public-header, .studio-header) nav > a:not(.studio-link) {
+  font-size: max(13px, 0.8rem);
+  padding: 13px 4px;
+  color: color-mix(in srgb, var(--c-linen) 55%, transparent);
+  transition: color var(--dur-base, 420ms) var(--ease-out-soft);
+}
+.site-header:is(.public-header, .studio-header) nav > a:not(.studio-link):is(:focus-visible, .active, [aria-current="page"]) {
+  color: var(--c-linen);
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-header:is(.public-header, .studio-header) nav > a:not(.studio-link):hover {
+    color: var(--c-linen);
+  }
+}
+/* No underline strokes in the masthead. */
+.site-header:is(.public-header, .studio-header) nav > a:not(.studio-link)::after,
+.site-header:is(.public-header, .studio-header) .nav-label::after {
+  content: none;
+  display: none;
+}
+.site-header:is(.public-header, .studio-header) nav > a:focus-visible {
+  outline: 2px solid var(--c-linen);
+  outline-offset: 2px;
+}
+/* Mobile: the folded-out row below the bar and the open menu keep the same size and treatment. */
+@media (max-width: 699px) {
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) {
+    font-size: max(13px, 0.8rem);
+  }
+  .site-header:is(.public-header, .studio-header) nav.nav-open > a:not(.studio-link) {
+    font-size: 18px;
+    padding-inline: 4px;
+  }
+}
+/* Pale hairline and soft shadow under the bar: the travelling hairline (::after) and
+   any shadow are invisible over the dark home hero but show as a pale strip on light pages. */
+.site-header.public-header,
+.site-header.public-header.is-compact,
+.site-header.public-header::before,
+.site-header.public-header.is-compact::before {
+  box-shadow: none;
+  border-bottom: 0;
+}
+.site-header.public-header::after,
+.site-header.public-header.is-compact::after {
+  opacity: 0;
+}
+[data-motion="off"] .site-header:is(.public-header, .studio-header) nav > a { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .site-header:is(.public-header, .studio-header) nav > a { transition: none; }
+}
+/* Same masthead as the home page everywhere: no hairline or shadow under the bar,
+   and the frame overlaps the reserve by a pixel so no seam can show on fractional pixels. */
+.site-header.public-header::after,
+.site-header.public-header.is-compact::after {
+  display: none;
+}
+.site-header.public-header, .site-header.public-header.is-compact { outline: 0; }
+.public-header-slot { border: 0; margin-bottom: -1px; padding-bottom: 1px; }
+/* 08.11.: wie auf der Startseite – keine Linie/kein Schatten unter der Navigation auf Unterseiten. */
+.site-header.public-header nav { border-color: transparent; }
+.site-header.public-header nav:not(.nav-open) { box-shadow: none; }
+/* Studio-Header: gleiche Masthead-Optik wie die öffentlichen Seiten – keine Linie, kein Schatten. */
+.site-header.studio-header,
+.site-header.studio-header.is-compact {
+  border-bottom: 0;
+  border-color: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+.site-header.studio-header::before,
+.site-header.studio-header::after {
+  content: none;
+  display: none;
+}
+.site-header.studio-header nav { border-color: transparent; }
+.site-header.studio-header nav:not(.nav-open) { box-shadow: none; }
+.studio-header-slot { border: 0; }
+/* Mobile masthead: journey actions (edit, share) sit left of the centred wordmark,
+   beside the menu toggle, so they never meet the wordmark or the language switch on the right.
+   32px targets, 8px gap. Desktop is untouched (media query). */
+@media (max-width: 699px) {
+  /* Edit/share move into the menu (.nav-story-actions) on mobile. */
+  .site-header .header-actions { display: none; }
+}
+.nav-story-actions { display: none; }
+@media (max-width: 699px) {
+  .site-header nav.nav-open .nav-story-actions { display: contents; }
+  .site-header nav.nav-open .nav-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 4px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 18px;
+    text-align: left;
+    text-decoration: none;
+    color: color-mix(in srgb, var(--c-linen) 55%, transparent);
+    cursor: pointer;
+  }
+  .site-header nav.nav-open .nav-action:focus-visible { color: var(--c-linen); }
+  @media (hover: hover) and (pointer: fine) {
+    .site-header nav.nav-open .nav-action:hover { color: var(--c-linen); }
+  }
+  .site-header.is-compact nav.nav-open .nav-action { padding-block: 10px; }
+}
+/* At <=400px the compact wordmark is scaled a little so the actions fit between toggle and wordmark. */
+@media (max-width: 400px) {
+  .site-header.public-header.is-compact .editorial-brand {
+    transform: translateX(-50%) scale(0.85);
+  }
+}
+/* Prompt 02 (11.11.2026): schmaler öffentlicher Header.
+   Unter 761 px zeigt er nur Menü-Knopf, Marke und Sprachwahl. Die Masthead-Zeile
+   (Startseite, Archiv, Editionen, Über) entfällt dort und bleibt im geöffneten Menü erreichbar.
+   Die Höhe (136 px) bleibt größer als der Inhalt (Marke endet bei 92 px), nichts ragt in main. */
+@media (max-width: 699px) {
+  .site-header:is(.public-header, .studio-header):not(.is-compact) nav:not(.nav-open) {
+    display: none;
+  }
+}
+/* Safe-Area (viewport-fit=cover): seitliche Abstände von Menü-Knopf, Sprachwahl und offenem Menü.
+   Oben ist kein Abstand nötig: der Header sitzt ohne Standalone-Modus unterhalb der Statusleiste. */
+:is(.public-header, .studio-header) .menu-toggle {
+  left: max(var(--gutter), env(safe-area-inset-left, 0px));
+}
+:is(.public-header, .studio-header) .language-switch {
+  right: max(var(--gutter), env(safe-area-inset-right, 0px));
+}
+@media (max-width: 699px) {
+  :is(.public-header, .studio-header) .menu-toggle {
+    left: max(16px, env(safe-area-inset-left, 0px));
+  }
+  :is(.public-header, .studio-header) .language-switch {
+    right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .site-header:is(.public-header, .studio-header) nav.nav-open {
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+  }
+}
+html .public-header-slot.is-story {
+  height: var(--compact-header);
+}
+
+/* Logo wrapper (one tone): the editions page uses the normal header like every page. */
+.site-header .editorial-brand .brand-tone {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  clip-path: inset(-24px -24px -24px -24px);
+}

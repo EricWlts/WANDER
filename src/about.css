@@ -1,0 +1,155 @@
+/* About: an editorial essay – opening, framed plate, three thoughts, a dark band, two links, credits. */
+
+/* The written-out wordmark replaces the former single W wherever a quiet mark is needed. */
+.toast .brand-signature { height: 11px; width: auto; aspect-ratio: 736 / 84; flex: none; }
+:is(.page-state-mark, .empty-state .brand-signature, .home-feature-empty .brand-signature, .archive-end .brand-signature) {
+  display: block;
+  width: clamp(120px, 14vw, 168px);
+  height: auto;
+  aspect-ratio: 736 / 84;
+  opacity: 0.6;
+}
+.empty-state .brand-signature, .page-state-mark { margin-inline: auto; }
+
+/* ==========================================================================
+   Über WANDER: dunkel wie das Archiv. Auftakt (Foto-Band) → Hinter WANDER →
+   Gestalten → Deine Fotos → Was WANDER nicht ist → Fragen → Abschluss → Nachweise.
+   ========================================================================== */
+html body .about-mag {
+  --ab-ink: var(--c-linen);
+  --ab-soft: color-mix(in srgb, var(--c-linen) 72%, transparent);
+  --ab-line: rgba(255, 255, 255, 0.14);
+  --ab-edge: max(var(--gutter, 24px), calc((100vw - 1280px) / 2));
+  padding: 0 !important;
+  margin-inline: calc(50% - 50vw);
+  width: 100vw;
+  max-width: 100vw;
+  overflow-x: clip;
+  background: #0a0c0b;
+  color: var(--ab-ink);
+}
+.about-mag h1, .about-mag h2, .about-mag h3 { color: var(--ab-ink); font-weight: 400; }
+.about-kicker {
+  display: block;
+  font: 500 12px / 1.6 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ab-soft);
+}
+
+/* Foto-Bänder (Auftakt und Abschluss) */
+.about-hero, .about-closing { position: relative; isolation: isolate; overflow: hidden; display: flex; }
+.about-hero { align-items: flex-end; min-height: clamp(520px, 84svh, 900px); padding: 0 var(--ab-edge) clamp(48px, 8vw, 110px); }
+.about-closing { align-items: center; justify-content: center; min-height: clamp(460px, 76svh, 800px); padding: clamp(64px, 8vw, 120px) var(--gutter, 24px); text-align: center; }
+.about-hero-media, .about-not-media { position: absolute; inset: 0; z-index: -2; }
+.about-hero-layer { position: absolute; inset: -10% 0; transform: translate3d(0, var(--close-y, 0px), 0); will-change: transform; }
+.about-hero-layer img, .about-not-media img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.about-hero-shade, .about-not-shade { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(to top, rgba(10, 12, 11, 0.88), rgba(10, 12, 11, 0.35) 55%, rgba(10, 12, 11, 0.6)); }
+.about-hero-shade:not(.is-closing) { background: linear-gradient(to right, rgba(10, 12, 11, 0.55), rgba(10, 12, 11, 0.2) 55%, rgba(10, 12, 11, 0) 80%), linear-gradient(to top, rgba(10, 12, 11, 0.9), rgba(10, 12, 11, 0.4) 55%, rgba(10, 12, 11, 0.6)); }
+.about-hero-shade.is-closing { background: linear-gradient(to top, rgba(10, 12, 11, 0.8), rgba(10, 12, 11, 0.55) 55%, rgba(10, 12, 11, 0.85)); }
+.about-hero-copy { width: 100%; max-width: 1280px; }
+.about-hero h1 { margin: 16px 0 0; max-width: 14ch; font: 400 clamp(44px, 7vw, 104px) / 1 var(--serif); letter-spacing: -0.03em; text-wrap: balance; }
+.about-hero h1 em { display: block; font-style: italic; opacity: 0.88; }
+
+/* Abschnitte */
+.about-section { padding: clamp(72px, 10vw, 150px) var(--ab-edge) 0; max-width: 100%; box-sizing: border-box; }
+.about-section h2 { margin: 14px 0 0; max-width: 18ch; font: 400 clamp(34px, 4.6vw, 68px) / 1.04 var(--serif); letter-spacing: -0.025em; text-wrap: balance; }
+.about-prose p, .about-note, .about-pledge, .about-q p { font: 400 clamp(16px, 1.3vw, 19px) / 1.7 var(--sans, "Manrope", sans-serif); color: var(--ab-soft); text-wrap: pretty; }
+
+/* Hinter WANDER */
+.about-behind { display: grid; gap: clamp(36px, 5vw, 72px); align-items: start; }
+.about-behind-text .about-prose { margin-top: clamp(20px, 2.4vw, 32px); max-width: 46ch; }
+.about-behind-text .about-prose p { margin: 0; font-size: clamp(18px, 1.6vw, 22px); color: var(--ab-ink); }
+.about-portraits { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.about-portrait { margin: 0; }
+.about-portrait .picture { display: block; width: 100%; background: #101311; }
+.about-portrait .picture img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.about-portrait figcaption { margin-top: 10px; font: 400 13px / 1.4 var(--sans, "Manrope", sans-serif); letter-spacing: 0.04em; color: var(--ab-soft); }
+.about-portrait.is-0 { grid-column: 1 / -1; }
+.about-portrait.is-0 .picture { aspect-ratio: 4 / 5; max-height: 78svh; }
+.about-portrait.is-1 .picture, .about-portrait.is-2 .picture { aspect-ratio: 4 / 3; }
+@media (min-width: 900px) {
+  .about-behind { grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); }
+  .about-behind { align-items: center; }
+  /* Big portrait sets the height; the two smaller pictures share it, with a clear gap between them. */
+  .about-portraits { grid-template-columns: 1.1fr 1fr; grid-template-rows: 1fr 1fr; gap: clamp(14px, 1.4vw, 20px); align-items: stretch; }
+  .about-portrait.is-0 { grid-column: 1; grid-row: 1 / span 2; }
+  .about-portrait.is-1 { grid-column: 2; grid-row: 1; }
+  .about-portrait.is-2 { grid-column: 2; grid-row: 2; }
+  .about-portrait.is-1, .about-portrait.is-2 { display: flex; flex-direction: column; min-height: 0; }
+  .about-portrait.is-1 > *, .about-portrait.is-2 > * { flex: 1 1 auto; min-height: 0; display: flex; }
+  .about-portrait.is-1 .picture, .about-portrait.is-2 .picture { aspect-ratio: auto; height: 100%; }
+  .about-portraits.has-1 .about-portrait.is-0 { grid-column: 1 / -1; grid-row: auto; max-width: 560px; }
+}
+
+/* Gestalten: drei hohe Filmbilder, Titel und Satz unten im Bild auf weichem Verlauf */
+.about-trio { list-style: none; margin: clamp(32px, 4vw, 56px) 0 0; padding: 0; display: grid; gap: clamp(8px, 1vw, 14px); }
+.about-trio-item { position: relative; isolation: isolate; overflow: hidden; margin: 0; padding: 0; aspect-ratio: 16 / 10; background: #101311; display: flex; align-items: flex-end; }
+.about-trio-img { position: absolute; inset: 0; z-index: -2; display: block; width: 100%; height: 100%; object-fit: cover; }
+.about-trio-item::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(to top, rgba(10, 12, 11, 0.86) 0%, rgba(10, 12, 11, 0.55) 32%, rgba(10, 12, 11, 0) 62%); }
+.about-trio-copy { width: 100%; box-sizing: border-box; padding: clamp(18px, 2.2vw, 30px); }
+.about-trio h3 { margin: 0 0 8px; font: 400 clamp(28px, 3vw, 42px) / 1.1 var(--serif); font-style: italic; }
+.about-trio p { margin: 0; max-width: 34ch; color: var(--ab-ink); font: 400 16px / 1.55 var(--sans, "Manrope", sans-serif); }
+.about-note { max-width: 60ch; margin: clamp(24px, 2.6vw, 36px) 0 0; }
+@media (min-width: 761px) {
+  .about-trio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .about-trio-item { aspect-ratio: 2 / 3; }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .about-trio-item { aspect-ratio: 3 / 4; }
+}
+
+/* Deine Fotos */
+.about-promises { list-style: none; margin: clamp(28px, 3.4vw, 48px) 0 0; padding: 0; max-width: 62ch; }
+.about-promises li { padding: 18px 0; border-top: 1px solid var(--ab-line); font: 400 clamp(17px, 1.5vw, 20px) / 1.55 var(--sans, "Manrope", sans-serif); }
+.about-promises li:last-child { border-bottom: 1px solid var(--ab-line); }
+.about-pledge { margin: clamp(24px, 3vw, 40px) 0 0; font: italic 400 clamp(22px, 2.4vw, 32px) / 1.25 var(--serif); color: var(--ab-ink); }
+@media (min-width: 900px) {
+  .about-yours { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(40px, 6vw, 96px); align-items: center; }
+  .about-yours .about-pledge { margin: 0; font-size: clamp(28px, 3.2vw, 48px); line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+}
+
+/* Was WANDER nicht ist */
+.about-not { position: relative; isolation: isolate; overflow: hidden; margin-top: clamp(72px, 10vw, 150px); padding: clamp(80px, 12vw, 170px) var(--ab-edge); }
+.about-not-media img { filter: grayscale(0.35); }
+.about-not-shade { background: rgba(10, 12, 11, 0.8); }
+.about-not-list { list-style: none; margin: clamp(20px, 3vw, 40px) 0 0; padding: 0; }
+.about-not-list li { font: 400 clamp(44px, 9vw, 132px) / 1.08 var(--serif); letter-spacing: -0.03em; color: color-mix(in srgb, var(--c-linen) 78%, transparent); }
+.about-not-list s { text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, var(--c-linen) 50%, transparent); }
+.about-not-final { margin: clamp(28px, 4vw, 56px) 0 0; font: italic 400 clamp(28px, 4.4vw, 60px) / 1.1 var(--serif); color: var(--ab-ink); }
+
+/* Fragen */
+.about-faq-list { margin-top: clamp(28px, 3.4vw, 48px); max-width: 780px; border-top: 1px solid var(--ab-line); }
+.about-q { border-bottom: 1px solid var(--ab-line); }
+.about-q summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 64px; padding: 14px 0; font: 400 clamp(20px, 2vw, 26px) / 1.25 var(--serif); }
+.about-q summary::-webkit-details-marker { display: none; }
+.about-q summary:focus-visible { outline: 2px solid var(--ab-ink); outline-offset: 4px; }
+.about-q-mark { position: relative; flex: none; width: 14px; height: 14px; }
+.about-q-mark::before, .about-q-mark::after { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: currentColor; transition: transform 0.25s ease; }
+.about-q-mark::after { transform: rotate(90deg); }
+.about-q[open] .about-q-mark::after { transform: rotate(0); }
+.about-q p { margin: 0 0 22px; max-width: 60ch; }
+@media (hover: hover) { .about-q summary:hover { color: #fff; } }
+
+@media (min-width: 900px) {
+  .about-faq { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: clamp(40px, 6vw, 96px); align-items: start; }
+  .about-faq h2 { margin-top: 0; }
+  .about-faq-list { margin-top: 0; max-width: none; }
+}
+
+/* Abschluss */
+.about-closing { margin-top: clamp(72px, 10vw, 150px); }
+.about-closing-copy { display: flex; flex-direction: column; align-items: center; text-shadow: 0 1px 18px rgba(10, 12, 11, 0.4); }
+.about-closing h2 { margin: 0 auto clamp(20px, 2.6vw, 32px); max-width: 15ch; font: 400 clamp(44px, 6.6vw, 96px) / 1 var(--serif); letter-spacing: -0.03em; text-wrap: balance; }
+.about-cta { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--ab-ink); font: 500 15px / 1 var(--sans, "Manrope", sans-serif); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px; }
+.about-cta-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px clamp(28px, 4vw, 48px); }
+.about-cta.is-quiet { font-weight: 400; opacity: 0.8; }
+.about-cta:focus-visible { outline: 2px solid var(--ab-ink); outline-offset: 4px; }
+
+/* Nachweise */
+html body .about-mag .about-credits { max-width: none; margin: 0; padding: clamp(40px, 5vw, 72px) var(--ab-edge) clamp(48px, 6vw, 88px); background: #0a0c0b; border: 0; color: var(--ab-soft); }
+html body .about-mag .about-credits h2 { margin: 0 0 10px; font: 500 12px / 1.6 var(--sans, "Manrope", sans-serif); letter-spacing: 0.26em; text-transform: uppercase; color: var(--ab-soft); max-width: none; }
+html body .about-mag .about-credits p { margin: 0 0 6px; font-size: 13px; line-height: 1.6; color: var(--ab-soft); }
+
+[data-motion="off"] .about-hero-layer { transform: none; will-change: auto; }
+@media (prefers-reduced-motion: reduce) { .about-hero-layer { transform: none; will-change: auto; } .about-q-mark::before, .about-q-mark::after { transition: none; } }

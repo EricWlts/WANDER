@@ -1,30 +1,48 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { createPortal, flushSync } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
-  Copy,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   LayoutGrid,
   Monitor,
   Smartphone,
   Pencil,
   Plus,
-  Save,
   Trash2,
   X,
   Images,
+  Sparkles,
   Settings2,
   Play,
   Globe,
   GripVertical,
+  Copy,
+  Quote,
+  Type,
 } from "lucide-react";
-import { imageParallax } from "./imageParallax";
-import { ApiError, api, json } from "./api";
+import { ApiError, api } from "./api";
+import { photoDateRange, shouldAdoptDates, type DateRange } from "./journeyDates";
+import {
+  draftChapterTitle,
+  formOf,
+  initialDraftMode,
+  isPlaceholderTitleOfAnyForm,
+  suggestMomentTitle,
+} from "./journeyForm";
 import { useApp, PageState } from "./App";
-import { Field, Modal, Picture } from "./components";
+import { Modal, Picture, dateLabel } from "./components";
 import {
   JournalCanvas,
   moduleNames,
@@ -32,54 +50,319 @@ import {
   type Selection,
 } from "./JournalCanvas";
 import {
-  AppearanceSettings,
-  TypographySettings,
-  WallSettings,
-  RailSettings,
-  MediaLayoutSettings,
-} from "./ModuleSettings";
-import { ModulePhotographs } from "./ModulePhotographs";
-import {
   placementsFor,
-  editionColors,
-  mergeSavedJourney,
   sequenceIndex,
   rootPhotos,
   replaceSourceReferences,
 } from "./journalModel";
-import { HoverZoomControl } from "./HoverZoomControl";
-import { ImageControls, ratios } from "./ImageControls";
+import {
+  applyPreset,
+  pickerGroups,
+  initialLayoutFor,
+  stepVariant,
+  variantState,
+  type StylePreset,
+} from "./editorPresets";
+import { VariantContext, type VariantActions } from "./EditorControls";
+import { StoryDraftDialog } from "./StoryDraftDialog";
+import { cachedLights, readLights } from "./photoMood";
+import { draftModeFromParam, parseWords, wordsKey, type StoryWords } from "./newStoryFlow";
+import {
+  dayOf,
+  draftStory,
+  suggestJourneyTitle,
+  type DraftMode,
+} from "./storyDraft";
+import {
+  applyStoryDraft,
+  applyStoryWords,
+  restoreStoryDraft,
+  type DraftSnapshot,
+} from "./storyDraftApply";
 import { Upload } from "./Upload";
 import { useMotionOff } from "./Motion";
-import { MotionControl } from "./MotionControl";
-import { PhotoViewer } from "./StoryExperience";
+import { PhotoViewer, StoryExperience } from "./StoryExperience";
 import { t, useLocale } from "./I18n";
-import { moveModule } from "./moduleOrder";
 import { removeModuleFromDraft, selectionAfterModuleRemoval } from "./moduleDeletion";
-import { moduleDropTarget, moduleScrollSpeed, moduleTransferTarget } from "./moduleDrag";
+import { canRestoreRecovery } from "./recoveryModel";
+import { retryDelayMs, retrySeconds } from "./autosaveRetry";
 import {
-  canRestoreRecovery,
-  readRecoveries,
-  removeRecovery,
-  writeRecovery,
-  type RecoveryCopy,
-} from "./recoveryModel";
-import type { Chapter, Journey, Layout, Photo } from "./types";
+  mappedId,
+  remapSelection,
+} from "./editor/compositionModel";
+import { useComposition } from "./editor/useComposition";
+import { EditorContext, type EditorContextValue } from "./editor/EditorContext";
+import { PublishedDialog } from "./EditorDialogs";
+import { Inspector } from "./editor/Inspector";
+import { useModuleDrag } from "./editor/useModuleDrag";
+import type { Chapter, Journey, Photo } from "./types";
 
-function recoveryStores(): Storage[] {
-  return (["localStorage", "sessionStorage"] as const).flatMap((name) => {
-    try {
-      return [window[name]];
-    } catch {
-      return [];
-    }
-  });
+/** Name of a module in lists and notices: its title, or the module type when it has none. */
+const moduleLabel = (c: Chapter) => c.title.trim() || t(...moduleNames[c.kind]);
+
+/** Small contact sheet of a module's real photographs for the screenplay list. */
+function NavThumbs({ module, journey }: { module: Chapter; journey: Journey }) {
+  const shown = modulePhotos(module, journey).slice(0, 3);
+  return (
+    <span className={`nav-thumbs nav-thumbs-${Math.max(shown.length, 1)}`} aria-hidden="true">
+      {shown.length ? (
+        shown.map((p) => (
+          <img
+            key={p.placement_id ?? p.id}
+            src={p.url}
+            srcSet={p.srcset || undefined}
+            sizes="48px"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        ))
+      ) : module.kind === "quote" ? (
+        <Quote size={14} />
+      ) : (
+        <Type size={14} />
+      )}
+    </span>
+  );
 }
 
-async function withRecoveryLock<T>(id: number, action: () => T): Promise<T> {
-  // Tabs using this editor serialize read/modify/write on the shared local slot.
-  if (navigator.locks) return navigator.locks.request(`wander-recovery-${id}`, action);
-  return action();
+/** Stable comparison of two layouts: key order and unset fields do not matter. */
+function sameLayout(a: Chapter["layout"] | undefined, b: Chapter["layout"] | undefined) {
+  const norm = (l: Chapter["layout"] | undefined) =>
+    JSON.stringify(
+      Object.entries(l || {})
+        .filter(([, v]) => v !== undefined)
+        .sort(([x], [y]) => (x < y ? -1 : 1)),
+    );
+  return norm(a) === norm(b);
+}
+
+/** Where arrow keys and ⌘Z belong to something else: typing, dialogs, controls with own arrows. */
+const OWN_KEYS =
+  'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="dialog"], dialog, .modal, [role="tablist"], [role="radiogroup"], [role="slider"], [role="listbox"], [role="menu"], .photo-rail-shell';
+
+/** Arrow left/right browse the variants of the selected module. */
+function variantKey(e: KeyboardEvent): 1 | -1 | null {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return null;
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return null;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest(OWN_KEYS)) return null;
+  return e.key === "ArrowRight" ? 1 : -1;
+}
+
+/** ⌘Z / Ctrl+Z outside text fields: undo the last variant change. */
+function undoKey(e: KeyboardEvent): boolean {
+  if (e.defaultPrevented || e.altKey || e.shiftKey || !(e.metaKey || e.ctrlKey)) return false;
+  if (e.key !== "z" && e.key !== "Z") return false;
+  const target = e.target instanceof Element ? e.target : null;
+  return !target?.closest(OWN_KEYS);
+}
+
+function motionIsOff() {
+  return (
+    document.documentElement.dataset.motion === "off" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+/**
+ * „Variante 2 von 4“ on the selected module of the stage: two arrows, the dots and the name.
+ * Rendered inside the preview document, at the top right of the module.
+ */
+function StageVariants({
+  moduleId,
+  revision,
+  index,
+  count,
+  name,
+  customised,
+  onStep,
+}: {
+  moduleId: number | null;
+  revision: unknown;
+  index: number;
+  count: number;
+  name: string;
+  customised: boolean;
+  onStep: (dir: 1 | -1) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  useEffect(() => {
+    const doc = ref.current?.ownerDocument;
+    const win = doc?.defaultView;
+    if (!doc || !win) return;
+    let frame = 0;
+    const place = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const el = moduleId === null ? null : doc.getElementById(`canvas-module-${moduleId}`);
+        const label = el?.querySelector<HTMLElement>(":scope > .canvas-module-label");
+        if (!el || !label) return setPos(null);
+        const r = el.getBoundingClientRect();
+        const l = label.getBoundingClientRect();
+        setPos({
+          top: Math.max(0, l.top + win.scrollY),
+          right: Math.max(8, doc.documentElement.clientWidth - r.right + 8),
+        });
+      });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(doc.body);
+    win.addEventListener("resize", place);
+    win.addEventListener("scroll", place, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      win.removeEventListener("resize", place);
+      win.removeEventListener("scroll", place);
+    };
+  }, [moduleId, revision]);
+  const visible = !!pos && count > 1;
+  return (
+    <div
+      ref={ref}
+      className="stage-variants"
+      role="group"
+      aria-label={t("Variants", "Varianten")}
+      hidden={!visible}
+      style={pos ? { top: pos.top, right: pos.right } : undefined}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label={t("Previous variant", "Vorige Variante")}
+        title={t("Previous variant (←)", "Vorige Variante (←)")}
+        onClick={() => onStep(-1)}
+      >
+        <ChevronLeft size={15} aria-hidden="true" />
+      </button>
+      <span className="stage-variant-dots" aria-hidden="true">
+        {Array.from({ length: count }, (_, i) => (
+          <i key={i} data-active={i === index ? (customised ? "base" : "") : undefined} />
+        ))}
+      </span>
+      <span className="stage-variant-text" role="status">
+        {t(`Variant ${index + 1} of ${count}`, `Variante ${index + 1} von ${count}`)}
+        <span className="stage-variant-name">
+          {" · "}
+          {customised ? t("Customised", "Angepasst") : name}
+        </span>
+      </span>
+      <button
+        type="button"
+        aria-label={t("Next variant", "Nächste Variante")}
+        title={t("Next variant (→)", "Nächste Variante (→)")}
+        onClick={() => onStep(1)}
+      >
+        <ChevronRight size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/** Keyboard target for the preview (F toggles, Esc returns): never while typing or inside a dialog. */
+function previewKey(e: KeyboardEvent): "toggle" | "exit" | null {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return null;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest('[role="dialog"], dialog, .modal')) return null;
+  if (e.key === "Escape") return document.querySelector('[role="dialog"], dialog[open], .modal') ? null : "exit";
+  if (e.key !== "f" && e.key !== "F") return null;
+  if (target?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return null;
+  return "toggle";
+}
+
+/**
+ * Quiet actions next to the label of the selected module on the stage. Rendered inside the
+ * preview document and positioned on the label, so the canvas itself stays untouched.
+ */
+function StageActions({
+  moduleId,
+  revision,
+  canUp,
+  canDown,
+  onUp,
+  onDown,
+  onDuplicate,
+  onRemove,
+  onKey,
+}: {
+  moduleId: number | null;
+  revision: unknown;
+  canUp: boolean;
+  canDown: boolean;
+  onUp: () => void;
+  onDown: () => void;
+  onDuplicate: () => void;
+  onRemove: (trigger: HTMLElement) => void;
+  onKey: (e: KeyboardEvent) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const keyRef = useRef(onKey);
+  keyRef.current = onKey;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    const doc = ref.current?.ownerDocument;
+    const win = doc?.defaultView;
+    if (!doc || !win) return;
+    const key = (e: KeyboardEvent) => keyRef.current(e);
+    doc.addEventListener("keydown", key);
+    return () => doc.removeEventListener("keydown", key);
+  }, []);
+  useEffect(() => {
+    const doc = ref.current?.ownerDocument;
+    const win = doc?.defaultView;
+    if (!doc || !win) return;
+    let frame = 0;
+    const place = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const label =
+          moduleId === null
+            ? null
+            : doc.querySelector<HTMLElement>(`#canvas-module-${moduleId} > .canvas-module-label`);
+        if (!label) return setPos(null);
+        const r = label.getBoundingClientRect();
+        setPos({ top: Math.max(0, r.top + win.scrollY), left: r.right + win.scrollX + 6 });
+      });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(doc.body);
+    win.addEventListener("resize", place);
+    win.addEventListener("scroll", place, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      win.removeEventListener("resize", place);
+      win.removeEventListener("scroll", place);
+    };
+  }, [moduleId, revision]);
+  return (
+    <div
+      ref={ref}
+      className="stage-actions"
+      role="toolbar"
+      aria-label={t("Module actions", "Modulaktionen")}
+      hidden={!pos}
+      style={pos ? { top: pos.top, left: pos.left } : undefined}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button type="button" disabled={!canUp} aria-label={t("Move up", "Nach oben")} title={t("Move up", "Nach oben")} onClick={onUp}>
+        <ArrowUp size={15} aria-hidden="true" />
+      </button>
+      <button type="button" disabled={!canDown} aria-label={t("Move down", "Nach unten")} title={t("Move down", "Nach unten")} onClick={onDown}>
+        <ArrowDown size={15} aria-hidden="true" />
+      </button>
+      <button type="button" aria-label={t("Duplicate module", "Modul duplizieren")} title={t("Duplicate module", "Modul duplizieren")} onClick={onDuplicate}>
+        <Copy size={15} aria-hidden="true" />
+      </button>
+      <button type="button" className="stage-action-delete" aria-label={t("Delete module", "Modul löschen")} title={t("Delete module", "Modul löschen")} onClick={(e) => onRemove(e.currentTarget)}>
+        <Trash2 size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
 function PreviewFrame({
@@ -165,29 +448,61 @@ function PreviewFrame({
     </div>
   );
 }
-const cleanChapter = (c: Chapter) => ({
-  id: c.id,
-  title: c.title,
-  date: c.date || "",
-  story: c.story || "",
-  quote: c.quote || "",
-  kind: c.kind,
-  reveal: c.reveal || {},
-  gallery_mode: c.gallery_mode || "editorial",
-  layout: c.layout || {},
-});
 export function ModularEditor() {
   const navigate = useNavigate();
   const { slug } = useParams(),
     { notify } = useApp();
-  useLocale();
-  const [journey, setJourney] = useState<Journey | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [uploadBusy, setUploadBusy] = useState(false),
-    [dirty, setDirty] = useState(false);
+  const { locale: uiLocale } = useLocale();
+  const motionOff = useMotionOff();
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const {
+    journey,
+    setJourney,
+    layoutIssue,
+    saveFailure,
+    error,
+    setError,
+    busy,
+    setBusy,
+    dirty,
+    setDirty,
+    backgroundSaving,
+    autoError,
+    failures,
+    online,
+    conflicted,
+    conflictBusy,
+    recoveries,
+    recoveryUnavailable,
+    saving,
+    revision,
+    saved,
+    draftRef,
+    change,
+    moduleChange,
+    photoChange,
+    layoutChange,
+    save,
+    markConflict,
+    loadCurrentVersion,
+    keepMyVersion,
+    restoreRecovery,
+    discardRecovery,
+    discardChanges,
+  } = useComposition({
+    slug,
+    uploadBusy,
+    notify,
+    onIdsReassigned: reassignModuleIds,
+    onPublished: (published) => {
+      setPublishReview(null);
+      setPublishResult(published);
+    },
+    onReviewInvalid: () => setPublishReview(null),
+    onVersionLoaded: () => select({ type: "hero" }),
+  });
   const [selected, select] = useState<Selection>({ type: "hero" }),
-    [mode, setMode] = useState<"edit" | "visit">("edit"),
+    [mode] = useState<"edit" | "visit">("edit"),
     [mobile, setMobile] = useState(window.innerWidth < 760),
     [picker, setPicker] = useState(false),
     [tab, setTab] = useState<"canvas" | "modules" | "settings">("canvas"),
@@ -195,18 +510,143 @@ export function ModularEditor() {
     [replay, setReplay] = useState(0),
     [viewerPhotos, setViewerPhotos] = useState<Photo[]>([]),
     [viewer, setViewer] = useState<number | null>(null),
-    [pending, setPending] = useState("");
+    [pending, setPending] = useState(""),
+    [previewing, setPreviewing] = useState(false),
+    [previewMobile, setPreviewMobile] = useState(false);
+  /** Where the stage and the page stood before „Vorschau“, restored on „Bearbeiten“. */
+  const previewReturnTo = useRef<{ stage: number; page: number } | null>(null);
+  function openPreview() {
+    const stage = document.querySelector<HTMLIFrameElement>(".modular-studio .preview-frame")?.contentWindow;
+    previewReturnTo.current = { stage: stage?.scrollY ?? 0, page: window.scrollY };
+    setPreviewMobile(mobile);
+    setPreviewing(true);
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }
+  function closePreview() {
+    setPreviewing(false);
+  }
+  useEffect(() => {
+    const back = previewReturnTo.current;
+    if (previewing || !back) return;
+    previewReturnTo.current = null;
+    window.scrollTo({ top: back.page, behavior: "instant" as ScrollBehavior });
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLIFrameElement>(".modular-studio .preview-frame")
+        ?.contentWindow?.scrollTo({ top: back.stage, behavior: "instant" as ScrollBehavior });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [previewing]);
+  const cinemaHandler = (e: KeyboardEvent) => {
+    const action = previewKey(e);
+    if (!action) return;
+    if (action === "exit") {
+      if (previewing) closePreview();
+      return;
+    }
+    e.preventDefault();
+    if (previewing) closePreview();
+    else openPreview();
+  };
+  /** Variant changes for „Rückgängig“: one entry per change, valid while it is the latest edit. */
+  const variantUndo = useRef<{ id: number; before: Chapter["layout"]; after: Chapter["layout"] }[]>([]);
+  const [, setVariantUndoCount] = useState(0);
+  function switchVariant(moduleId: number, preset: StylePreset) {
+    const module = journey?.chapters.find((c) => c.id === moduleId);
+    if (!module) return;
+    const before = module.layout || {};
+    const after = applyPreset(before, preset);
+    if (sameLayout(before, after)) return;
+    const run = () => {
+      flushSync(() => moduleChange(moduleId, { layout: after }));
+      variantUndo.current = [...variantUndo.current.slice(-49), { id: moduleId, before, after }];
+      setVariantUndoCount(variantUndo.current.length);
+    };
+    const doc = document.querySelector<HTMLIFrameElement>(".preview-frame")?.contentDocument;
+    const el = doc?.getElementById(`canvas-module-${moduleId}`);
+    if (!doc || !el || motionIsOff()) return run();
+    // 420 ms crossfade of the module on the stage (builder.css: ::view-transition-*(wander-variant)).
+    const start = (doc as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } }).startViewTransition;
+    if (start) {
+      el.style.setProperty("view-transition-name", "wander-variant");
+      start
+        .call(doc, run)
+        .finished.catch(() => {})
+        .finally(() => el.style.removeProperty("view-transition-name"));
+    } else {
+      run();
+      el.animate([{ opacity: 0.35 }, { opacity: 1 }], {
+        duration: 420,
+        easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+      });
+    }
+  }
+  /** The last variant change, if nothing else changed that module since. */
+  function lastVariantChange(moduleId?: number) {
+    const top = variantUndo.current[variantUndo.current.length - 1];
+    if (!top || (moduleId !== undefined && top.id !== moduleId)) return null;
+    const module = journey?.chapters.find((c) => c.id === top.id);
+    if (!module || !sameLayout(module.layout, top.after)) return null;
+    return top;
+  }
+  function undoVariant(moduleId?: number) {
+    const top = lastVariantChange(moduleId);
+    if (!top) {
+      if (variantUndo.current.length) {
+        variantUndo.current = [];
+        setVariantUndoCount(0);
+      }
+      return false;
+    }
+    variantUndo.current = variantUndo.current.slice(0, -1);
+    setVariantUndoCount(variantUndo.current.length);
+    moduleChange(top.id, { layout: top.before });
+    if (selected.type !== "module" || selected.id !== top.id) select({ type: "module", id: top.id });
+    return true;
+  }
+  const variantActions: VariantActions = {
+    apply: switchVariant,
+    undo: (id) => undoVariant(id),
+    canUndo: (id) => !!lastVariantChange(id),
+  };
+  const stageKeys = (e: KeyboardEvent) => {
+    if (mode === "edit" && journey && !previewing) {
+      if (undoKey(e) && undoVariant()) {
+        e.preventDefault();
+        return;
+      }
+      const dir = variantKey(e);
+      const current =
+        dir && selected.type === "module"
+          ? journey.chapters.find((c) => c.id === selected.id)
+          : undefined;
+      const next = current && dir ? stepVariant(current.layout, current.kind, dir) : null;
+      if (current && next) {
+        e.preventDefault();
+        switchVariant(current.id, next);
+        return;
+      }
+    }
+    cinemaHandler(e);
+  };
+  const cinemaHandlerRef = useRef(stageKeys);
+  cinemaHandlerRef.current = stageKeys;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => cinemaHandlerRef.current(e);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
   const [deletingModule, setDeletingModule] = useState<{ id: number; title: string; navigator: boolean } | null>(null);
   const deletingModuleRef = useRef(deletingModule);
   const deleteReturn = useRef<HTMLElement | null>(null);
   const [library, setLibrary] = useState(false),
     [discard, setDiscard] = useState(false);
-  const [backgroundSaving, setBackgroundSaving] = useState(false),
-    [autoError, setAutoError] = useState(false),
-    [replaceOpen, setReplaceOpen] = useState(false),
+  const [replaceOpen, setReplaceOpen] = useState(false),
     [replaceCover, setReplaceCover] = useState(false),
     [deletingPhoto, setDeletingPhoto] = useState<Photo | null>(null),
     [deleteError, setDeleteError] = useState("");
+  const [overwriteAsk, setOverwriteAsk] = useState(false);
+  const [textFocus, setTextFocus] = useState<EditorContextValue["textFocus"]>(null);
   const [publishReview, setPublishReview] = useState<{
       content: string;
       revision: number;
@@ -215,99 +655,55 @@ export function ModularEditor() {
       title: string;
       slug: string;
     } | null>(null);
+  // The draft is serialised only while the review dialog is open, once per change of the draft.
+  const reviewOpen = publishReview !== null;
+  const reviewContent = useMemo(
+    () => (reviewOpen && journey ? JSON.stringify(journey) : null),
+    [reviewOpen, journey],
+  );
   const [addTarget, setAddTarget] = useState<number | null>(null),
-    [chosenPhotos, setChosenPhotos] = useState<number[]>([]),
-    [drag, setDrag] = useState<{
-      id: number;
-      target: number;
-      after: boolean;
-      inside?: boolean;
-    } | null>(null);
-  const dragStart = useRef<{
-    id: number;
-    y: number;
-    active: boolean;
-    pointerId: number;
-    clientX: number;
-    clientY: number;
-    handle: HTMLButtonElement;
-  } | null>(null);
-  const [draggingId, setDraggingId] = useState<number | null>(null);
-  const dragTarget = useRef<typeof drag>(null);
-  const dragFrame = useRef<number | null>(null);
-  const [moveAnnouncement, setMoveAnnouncement] = useState("");
+    [chosenPhotos, setChosenPhotos] = useState<number[]>([]);
+  const {
+    drag,
+    draggingId,
+    moveAnnouncement,
+    cancelDrag,
+    reorder,
+    dragHandleProps,
+    rowDragProps,
+    settleAfterIdChange,
+  } = useModuleDrag({ draftRef, change, resetKey: `${mode}|${tab}|${slug}` });
+  const [storyDraftOpen, setStoryDraftOpen] = useState(false),
+    [draftWelcome, setDraftWelcome] = useState(false),
+    [storyDraftUndo, setStoryDraftUndo] = useState<{
+      snapshot: DraftSnapshot;
+      revision: number;
+      count: number;
+      mode: DraftMode;
+    } | null>(null),
+    [freshIds, setFreshIds] = useState<number[]>([]),
+    [titleFocus, setTitleFocus] = useState(false);
+  const titleInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") cancelDrag();
-    };
-    const hidden = () => { if (document.hidden) cancelDrag(); };
-    document.addEventListener("keydown", escape);
-    document.addEventListener("visibilitychange", hidden);
-    window.addEventListener("blur", cancelDrag);
-    return () => {
-      cancelDrag();
-      document.removeEventListener("keydown", escape);
-      document.removeEventListener("visibilitychange", hidden);
-      window.removeEventListener("blur", cancelDrag);
-    };
-  }, [mode, tab, slug]);
-  const [conflicted, setConflicted] = useState(false);
+    // After the automatic start: the suggested title is selected, so typing replaces it.
+    if (!titleFocus) return;
+    const input = titleInput.current;
+    if (!input) return;
+    setTitleFocus(false);
+    input.focus();
+    input.select();
+  }, [titleFocus, journey]);
   const conflictBanner = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (conflicted)
       conflictBanner.current?.scrollIntoView({ block: "center", behavior: "instant" });
   }, [conflicted]);
   const conflictMessage = t(
-    "This journey has changed since you opened it. Your draft is still here. Open the current version in another tab to compare and reapply your edits.",
-    "Diese Reise wurde seit dem Öffnen geändert. Dein Entwurf ist noch da. Öffne den aktuellen Stand in einem anderen Tab, um zu vergleichen und deine Änderungen erneut zu übernehmen.",
+    "This story was changed elsewhere since you opened it. Choose which version to continue with. If you load the current one, your edits stay available as a local copy.",
+    "Diese Geschichte wurde seit dem Öffnen woanders geändert. Wähle, mit welcher Version du weitermachst. Lädst du die aktuelle, bleiben deine Änderungen als lokale Wiederherstellung erhalten.",
   );
-  function markConflict() {
-    setConflicted(true);
-    setError("");
-    setPublishReview(null);
-  }
-  const [recoveries, setRecoveries] = useState<RecoveryCopy[]>([]);
-  const ownedRecovery = useRef<RecoveryCopy | null>(null);
-  const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
-  function refreshRecoveries(id: number) {
-    const owned = ownedRecovery.current;
-    setRecoveries(readRecoveries(recoveryStores(), id).filter(
-      (copy) => copy.storage !== owned?.storage || copy.raw !== owned.raw,
-    ));
-  }
-  function clearRecovery(copy: RecoveryCopy) {
-    if (!removeRecovery(copy)) return false;
-    if (ownedRecovery.current === copy) ownedRecovery.current = null;
-    refreshRecoveries(copy.draft.id);
-    return true;
-  }
-  const revision = useRef(0),
-    saving = useRef(false);
-  const saved = useRef<Journey | null>(null),
-    draftRef = useRef(journey);
-  draftRef.current = journey;
   useEffect(() => {
-    let alive = true;
-    api<Journey>(`/journeys/${slug}`)
-      .then((j) => {
-        if (alive) {
-          setConflicted(false);
-          saved.current = j;
-          ownedRecovery.current = null;
-          setDirty(false);
-          refreshRecoveries(j.id);
-          setJourney(j);
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(e.message);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [slug]);
-  useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !uploadBusy) return;
     const unload = (e: BeforeUnloadEvent) => e.preventDefault();
     const click = (e: MouseEvent) => {
       const a = (e.target as Element).closest<HTMLAnchorElement>("a[href]");
@@ -329,21 +725,11 @@ export function ModularEditor() {
       window.removeEventListener("beforeunload", unload);
       document.removeEventListener("click", click, true);
     };
-  }, [dirty]);
-  // Preserve unfinished edits across an accidental reload, without replacing server data.
+  }, [dirty, uploadBusy]);
+  // The link guard only has something to say while changes or an upload are open.
   useEffect(() => {
-    if (!journey || !dirty) return;
-    let active = true;
-    void withRecoveryLock(journey.id, () => {
-      if (!active) return;
-      const copy = writeRecovery(recoveryStores(), journey, ownedRecovery.current);
-      if (copy) ownedRecovery.current = copy;
-      setRecoveryUnavailable(!copy);
-    }).catch(() => {
-      if (active) setRecoveryUnavailable(true);
-    });
-    return () => { active = false; };
-  }, [journey, dirty]);
+    if (pending && !dirty && !uploadBusy) setPending("");
+  }, [pending, dirty, uploadBusy]);
   useEffect(() => {
     if (restoring.current) {
       restoring.current = false;
@@ -416,212 +802,36 @@ export function ModularEditor() {
     });
     return () => cancelAnimationFrame(frame);
   }, [selected, tab, previewReturn]);
-  function change(patch: Partial<Journey>) {
-    revision.current++;
-    setAutoError(false);
-    setJourney((j) => (j ? { ...j, ...patch } : j));
-    setDirty(true);
-  }
-  function moduleChange(id: number, patch: Partial<Chapter>) {
-    revision.current++;
-    setAutoError(false);
-    setJourney((j) =>
-      j
-        ? {
-            ...j,
-            chapters: j.chapters.map((c) =>
-              c.id === id ? { ...c, ...patch } : c,
-            ),
-          }
-        : j,
-    );
-    setDirty(true);
-  }
-  function photoChange(id: number, patch: Partial<Photo>) {
-    revision.current++;
-    setAutoError(false);
-    setJourney((j) =>
-      j
-        ? {
-            ...j,
-            photos: j.photos.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-            cover: j.cover?.id === id ? { ...j.cover, ...patch } : j.cover,
-          }
-        : j,
-    );
-    setDirty(true);
-  }
-  function layoutChange(id: number | null, patch: Partial<Layout>) {
-    if (!journey) return;
-    if (id === null) change({ layout: { ...journey.layout, ...patch } });
-    else {
-      const c = journey.chapters.find((c) => c.id === id);
-      if (c) moduleChange(id, { layout: { ...c.layout, ...patch } });
-    }
-  }
-  async function save(
-    publish = false,
-    silent = false,
-  ): Promise<Journey | null> {
-    const current = draftRef.current;
-    if (!current || saving.current || uploadBusy || conflicted) return null;
-    saving.current = true;
-    const sentRevision = revision.current;
-    setAutoError(false);
-    if (silent) setBackgroundSaving(true);
-    else setBusy(true);
-    setError("");
-    try {
-      const next = await api<Journey>(
-        `/journeys/${current.id}/composition`,
-        json("PATCH", {
-          base_version: current.composition_version,
-          base_slug: current.slug,
-          journey: {
-            title: current.title,
-            subtitle: current.subtitle,
-            location: current.location,
-            country: current.country,
-            start_date: current.start_date,
-            end_date: current.end_date,
-            introduction: current.introduction,
-            reflection: current.reflection,
-            closing: current.closing,
-            description: current.description,
-            cover_id: current.cover_id,
-            layout: current.layout || {},
-            story_template: current.story_template,
-            reveal_settings: current.reveal_settings,
-          },
-          chapters: current.chapters.map(cleanChapter),
-          photo_order: current.photos.map((p) => p.id),
-          photos: current.photos.map((p) => ({
-            id: p.id,
-            edits: p.edits || {},
-            title: p.title,
-            description: p.description,
-            alt: p.alt,
-            featured: p.featured,
-          })),
-          publish,
-        }),
-      );
-      const changed = revision.current !== sentRevision;
-      const idMap = new Map(
-        current.chapters.map((c, i) => [c.id, next.chapters[i]?.id ?? c.id]),
-      );
-      select((active) =>
-        active.type === "module"
-          ? idMap.get(active.id) && idMap.get(active.id) !== active.id
-            ? { ...active, id: idMap.get(active.id)! }
-            : active
-          : active.type === "photo" &&
-              active.moduleId &&
-              idMap.get(active.moduleId) !== active.moduleId &&
-              idMap.has(active.moduleId)
-            ? {
-                ...active,
-                moduleId: idMap.get(active.moduleId) ?? active.moduleId,
-              }
-            : active,
-      );
-      setAddTarget((target) =>
-        target === null ? null : (idMap.get(target) ?? target),
-      );
-      if (deletingModuleRef.current) {
-        const pending = deletingModuleRef.current;
-        deletingModuleRef.current = { ...pending, id: idMap.get(pending.id) ?? pending.id };
-        setDeletingModule(deletingModuleRef.current);
-      }
-      // Saving a new module replaces its keyed row. Cancel an in-flight gesture
-      // before that replacement and return keyboard focus to the same module.
-      const focusedHandle = document.activeElement;
-      const focusedControl = focusedHandle?.classList.contains("module-delete-button") ? "module-delete-button" : "module-drag-handle";
-      const focusedId = focusedHandle?.classList.contains(focusedControl)
-        ? Number(
-            (focusedHandle.closest("[data-module-id]") as HTMLElement)?.dataset
-              .moduleId,
-          )
-        : null;
-      if (
-        dragStart.current &&
-        idMap.get(dragStart.current.id) !== dragStart.current.id
-      ) {
-        cancelDrag();
-      }
-      if (
-        focusedId !== null &&
-        idMap.has(focusedId) &&
-        idMap.get(focusedId) !== focusedId
-      )
-        requestAnimationFrame(() =>
-          document
-            .querySelector<HTMLButtonElement>(
-              `[data-module-id="${idMap.get(focusedId)}"] > .${focusedControl}`,
-            )
-            ?.focus({ preventScroll: true }),
-        );
-      if (imageReturn.current)
-        imageReturn.current.moduleId =
-          idMap.get(imageReturn.current.moduleId) ??
-          imageReturn.current.moduleId;
-      saved.current = next;
-      setJourney((local) =>
-        local && changed ? mergeSavedJourney(local, current, next) : next,
-      );
-      setDirty(changed);
-      if (!changed) {
-        try {
-          await withRecoveryLock(current.id, () => {
-            const copy = ownedRecovery.current;
-            if (revision.current !== sentRevision || copy?.draft.id !== current.id) return;
-            if (!clearRecovery(copy)) {
-              ownedRecovery.current = null;
-              refreshRecoveries(current.id);
-            }
-          });
-        } catch {
-          ownedRecovery.current = null;
-          refreshRecoveries(current.id);
-        }
-      }
-      if (publish) {
-        setPublishReview(null);
-        setPublishResult({ title: current.title, slug: next.slug });
-      }
-      if (!silent)
-        notify(
-          publish
-            ? changed
-              ? t(
-                  "Reviewed version published. Newer changes remain in your draft.",
-                  "Geprüfte Fassung veröffentlicht. Neuere Änderungen bleiben im Entwurf.",
-                )
-              : t(
-                  "Reviewed version published.",
-                  "Geprüfte Fassung veröffentlicht.",
-                )
-            : t("Draft saved.", "Entwurf gespeichert."),
-        );
-      return next;
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "composition_conflict") markConflict();
-      else {
-        setError((e as Error).message);
-        setAutoError(true);
-      }
-      return null;
-    } finally {
-      saving.current = false;
-      setBackgroundSaving(false);
-      setBusy(false);
-    }
-  }
   useEffect(() => {
-    if (!dirty || busy || backgroundSaving || uploadBusy || autoError || conflicted) return;
-    const timer = setTimeout(() => void save(false, true), 850);
+    // Any manual edit after the draft makes "undo" ambiguous: retire the notice.
+    if (storyDraftUndo && revision.current !== storyDraftUndo.revision)
+      setStoryDraftUndo(null);
+  }, [journey, storyDraftUndo]);
+  useEffect(() => {
+    if (!storyDraftUndo) return;
+    const timer = setTimeout(() => setStoryDraftUndo(null), 120000);
     return () => clearTimeout(timer);
-  }, [journey, dirty, busy, backgroundSaving, uploadBusy, autoError, conflicted]);
+  }, [storyDraftUndo]);
+  useEffect(() => {
+    if (!freshIds.length) return;
+    const timer = setTimeout(() => setFreshIds([]), 3000);
+    return () => clearTimeout(timer);
+  }, [freshIds]);
+  /** Saving gave new modules their real IDs: everything that pointed at the temporary ID follows. */
+  function reassignModuleIds(idMap: Map<number, number>) {
+    select((active) => remapSelection(active, idMap));
+    setAddTarget((target) =>
+      target === null ? null : mappedId(target, idMap),
+    );
+    if (deletingModuleRef.current) {
+      const pending = deletingModuleRef.current;
+      deletingModuleRef.current = { ...pending, id: mappedId(pending.id, idMap) };
+      setDeletingModule(deletingModuleRef.current);
+    }
+    settleAfterIdChange(idMap);
+    if (imageReturn.current)
+      imageReturn.current.moduleId = mappedId(imageReturn.current.moduleId, idMap);
+  }
   function nextModuleId() {
     return (
       Math.min(
@@ -645,7 +855,7 @@ export function ModularEditor() {
     const c: Chapter = {
       id: nextModuleId(),
       kind,
-      title: t(...moduleNames[kind]),
+      title: kind === "chapter" && formOf(journey) !== "journey" ? t("Chapter", "Kapitel") : t(...moduleNames[kind]),
       date: kind === "chapter" ? journey.start_date : "",
       story: "",
       quote: "",
@@ -657,9 +867,10 @@ export function ModularEditor() {
       gallery_mode: "editorial",
       layout: {
         edition: "inherit",
+        ...initialLayoutFor(kind),
         ...(day ? { parent_id: day } : {}),
         ...(kind === "pair" ? { columns: 2 } : {}),
-        ...(kind === "wall" ? { columns: 4, rows: 4, gap: 12 } : {}),
+        ...(kind === "wall" ? { wall_mode: "balanced" as const, gap: 12 } : {}),
         ...(kind === "hero" ? { parallax: true, title_style: "overlay" } : {}),
         show_title: ![
           "image",
@@ -676,13 +887,114 @@ export function ModularEditor() {
     setPicker(false);
     setTab("settings");
   }
+  function keepSelection(chapters: Chapter[]) {
+    select((active) =>
+      (active.type === "module" && !chapters.some((c) => c.id === active.id)) ||
+      (active.type === "photo" && active.moduleId !== undefined && active.moduleId !== null &&
+        !chapters.some((c) => c.id === active.moduleId))
+        ? { type: "hero" }
+        : active,
+    );
+  }
+  function createStoryDraft(mode: DraftMode, words?: StoryWords | null) {
+    const current = draftRef.current;
+    setStoryDraftOpen(false);
+    if (!current || conflicted || uploadBusy) return;
+    cancelDrag();
+    const form = formOf(current);
+    // "By mood" follows the light arc (not for a moment): read the light first, then draft.
+    const lit = mode === "mood" && form !== "moment";
+    const light = lit ? cachedLights(current.photos) : undefined;
+    if (lit && !light) {
+      void readLights(current.photos).then(() => createStoryDraft(mode, words));
+      return;
+    }
+    const modules = draftStory(
+      current.photos.map((p) => ({
+        id: p.id,
+        width: p.width,
+        height: p.height,
+        taken_at: p.taken_at,
+        position: p.position,
+        featured: p.featured,
+      })),
+      mode,
+      { locale: uiLocale, coverPhotoId: current.cover_id ?? current.cover?.id ?? null, light },
+    ).map((module) =>
+      // "Day n" is only handed out automatically for journeys.
+      module.kind === "chapter"
+        ? {
+            ...module,
+            title: draftChapterTitle(
+              form,
+              module.title,
+              module.date,
+              (day) => dateLabel(day, { day: "numeric", month: "long" }),
+              uiLocale,
+            ),
+          }
+        : module,
+    );
+    // Every new module gets the usual default title; only a day / chapter must not be untitled.
+    const titleFor = (kind: Chapter["kind"]) =>
+      kind === "chapter" && form !== "journey" ? t("Chapter", "Kapitel") : t(...moduleNames[kind]);
+    const result = applyStoryDraft(current, modules, {
+      firstId: nextModuleId(),
+      newPlacementId: () => crypto.randomUUID(),
+      titleFor,
+    });
+    if (!result) {
+      setError(
+        t(
+          "This draft would exceed the maximum number of modules. Nothing was changed.",
+          "Dieser Entwurf würde die maximale Modulanzahl überschreiten. Es wurde nichts geändert.",
+        ),
+      );
+      return;
+    }
+    const snapshot = { chapters: current.chapters, photos: current.photos };
+    // Words from the assistant (step 4) are written into the fresh modules right away.
+    const nextChapters = words
+      ? applyStoryWords(result.chapters, words, () => nextModuleId() - result.chapters.length - 1, titleFor)
+      : result.chapters;
+    const createdIds = nextChapters.filter((c) => !current.chapters.some((o) => o.id === c.id)).map((c) => c.id);
+    draftRef.current = { ...current, chapters: nextChapters, photos: result.photos };
+    change({ chapters: nextChapters, photos: result.photos });
+    keepSelection(nextChapters);
+    setFreshIds(motionOff ? [] : createdIds);
+    setStoryDraftUndo({
+      snapshot,
+      revision: revision.current,
+      count: createdIds.length,
+      mode,
+    });
+  }
+  /** "By days" ⇄ "By mood" straight from the undo notice: restore, then draft the other way. */
+  function switchStoryDraft() {
+    const state = storyDraftUndo;
+    if (!state) return;
+    undoStoryDraft();
+    createStoryDraft(state.mode === "days" ? "mood" : "days");
+  }
+  function undoStoryDraft() {
+    const state = storyDraftUndo,
+      current = draftRef.current;
+    setStoryDraftUndo(null);
+    setFreshIds([]);
+    if (!state || !current || revision.current !== state.revision) return;
+    cancelDrag();
+    const restored = restoreStoryDraft(current, state.snapshot, nextModuleId());
+    draftRef.current = { ...current, ...restored };
+    change(restored);
+    keepSelection(restored.chapters);
+  }
   function requestModuleRemoval(id: number, trigger: HTMLElement, navigator = false) {
     const current = draftRef.current;
     const chapter = current?.chapters.find((c) => c.id === id);
     if (!chapter) return;
     cancelDrag();
     deleteReturn.current = trigger;
-    deletingModuleRef.current = { id, title: chapter.title, navigator };
+    deletingModuleRef.current = { id, title: moduleLabel(chapter), navigator };
     setDeletingModule(deletingModuleRef.current);
   }
   function closeModuleRemoval() {
@@ -761,110 +1073,6 @@ export function ModularEditor() {
     list.splice(list.findIndex((m) => m.id === c.id) + 1, 0, copy, ...children);
     change({ chapters: list });
     select({ type: "module", id: copy.id });
-  }
-  function focusMoveHandle(id: number, reveal = false) {
-    requestAnimationFrame(() => {
-      const handle = document.querySelector<HTMLButtonElement>(
-        `.module-navigator [data-module-id="${id}"] > .module-drag-handle`,
-      );
-      handle?.focus({ preventScroll: true });
-      if (reveal) handle?.scrollIntoView({ block: "nearest", behavior: "instant" });
-    });
-  }
-  function announceMove(chapters: Chapter[], id: number) {
-    const source = chapters.find((c) => c.id === id);
-    if (!source) return;
-    const peers = chapters.filter(
-      (c) => (c.layout?.parent_id || null) === (source.layout?.parent_id || null),
-    );
-    setMoveAnnouncement(`${source.title}: ${t("Position", "Position")} ${peers.indexOf(source) + 1} ${t("of", "von")} ${peers.length}`);
-  }
-  function reorder(id: number, dir: number, fromHandle = false) {
-    cancelDrag();
-    const current = draftRef.current;
-    if (!current) return;
-    const source = current.chapters.find((c) => c.id === id);
-    if (!source) return;
-    const siblings = current.chapters.filter(
-      (c) =>
-        (c.layout?.parent_id || null) === (source.layout?.parent_id || null),
-    );
-    const target = siblings[siblings.indexOf(source) + dir];
-    if (target) {
-      const chapters = moveModule(current.chapters, id, target.id, dir > 0);
-      change({ chapters });
-      announceMove(chapters, id);
-      if (fromHandle) focusMoveHandle(id, true);
-    }
-  }
-
-  function cancelDrag() {
-    const start = dragStart.current;
-    dragStart.current = null;
-    dragTarget.current = null;
-    setDraggingId(null);
-    if (start?.active)
-      setMoveAnnouncement(t("Move cancelled.", "Verschieben abgebrochen."));
-    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
-    dragFrame.current = null;
-    setDrag(null);
-    if (start?.handle.hasPointerCapture(start.pointerId))
-      start.handle.releasePointerCapture(start.pointerId);
-  }
-  function updateDragTarget() {
-    const start = dragStart.current;
-    const current = draftRef.current;
-    if (!start?.active || !current) return;
-    const source = current.chapters.find((c) => c.id === start.id);
-    const panel = start.handle.closest<HTMLElement>(".module-navigator");
-    if (!source || !panel) return;
-    const bounds = panel.getBoundingClientRect();
-    const inside = start.clientX >= bounds.left && start.clientX <= bounds.right &&
-      start.clientY >= Math.max(0, bounds.top) &&
-      start.clientY <= Math.min(window.innerHeight, bounds.bottom);
-    const peers = new Set(current.chapters.filter((c) =>
-      source.kind !== "chapter" || !c.layout?.parent_id,
-    ).map((c) => c.id));
-    const rows = Array.from(panel.querySelectorAll<HTMLElement>("[data-module-id]"))
-      .filter((row) => peers.has(Number(row.dataset.moduleId)))
-      .map((row) => {
-        const chapter = current.chapters.find((c) => c.id === Number(row.dataset.moduleId));
-        const rect = (source.kind === "chapter" ? row : row.querySelector(".module-nav-select") || row).getBoundingClientRect();
-        return { id: Number(row.dataset.moduleId), top: rect.top, bottom: rect.bottom, chapter: chapter?.kind === "chapter" };
-      });
-    const target: typeof drag = inside ? (source.kind === "chapter"
-      ? moduleDropTarget(rows, start.id, start.clientY)
-      : moduleTransferTarget(rows, start.id, start.clientY)) : null;
-    const old = dragTarget.current;
-    dragTarget.current = target;
-    if (old?.id !== target?.id || old?.target !== target?.target || old?.after !== target?.after || old?.inside !== target?.inside)
-      setDrag(target);
-  }
-  function startDragScroll() {
-    let previous = performance.now();
-    const frame = (now: number) => {
-      const start = dragStart.current;
-      if (!start?.active) return;
-      const panel = start.handle.closest<HTMLElement>(".module-navigator");
-      if (!panel) { cancelDrag(); return; }
-      const bounds = panel.getBoundingClientRect();
-      // On mobile the navigator grows with the document; desktop owns its scroll.
-      const ownScroll = panel.scrollHeight > panel.clientHeight + 1;
-      const scroller = ownScroll ? panel : document.scrollingElement;
-      const insideX = start.clientX >= bounds.left && start.clientX <= bounds.right;
-      const speed = insideX ? moduleScrollSpeed(start.clientY,
-        Math.max(0, bounds.top), Math.min(window.innerHeight, bounds.bottom)) : 0;
-      if (scroller && speed) {
-        scroller.scrollTo({
-          top: scroller.scrollTop + speed * Math.min(32, now - previous) / 1000,
-          behavior: "instant",
-        });
-      }
-      previous = now;
-      updateDragTarget();
-      dragFrame.current = requestAnimationFrame(frame);
-    };
-    dragFrame.current = requestAnimationFrame(frame);
   }
   function uploaded(value: Journey) {
     saved.current = value;
@@ -982,13 +1190,85 @@ export function ModularEditor() {
             (p) => p.placement_id === selected.placementId,
           ) || selectedPhoto
         : selectedPhoto;
-  const layout = module?.layout || journey?.layout || {};
+  function adoptPhotoDates(range: DateRange) {
+    change({
+      start_date: range.start,
+      end_date: formOf(journey) === "moment" ? range.start : range.end,
+      layout: { ...journey?.layout, dates_from_photos: true },
+    });
+  }
+  const startChecked = useRef(false);
+  useEffect(() => {
+    // /studio/new?start=1 → design the story once without asking (undo stays available), then drop the parameter.
+    if (!journey || startChecked.current) return;
+    startChecked.current = true;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("start") !== "1") return;
+    const requestedMode = draftModeFromParam(url.searchParams.get("mode"));
+    url.searchParams.delete("start");
+    url.searchParams.delete("mode");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    // Words typed in the assistant wait in sessionStorage: read once, then remove.
+    let words: StoryWords | null = null;
+    try {
+      const key = wordsKey(journey.slug);
+      words = parseWords(window.sessionStorage.getItem(key));
+      window.sessionStorage.removeItem(key);
+    } catch {
+      /* storage unavailable: start without words */
+    }
+    if (journey.photos.length === 0) return;
+    const form = formOf(journey);
+    const range = photoDateRange(journey.photos);
+    const suggestion = isPlaceholderTitleOfAnyForm(journey.title)
+      ? form === "journey"
+        ? suggestJourneyTitle(range, uiLocale)
+        : form === "moment"
+          ? suggestMomentTitle(range, uiLocale)
+          : null
+      : null;
+    // The title comes first so that the undo notice of the draft stays valid.
+    if (words?.title) change({ title: words.title });
+    else if (suggestion) change({ title: suggestion });
+    if (journey.photos.length >= 2)
+      createStoryDraft(
+        requestedMode ??
+          initialDraftMode(form, journey.photos.length, journey.photos.filter((p) => dayOf(p.taken_at)).length),
+        words,
+      );
+    if (window.innerWidth >= 760) setTitleFocus(true);
+  }, [journey]);
+  const lastRange = useRef<DateRange | null | undefined>(undefined);
+  useEffect(() => {
+    if (!journey) return;
+    const next = photoDateRange(journey.photos);
+    const before = lastRange.current;
+    lastRange.current = next;
+    // First load only records the baseline; later photo changes may update the dates.
+    if (before === undefined) {
+      if (next && journey.layout?.dates_from_photos === true &&
+          (journey.start_date !== next.start ||
+            journey.end_date !== (formOf(journey) === "moment" ? next.start : next.end)))
+        adoptPhotoDates(next);
+      return;
+    }
+    if (next && shouldAdoptDates(journey.layout?.dates_from_photos, before, next))
+      adoptPhotoDates(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journey?.photos]);
+  const layoutIssueRef = useRef(layoutIssue);
+  useEffect(() => {
+    if (!layoutIssue || layoutIssueRef.current === layoutIssue) return;
+    layoutIssueRef.current = layoutIssue;
+    openLayoutIssue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutIssue]);
   if (!journey)
     return (
       <PageState
         title={
           error
-            ? t("This journey is out of reach.")
+            ? t("This story is out of reach.")
             : t("Opening the editor…", "Editor wird geöffnet…")
         }
         text={error || undefined}
@@ -1103,12 +1383,30 @@ export function ModularEditor() {
       select({ type: "hero" });
     }
   }
+  /** Selects the module a rejected setting belongs to and opens its settings. */
+  function openLayoutIssue() {
+    const id = layoutIssue?.moduleId;
+    if (id == null || !journey?.chapters.some((c) => c.id === id)) return;
+    select({ type: "module", id });
+    setTab("settings");
+  }
   async function deleteSource() {
     if (!deletingPhoto || saving.current || uploadBusy || conflicted) return;
     setDeleteError("");
     const beforeSave = revision.current;
     const base = dirty ? await save(false, true) : draftRef.current;
-    if (!base || revision.current !== beforeSave) return;
+    if (!base) {
+      // Deleting needs the saved version first; say why it stopped instead of doing nothing.
+      setDeleteError(
+        t("The photograph was not deleted because your changes could not be saved first: ", "Das Foto wurde nicht gelöscht, weil deine Änderungen vorher nicht gespeichert werden konnten: ") +
+          (saveFailure.current || t("Please try again.", "Bitte versuche es noch einmal.")),
+      );
+      return;
+    }
+    if (revision.current !== beforeSave) {
+      setDeleteError(t("Your story changed while saving. Please delete again.", "Deine Geschichte hat sich beim Speichern geändert. Bitte lösche noch einmal."));
+      return;
+    }
     setBusy(true);
     try {
       const next = await api<Journey>(`/photos/${deletingPhoto.id}`, {
@@ -1139,6 +1437,12 @@ export function ModularEditor() {
       setBusy(false);
     }
   }
+  const uploadPhotoIds = j.photos.map((p) => p.id);
+  // The upload list asks to delete through the same confirm dialog as the grid.
+  const askDeleteUploaded = (id: number) => {
+    const photo = j.photos.find((p) => p.id === id);
+    if (photo) setDeletingPhoto(photo);
+  };
   const imageUses =
     (j.photos.some((p) => p.id === j.cover_id) || j.cover ? 1 : 0) +
     rootPhotos(j, "loose").length +
@@ -1154,10 +1458,21 @@ export function ModularEditor() {
     }, 0);
   const reviewChanged =
     publishReview !== null &&
-    (publishReview.content !== JSON.stringify(j) ||
+    (publishReview.content !== reviewContent ||
       publishReview.revision !== revision.current);
+  const retryIn = retryDelayMs({ failures });
+  const retryPlanned = autoError && dirty && !conflicted && !uploadBusy && retryIn !== null;
   const status = autoError
-    ? t("Save failed · retry", "Speichern fehlgeschlagen · erneut versuchen")
+    ? retryPlanned
+      ? backgroundSaving
+        ? t("Trying to save again…", "Speichern wird erneut versucht…")
+        : !online
+          ? t("Offline – will retry automatically", "Offline – wird automatisch erneut versucht")
+          : t(
+              `Save failed – retrying in ${retrySeconds(retryIn)} s`,
+              `Speichern fehlgeschlagen – neuer Versuch in ${retrySeconds(retryIn)} s`,
+            )
+      : t("Save failed · retry", "Speichern fehlgeschlagen · erneut versuchen")
     : backgroundSaving
       ? t("Saving draft…", "Entwurf wird gespeichert…")
       : dirty
@@ -1170,6 +1485,9 @@ export function ModularEditor() {
           : j.published
             ? t("Saved & published", "Gespeichert & veröffentlicht")
             : t("Private draft saved", "Privater Entwurf gespeichert");
+  const dayNumbers = new Map(
+    j.chapters.filter((c) => c.kind === "chapter").map((c, i) => [c.id, i + 1]),
+  );
   const moduleList = (parent?: number) =>
     j.chapters
       .filter((c) => (c.layout?.parent_id || undefined) === parent)
@@ -1177,90 +1495,50 @@ export function ModularEditor() {
         <div
           key={c.id}
           data-module-id={c.id}
-          className={`module-nav-item ${draggingId === c.id ? "module-dragging" : ""} ${drag?.target === c.id ? (drag.inside ? "module-drop-inside" : drag.after ? "module-drop-after" : "module-drop-before") : ""}`}
+          style={freshIds.includes(c.id) ? ({ "--fresh-index": freshIds.indexOf(c.id) } as CSSProperties) : undefined}
+          {...rowDragProps(c.id)}
+          className={`module-nav-item ${freshIds.includes(c.id) ? "story-draft-fresh" : ""} ${draggingId === c.id ? "module-dragging" : ""} ${drag?.target === c.id ? (drag.inside ? "module-drop-inside" : drag.after ? "module-drop-after" : "module-drop-before") : ""}`}
         >
           <button
             type="button"
             className="module-drag-handle"
-            aria-label={`${t("Move module", "Modul verschieben")}: ${c.title}`}
+            aria-label={`${t("Move module", "Modul verschieben")}: ${moduleLabel(c)}`}
             title={t(
               "Drag to reorder; use Up/Down keys",
               "Zum Verschieben ziehen; Pfeiltasten oben/unten verwenden",
             )}
             aria-describedby="module-reorder-help"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                e.preventDefault();
-                reorder(c.id, e.key === "ArrowUp" ? -1 : 1, true);
-              }
-              if (e.key === "Escape") cancelDrag();
-            }}
-            onPointerDown={(e) => {
-              if (e.button !== 0 || !e.isPrimary || dragStart.current) return;
-              e.currentTarget.setPointerCapture(e.pointerId);
-              e.currentTarget.focus({ preventScroll: true });
-              dragStart.current = {
-                id: c.id, y: e.clientY, active: false, pointerId: e.pointerId,
-                clientX: e.clientX, clientY: e.clientY, handle: e.currentTarget,
-              };
-            }}
-            onPointerMove={(e) => {
-              const start = dragStart.current;
-              if (!start || start.id !== c.id || start.pointerId !== e.pointerId) return;
-              start.clientX = e.clientX;
-              start.clientY = e.clientY;
-              if (!start.active) {
-                if (Math.abs(e.clientY - start.y) < 6) return;
-                start.active = true;
-                setDraggingId(c.id);
-                setMoveAnnouncement(t("Moving module. Escape to cancel.", "Modul wird verschoben. Escape zum Abbrechen."));
-                startDragScroll();
-              }
-              updateDragTarget();
-            }}
-            onPointerUp={(e) => {
-              const start = dragStart.current;
-              if (!start || start.pointerId !== e.pointerId) return;
-              const target = dragTarget.current;
-              const current = draftRef.current;
-              cancelDrag();
-              // Commit exactly the previewed slot; a release alone never starts a drag.
-              if (start.active && target && current) {
-                const panel = start.handle.closest<HTMLElement>(".module-navigator");
-                const bounds = panel?.getBoundingClientRect();
-                if (bounds && e.clientX >= bounds.left && e.clientX <= bounds.right &&
-                    e.clientY >= Math.max(0, bounds.top) &&
-                    e.clientY <= Math.min(window.innerHeight, bounds.bottom)) {
-                  const chapters = moveModule(current.chapters, target.id, target.target, target.after, target.inside ? "inside" : "transfer");
-                  if (chapters !== current.chapters) {
-                    change({ chapters });
-                    announceMove(chapters, start.id);
-                    focusMoveHandle(start.id);
-                  }
-                }
-              }
-            }}
-            onPointerCancel={cancelDrag}
-            onLostPointerCapture={cancelDrag}
+            {...dragHandleProps(c.id)}
           >
             <GripVertical size={16} />
           </button>
           <button
-            title={c.title}
-            className={`module-nav-select ${selected.type === "module" && selected.id === c.id ? "active" : ""}`}
+            title={`${t(...moduleNames[c.kind])} · ${moduleLabel(c)}`}
+            className={`module-nav-select ${c.kind === "chapter" ? "is-day" : "is-shot"} ${selected.type === "module" && selected.id === c.id ? "active" : ""}`}
             onClick={() => {
               select({ type: "module", id: c.id });
               setTab("settings");
             }}
           >
-            <span>{t(...moduleNames[c.kind])}</span>
-            <strong>{c.title}</strong>
+            {c.kind === "chapter" ? (
+              <span className="nav-day">
+                <span className="nav-day-no">{String(dayNumbers.get(c.id) ?? 1).padStart(2, "0")}</span>
+                <strong>{moduleLabel(c)}</strong>
+                {/^\d{4}-\d{2}-\d{2}$/.test(c.date) && (
+                  <small>{dateLabel(c.date, { day: "numeric", month: "short" })}</small>
+                )}
+              </span>
+            ) : (
+              <>
+                <NavThumbs module={c} journey={j} />
+                <strong className="nav-shot-name">{moduleLabel(c)}</strong>
+              </>
+            )}
           </button>
           <button
             type="button"
             className="module-delete-button"
-            aria-label={`${t("Delete module", "Modul löschen")}: ${c.title}`}
+            aria-label={`${t("Delete module", "Modul löschen")}: ${moduleLabel(c)}`}
             title={t("Delete module", "Modul löschen")}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -1275,34 +1553,172 @@ export function ModularEditor() {
           )}
         </div>
       ));
-  const moduleIndex = module
-    ? j.chapters
-        .filter(
-          (c) =>
-            (c.layout?.parent_id || null) ===
-            (module.layout?.parent_id || null),
-        )
-        .findIndex((c) => c.id === module.id)
-    : 0;
+  const pickerCard = (key: Chapter["kind"]) => {
+    const names = moduleNames[key];
+    const use = {
+      chapter: t("Opens a day with a heading", "Eröffnet einen Tag mit Überschrift"),
+      text: t("A few words between photographs", "Ein paar Worte zwischen den Fotos"),
+      quote: t("One line that stays", "Ein Satz, der bleibt"),
+      hero: t("Opens with a defining photograph", "Eröffnet mit einem prägenden Foto"),
+      image: t("One photograph, given room", "Ein Foto, dem Raum gehört"),
+      pair: t("Two photographs in conversation", "Zwei Fotos im Zwiegespräch"),
+      rail: t("Explore at your own pace", "Im eigenen Tempo entdecken"),
+      wall: t("Several photos, calmly side by side", "Mehrere Fotos, ruhig nebeneinander"),
+      gallery: t("A browsable collection", "Eine blätterbare Sammlung"),
+      filmstrip: t("A moving, atmospheric band", "Ein bewegtes Band als Akzent"),
+    }[key];
+    const shapes: Record<Chapter["kind"], ReactNode> = {
+      chapter: (
+        <>
+          <text x="6" y="30" fontSize="26" fontFamily="Instrument Serif, serif" fill="currentColor" opacity="0.7">1</text>
+          <path d="M28 22h46M28 30h30" stroke="currentColor" strokeWidth="1.2" opacity="0.35" />
+        </>
+      ),
+      text: (
+        <path d="M8 10h64M8 18h64M8 26h64M8 34h40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+      ),
+      quote: (
+        <text x="6" y="40" fontSize="44" fontFamily="Instrument Serif, serif" fill="currentColor" opacity="0.6">“</text>
+      ),
+      hero: (
+        <>
+          <rect x="2" y="3" width="76" height="36" fill="currentColor" opacity="0.22" />
+          <path d="M10 30h34" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+        </>
+      ),
+      image: <rect x="22" y="4" width="36" height="34" fill="currentColor" opacity="0.28" />,
+      pair: (
+        <>
+          <rect x="6" y="6" width="32" height="30" fill="currentColor" opacity="0.28" />
+          <rect x="42" y="6" width="32" height="30" fill="currentColor" opacity="0.18" />
+        </>
+      ),
+      rail: (
+        <>
+          <rect x="4" y="9" width="22" height="24" fill="currentColor" opacity="0.28" />
+          <rect x="29" y="9" width="22" height="24" fill="currentColor" opacity="0.2" />
+          <rect x="54" y="9" width="22" height="24" fill="currentColor" opacity="0.12" />
+        </>
+      ),
+      wall: (
+        <g fill="currentColor">
+          <rect x="4" y="4" width="30" height="16" opacity="0.28" />
+          <rect x="37" y="4" width="39" height="16" opacity="0.18" />
+          <rect x="4" y="23" width="42" height="16" opacity="0.2" />
+          <rect x="49" y="23" width="27" height="16" opacity="0.3" />
+        </g>
+      ),
+      gallery: (
+        <g fill="currentColor">
+          <rect x="6" y="5" width="20" height="14" opacity="0.28" />
+          <rect x="30" y="5" width="20" height="14" opacity="0.2" />
+          <rect x="54" y="5" width="20" height="14" opacity="0.28" />
+          <rect x="6" y="23" width="20" height="14" opacity="0.2" />
+          <rect x="30" y="23" width="20" height="14" opacity="0.28" />
+          <rect x="54" y="23" width="20" height="14" opacity="0.2" />
+        </g>
+      ),
+      filmstrip: (
+        <g fill="currentColor">
+          <rect x="-6" y="11" width="24" height="20" opacity="0.28" />
+          <rect x="21" y="11" width="24" height="20" opacity="0.2" />
+          <rect x="48" y="11" width="24" height="20" opacity="0.28" />
+          <rect x="75" y="11" width="24" height="20" opacity="0.2" />
+        </g>
+      ),
+    };
+    return (
+      <button key={key} type="button" className="mp-card" onClick={() => add(key)}>
+        <svg className="mp-thumb" viewBox="0 0 80 42" aria-hidden="true" focusable="false">
+          {shapes[key]}
+        </svg>
+        <strong>{t(...names)}</strong>
+        <small>{use}</small>
+      </button>
+    );
+  };
+  const editor: EditorContextValue = {
+    journey: j,
+    selected,
+    module,
+    photo,
+    photoModule,
+    selectionLabel,
+    busy,
+    backgroundSaving,
+    uploadBusy,
+    conflicted,
+    titleInput,
+    change,
+    moduleChange,
+    photoChange,
+    layoutChange,
+    save,
+    selectCanvas,
+    returnToModule,
+    removePlacement,
+    adoptPhotoDates,
+    reorder,
+    duplicate,
+    requestModuleRemoval,
+    uploaded,
+    askDeleteUploaded,
+    markConflict,
+    setUploadBusy,
+    openPicker: () => setPicker(true),
+    chooseImage: (forCover) => {
+      setReplaceCover(forCover);
+      setReplaceOpen(true);
+    },
+    deletePhoto: setDeletingPhoto,
+    textFocus,
+    layoutIssue,
+    clearTextFocus: () => setTextFocus(null),
+    showSelectionInPreview: () => {
+      setTab("canvas");
+      setPreviewReturn((value) => value + 1);
+    },
+  };
+  // „Vorschau“: the visitor page itself (same renderer, current draft). It comes first in the
+  // document so its own #main is the one the page effects find; the editor stays mounted, hidden.
+  const preview = previewing && (
+    <div className={`story-preview-layer ${previewMobile ? "is-phone" : ""}`}>
+      <div className="story-preview-pill" role="toolbar" aria-label={t("Preview", "Vorschau")}>
+        <span>{t("Preview", "Vorschau")}</span>
+        <span className="story-preview-devices">
+          <button type="button" aria-pressed={!previewMobile} onClick={() => setPreviewMobile(false)}>
+            {t("Desktop", "Desktop")}
+          </button>
+          <button type="button" aria-pressed={previewMobile} onClick={() => setPreviewMobile(true)}>
+            {t("Phone", "Handy")}
+          </button>
+        </span>
+        <button type="button" className="story-preview-edit" onClick={closePreview}>
+          <Pencil size={15} aria-hidden="true" />
+          {t("Edit", "Bearbeiten")}
+        </button>
+      </div>
+      {previewMobile ? (
+        <div className="story-preview-phone">
+          <PreviewFrame mobile>
+            <StoryExperience journey={j} preview />
+          </PreviewFrame>
+        </div>
+      ) : (
+        <StoryExperience journey={j} preview />
+      )}
+    </div>
+  );
   return (
+    <>
+    {preview}
     <main
       id="main"
       className={`modular-studio studio-tab-${tab} ${mode === "visit" ? "visitor-preview" : ""}`}
+      style={previewing ? { display: "none" } : undefined}
     >
       <header className="editor-bar">
         <div className="editor-identity">
-          <Link
-            to="/"
-            className="editor-brand"
-            aria-label={t("WANDER home", "WANDER Startseite")}
-          >
-            <img
-              src="/assets/brand/logos/wander-monogram-black.svg"
-              width="32"
-              height="32"
-              alt=""
-            />
-          </Link>
           <Link
             to="/studio"
             aria-label={t("Back to studio", "Zurück zum Studio")}
@@ -1310,7 +1726,19 @@ export function ModularEditor() {
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <strong>{j.title}</strong>
+            <input
+              className="editor-title-input"
+              aria-label={t("Story title", "Titel der Geschichte")}
+              title={t("Click to rename", "Zum Umbenennen klicken")}
+              placeholder={t("Untitled", "Ohne Titel")}
+              maxLength={160}
+              size={Math.max(6, Math.min(40, j.title.length + 1))}
+              value={j.title}
+              onChange={(e) => change({ title: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+              }}
+            />
             <span role="status">
               <i className={dirty ? "dirty" : ""} />
               {status}
@@ -1340,41 +1768,17 @@ export function ModularEditor() {
         </div>
         <div className="editor-actions">
           <button
-            aria-label={
-              mode === "edit"
-                ? t("Visitor preview", "Besuchervorschau")
-                : t("Edit", "Bearbeiten")
-            }
-            className="editor-mode"
-            onClick={() => setMode(mode === "edit" ? "visit" : "edit")}
-            aria-pressed={mode === "visit"}
+            type="button"
+            className="editor-mode editor-preview-toggle"
+            aria-pressed={previewing}
+            title={t("Preview (F) · Esc returns", "Vorschau (F) · Esc kehrt zurück")}
+            onClick={openPreview}
           >
-            {mode === "edit" ? <Eye size={17} /> : <Pencil size={17} />}
-            <span>
-              {mode === "edit"
-                ? t("Visitor preview", "Besuchervorschau")
-                : t("Edit", "Bearbeiten")}
-            </span>
+            <Eye size={17} aria-hidden="true" />
+            <span>{t("Preview", "Vorschau")}</span>
           </button>
           <button
-            aria-label={t("Save draft", "Entwurf speichern")}
-            className="button button-outline"
-            disabled={
-              busy ||
-              backgroundSaving ||
-              uploadBusy ||
-              conflicted ||
-              (!dirty && !j.has_unpublished_changes)
-            }
-            onClick={() => void save()}
-          >
-            <Save size={16} />
-            <span>
-              {busy ? t("Saving…", "Speichern…") : t("Save", "Speichern")}
-            </span>
-          </button>
-          <button
-            aria-label={t("Publish journey", "Reise veröffentlichen")}
+            aria-label={t("Publish story", "Geschichte veröffentlichen")}
             className="button"
             disabled={busy || backgroundSaving || uploadBusy || conflicted}
             onClick={() => {
@@ -1394,11 +1798,28 @@ export function ModularEditor() {
       {conflicted && (
         <div className="editor-error" role="alert" ref={conflictBanner}>
           {conflictMessage}
+          <button
+            onClick={() => void loadCurrentVersion()}
+            disabled={conflictBusy || busy || backgroundSaving || uploadBusy}
+          >
+            {t("Load current version", "Aktuelle Version laden")}
+          </button>
+          <button
+            onClick={() => setOverwriteAsk(true)}
+            disabled={conflictBusy || busy || backgroundSaving || uploadBusy}
+          >
+            {t("Keep my version", "Meine Version behalten")}
+          </button>
         </div>
       )}
       {error && (
         <div className="editor-error" role="alert">
           {error}
+          {layoutIssue?.moduleId != null && (
+            <button onClick={() => openLayoutIssue()}>
+              {t("Go to module", "Zum Modul")}
+            </button>
+          )}
           {autoError && (
             <button
               onClick={() => void save()}
@@ -1435,21 +1856,7 @@ export function ModularEditor() {
               <button
                 disabled={dirty || busy || backgroundSaving || uploadBusy}
                 onClick={() => {
-                  if (dirty || saving.current || busy || uploadBusy) return;
-                  const available = readRecoveries(recoveryStores(), j.id).some(
-                    (copy) => copy.storage === recovery.storage && copy.raw === recovery.raw,
-                  );
-                  if (!available) {
-                    refreshRecoveries(j.id);
-                    return;
-                  }
-                  revision.current++;
-                  ownedRecovery.current = recovery;
-                  setJourney(recovery.draft);
-                  select({ type: "hero" });
-                  setAutoError(false);
-                  setDirty(true);
-                  setRecoveries((copies) => copies.filter((copy) => copy !== recovery));
+                  if (restoreRecovery(recovery)) select({ type: "hero" });
                 }}
               >
                 {t("Restore", "Wiederherstellen")}
@@ -1458,8 +1865,8 @@ export function ModularEditor() {
           ) : (
             <>
               {t(
-                "This local draft has a different or unknown starting version, or its photo sources have changed. Download a copy to compare and reapply your changes to the current version.",
-                "Dieser lokale Entwurf hat eine andere oder unbekannte Ausgangsversion oder seine Fotoquellen haben sich geändert. Lade eine Kopie herunter, um zu vergleichen und Änderungen im aktuellen Stand erneut zu übernehmen.",
+                "This device still holds an older version of this story. You can back it up or discard it.",
+                "Auf diesem Gerät liegt noch eine ältere Fassung dieser Geschichte. Du kannst sie sichern oder verwerfen.",
               )}
               <button
                 onClick={() => {
@@ -1471,18 +1878,18 @@ export function ModularEditor() {
                   setTimeout(() => URL.revokeObjectURL(url), 1000);
                 }}
               >
-                {t("Download draft", "Entwurf herunterladen")}
+                {t("Save a copy", "Fassung sichern")}
               </button>
             </>
           )}
           <button
             onClick={async () => {
-              const cleared = await withRecoveryLock(j.id, () => clearRecovery(recovery)).catch(() => false);
+              const cleared = await discardRecovery(recovery);
               if (!cleared)
                 setError(t("The local draft could not be discarded.", "Der lokale Entwurf konnte nicht verworfen werden."));
             }}
           >
-            {t("Discard local draft", "Lokalen Entwurf verwerfen")}
+            {t("Discard", "Verwerfen")}
           </button>
         </div>
       ))}
@@ -1498,13 +1905,36 @@ export function ModularEditor() {
               <LayoutGrid size={17} />
             </div>
             <button
+              type="button"
+              className="story-draft-button"
+              disabled={j.photos.length < 2 || conflicted || uploadBusy}
+              aria-describedby={j.photos.length < 2 ? "story-draft-hint" : undefined}
+              onClick={() => setStoryDraftOpen(true)}
+            >
+              <Sparkles size={17} aria-hidden="true" />
+              {t("Design story", "Story gestalten")}
+            </button>
+            {j.photos.length < 2 && (
+              <small id="story-draft-hint" className="story-draft-hint">
+                {t(
+                  "Add at least two photographs to create a draft.",
+                  "Lade mindestens zwei Fotos hoch, um einen Entwurf zu erstellen.",
+                )}
+              </small>
+            )}
+            <button className="library-button" onClick={() => setLibrary(true)}>
+              <Images size={17} />
+              {t("Photographs", "Fotosammlung")}
+              <span>{j.photos.length}</span>
+            </button>
+            <button
               className={`cover-nav ${selected.type === "hero" ? "active" : ""}`}
               onClick={() => {
                 select({ type: "hero" });
                 setTab("settings");
               }}
             >
-              {t("Journey cover", "Reisetitelbild")}
+              {t("Story cover", "Titelbild")}
             </button>
             {moduleList()}
             <button
@@ -1513,11 +1943,6 @@ export function ModularEditor() {
             >
               <Plus size={17} />
               {t("Add module", "Modul hinzufügen")}
-            </button>
-            <button className="library-button" onClick={() => setLibrary(true)}>
-              <Images size={17} />
-              {t("Photographs", "Fotosammlung")}
-              <span>{j.photos.length}</span>
             </button>
           </aside>
         )}
@@ -1560,11 +1985,45 @@ export function ModularEditor() {
               </button>
             )}
           </div>
-          <div className={`canvas-device ${mobile ? "device-mobile" : ""}`}>
+          <div
+            className={`canvas-device ${mobile ? "device-mobile" : ""}`}
+            data-edition={j.story_template === "after-hours" ? "last-light" : "first-light"}
+          >
             <PreviewFrame mobile={mobile}>
               <JournalCanvas
                 journey={j}
                 editing={mode === "edit"}
+                emptyState={
+                  mode === "edit" ? (
+                    <div className="editor-empty-state">
+                      <p>
+                        {t(
+                          "No modules yet. “Design story” arranges your photographs automatically – or add a module.",
+                          "Noch keine Module. „Story gestalten“ ordnet deine Fotos automatisch – oder füge ein Modul hinzu.",
+                        )}
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          className="button"
+                          disabled={j.photos.length < 2 || conflicted || uploadBusy}
+                          onClick={() => setStoryDraftOpen(true)}
+                        >
+                          <Sparkles size={16} aria-hidden="true" />
+                          {t("Design story", "Story gestalten")}
+                        </button>
+                        <button
+                          type="button"
+                          className="button secondary"
+                          onClick={() => setPicker(true)}
+                        >
+                          <Plus size={16} aria-hidden="true" />
+                          {t("Add module", "Modul hinzufügen")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : undefined
+                }
                 selected={selected}
                 onSelect={selectCanvas}
                 onEmptyModule={(id) => {
@@ -1572,851 +2031,78 @@ export function ModularEditor() {
                   setAddTarget(id);
                   setChosenPhotos([]);
                 }}
+                onWriteText={(id) => {
+                  selectCanvas({ type: "module", id });
+                  setTextFocus({ moduleId: id, field: "story", nonce: Date.now() });
+                }}
                 onPhoto={(p, sequence = j.photos) => {
                   setViewerPhotos(sequence);
                   setViewer(sequenceIndex(sequence, p));
                 }}
                 replay={replay}
               />
+              {mode === "edit" && (() => {
+                const current =
+                  selected.type === "module"
+                    ? j.chapters.find((c) => c.id === selected.id) ?? null
+                    : null;
+                if (!current) return null;
+                const state = variantState(current.layout, current.kind);
+                return (
+                  <StageVariants
+                    moduleId={current.id}
+                    revision={j}
+                    index={state.index}
+                    count={state.list.length}
+                    name={state.index >= 0 ? t(...state.list[state.index].label) : ""}
+                    customised={state.customised}
+                    onStep={(dir) => {
+                      const next = stepVariant(current.layout, current.kind, dir);
+                      if (next) switchVariant(current.id, next);
+                    }}
+                  />
+                );
+              })()}
+              {mode === "edit" && (() => {
+                const current =
+                  selected.type === "module"
+                    ? j.chapters.find((c) => c.id === selected.id) ?? null
+                    : null;
+                const siblings = current
+                  ? j.chapters.filter(
+                      (c) => (c.layout?.parent_id || null) === (current.layout?.parent_id || null),
+                    )
+                  : [];
+                const index = current ? siblings.findIndex((c) => c.id === current.id) : -1;
+                return (
+                  <StageActions
+                    moduleId={current?.id ?? null}
+                    revision={j}
+                    canUp={index > 0}
+                    canDown={index >= 0 && index < siblings.length - 1}
+                    onUp={() => current && reorder(current.id, -1)}
+                    onDown={() => current && reorder(current.id, 1)}
+                    onDuplicate={() => current && duplicate(current)}
+                    onRemove={(trigger) => current && requestModuleRemoval(current.id, trigger)}
+                    onKey={stageKeys}
+                  />
+                );
+              })()}
             </PreviewFrame>
           </div>
           {mode === "edit" && (
             <button className="canvas-add" onClick={() => setPicker(true)}>
               <Plus size={18} />
-              {t("Add a moment", "Einen Moment hinzufügen")}
+              {t("Add module", "Modul hinzufügen")}
             </button>
           )}
         </div>
         {mode === "edit" && (
-          <aside className="module-inspector">
-            <div className="panel-heading">
-              <span>
-                {photo
-                  ? t("Photograph", "Foto")
-                  : module
-                    ? t(...moduleNames[module.kind])
-                    : selected.type === "intro"
-                      ? t("Introduction", "Einleitung")
-                      : t("Journey cover", "Reisetitelbild")}
-              </span>
-              <Settings2 size={17} />
-            </div>
-            <div className="inspector-body">
-              <div className="inspector-selection">
-                {photo && (
-                  <>
-                    <span>
-                      {t("This image placement", "Diese Bildverwendung")}
-                    </span>
-                    <strong>{selectionLabel}</strong>
-                  </>
-                )}
-                <button
-                  type="button"
-                  className="text-link"
-                  onClick={() => {
-                    setTab("canvas");
-                    setPreviewReturn((value) => value + 1);
-                  }}
-                >
-                  {t(
-                    "Show selection in preview",
-                    "Auswahl in der Vorschau zeigen",
-                  )}
-                </button>
-              </div>
-              <h3 className="inspector-group-title">
-                {module && !["text", "quote"].includes(module.kind)
-                  ? t("Image content", "Bildinhalt")
-                  : t("Content", "Inhalt")}
-              </h3>
-              {photo ? (
-                <>
-                  {photoModule && (
-                    <button className="back-to-module" onClick={returnToModule}>
-                      <ArrowLeft size={17} />
-                      {photoModule.kind === "wall"
-                        ? t("Back to photo wall", "Zurück zur Fotowand")
-                        : t("Back to module", "Zurück zum Modul")}
-                    </button>
-                  )}
-                  <button
-                    className="button button-outline"
-                    onClick={() => {
-                      setReplaceCover(false);
-                      setReplaceOpen(true);
-                    }}
-                  >
-                    <Images size={16} />
-                    {t("Choose / upload image", "Bild auswählen / hochladen")}
-                  </button>
-                  {photoModule && (
-                    <p className="inspector-note">
-                      {t(
-                        "Crop adjustments apply only to this image placement, including when the same source is used again. Titles and descriptions belong to the source photograph.",
-                        "Zuschnittänderungen gelten nur für diese Bildverwendung, auch bei mehrfach verwendeter Quelle. Titel und Beschreibungen gehören zum Ausgangsfoto.",
-                      )}
-                    </p>
-                  )}
-                  <ImageControls
-                    photo={photo}
-                    onChange={(p) => {
-                      if (p.edits && photoModule) {
-                        layoutChange(photoModule.id, {
-                          placements: placementsFor(photoModule, j).map((f) =>
-                            f.id === photo.placement_id
-                              ? { ...f, edits: p.edits }
-                              : f,
-                          ),
-                        });
-                      } else if (
-                        p.edits &&
-                        selected.type === "photo" &&
-                        (selected.context === "loose" ||
-                          selected.context === "filmstrip")
-                      ) {
-                        const key =
-                          selected.context === "loose"
-                            ? "placements"
-                            : "filmstrip_placements";
-                        layoutChange(null, {
-                          [key]: rootPhotos(j, selected.context).map((f) => ({
-                            id: f.placement_id!,
-                            photo_id: f.id,
-                            edits:
-                              f.placement_id === selected.placementId
-                                ? p.edits
-                                : f.edits,
-                          })),
-                        });
-                      } else photoChange(photo.id, p);
-                    }}
-                  />
-                  <div className="photo-delete-actions">
-                    {(photoModule ||
-                      (selected.type === "photo" &&
-                        ["loose", "filmstrip"].includes(
-                          selected.context || "",
-                        ))) && (
-                      <button className="text-link" onClick={removePlacement}>
-                        <Trash2 size={16} />
-                        {t(
-                          "Remove this placement",
-                          "Diese Bildverwendung entfernen",
-                        )}
-                      </button>
-                    )}
-                    <button
-                      className="text-link danger-action"
-                      disabled={busy || backgroundSaving || uploadBusy}
-                      onClick={() => setDeletingPhoto(photo)}
-                    >
-                      <Trash2 size={16} />
-                      {t("Delete from collection", "Aus Fotosammlung löschen")}
-                    </button>
-                  </div>
-                  <label className="check-field">
-                    <input
-                      type="checkbox"
-                      checked={photo.featured}
-                      onChange={(e) =>
-                        photoChange(photo.id, { featured: e.target.checked })
-                      }
-                    />
-                    {t("Favourite photograph", "Favoritenfoto")}
-                  </label>
-                  <button
-                    className="button button-outline"
-                    onClick={() => change({ cover_id: photo.id, cover: photo })}
-                  >
-                    {t("Use as journey cover", "Als Reisetitelbild verwenden")}
-                  </button>
-                </>
-              ) : selected.type === "intro" ? (
-                <Field label={t("Introduction", "Einleitung")}>
-                  <textarea
-                    rows={8}
-                    maxLength={20000}
-                    value={j.introduction}
-                    onChange={(e) => change({ introduction: e.target.value })}
-                  />
-                </Field>
-              ) : (
-                <>
-                  {module && !["text", "quote"].includes(module.kind) && (
-                    <>
-                      <ModulePhotographs
-                        key={module.id}
-                        module={module}
-                        journey={j}
-                        onDelete={setDeletingPhoto}
-                        deleteDisabled={busy || backgroundSaving || uploadBusy}
-                        onChange={(p) => layoutChange(module.id, p)}
-                        onPhoto={(p) =>
-                          selectCanvas({
-                            type: "photo",
-                            id: p.id,
-                            moduleId: module.id,
-                            placementId: p.placement_id,
-                          })
-                        }
-                      />
-                      {module.kind === "chapter" && (
-                        <button
-                          className="button button-outline"
-                          onClick={() => setPicker(true)}
-                        >
-                          <Plus size={16} />
-                          {t(
-                            "Add module to this day",
-                            "Modul zu diesem Tag hinzufügen",
-                          )}
-                        </button>
-                      )}
-                      {module.kind === "chapter" && module.id < 0 ? (
-                        <button
-                          className="button button-outline"
-                          onClick={() => void save()}
-                          disabled={busy}
-                        >
-                          {t(
-                            "Save day to upload photos",
-                            "Tag speichern und Fotos hochladen",
-                          )}
-                        </button>
-                      ) : (
-                        <Upload
-                          disabled={backgroundSaving || conflicted}
-                          composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
-                          onConflict={markConflict}
-                          journeyId={j.id}
-                          chapterId={
-                            module.kind === "chapter" ? module.id : null
-                          }
-                          onSave={uploaded}
-                          onBusy={setUploadBusy}
-                        />
-                      )}
-                    </>
-                  )}
-                  {!module && (
-                    <button
-                      className="button button-outline cover-replace-button"
-                      onClick={() => {
-                        setReplaceCover(true);
-                        setReplaceOpen(true);
-                      }}
-                    >
-                      <Images size={16} />
-                      {t(
-                        "Choose / upload cover image",
-                        "Titelbild auswählen / hochladen",
-                      )}
-                    </button>
-                  )}
-                  <details
-                    className="inspector-section"
-                    open={
-                      !module ||
-                      ["chapter", "text", "quote", "hero"].includes(module.kind)
-                    }
-                  >
-                    <summary>
-                      {module
-                        ? t("Heading & text", "Überschrift & Text")
-                        : t("Journey details", "Reisedetails")}
-                    </summary>
-                    <Field label={t("Title", "Titel")}>
-                      <input
-                        maxLength={160}
-                        value={module?.title ?? j.title}
-                        onChange={(e) =>
-                          module
-                            ? moduleChange(module.id, { title: e.target.value })
-                            : change({ title: e.target.value })
-                        }
-                      />
-                    </Field>
-                    {module ? (
-                      <>
-                        {!["text", "quote"].includes(module.kind) && (
-                          <label className="check-field">
-                            <input
-                              type="checkbox"
-                              checked={
-                                module.layout?.show_title ??
-                                ["chapter", "hero"].includes(module.kind)
-                              }
-                              onChange={(e) =>
-                                layoutChange(module.id, {
-                                  show_title: e.target.checked,
-                                })
-                              }
-                            />
-                            {t("Show heading", "Überschrift anzeigen")}
-                          </label>
-                        )}
-                        {["chapter", "text", "hero"].includes(module.kind) && (
-                          <Field label={t("Text", "Text")}>
-                            <textarea
-                              rows={4}
-                              maxLength={20000}
-                              value={module.story}
-                              onChange={(e) =>
-                                moduleChange(module.id, {
-                                  story: e.target.value,
-                                })
-                              }
-                            />
-                          </Field>
-                        )}
-                        {module.kind === "quote" && (
-                          <Field label={t("Quote", "Zitat")}>
-                            <textarea
-                              rows={5}
-                              maxLength={1000}
-                              value={module.quote}
-                              onChange={(e) =>
-                                moduleChange(module.id, {
-                                  quote: e.target.value,
-                                })
-                              }
-                            />
-                          </Field>
-                        )}
-                        {module.kind === "chapter" && (
-                          <Field label={t("Date", "Datum")}>
-                            <input
-                              type="date"
-                              value={module.date}
-                              onChange={(e) =>
-                                moduleChange(module.id, {
-                                  date: e.target.value,
-                                })
-                              }
-                            />
-                          </Field>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Field label={t("Subtitle", "Untertitel")}>
-                          <textarea
-                            rows={2}
-                            maxLength={300}
-                            value={j.subtitle}
-                            onChange={(e) =>
-                              change({ subtitle: e.target.value })
-                            }
-                          />
-                        </Field>
-                        <Field label={t("Place", "Ort")}>
-                          <input
-                            maxLength={160}
-                            value={j.location}
-                            onChange={(e) =>
-                              change({ location: e.target.value })
-                            }
-                          />
-                        </Field>
-                        <div className="field-pair">
-                          <Field label={t("From", "Von")}>
-                            <input
-                              type="date"
-                              value={j.start_date}
-                              onChange={(e) =>
-                                change({ start_date: e.target.value })
-                              }
-                            />
-                          </Field>
-                          <Field label={t("Until", "Bis")}>
-                            <input
-                              type="date"
-                              value={j.end_date}
-                              onChange={(e) =>
-                                change({ end_date: e.target.value })
-                              }
-                            />
-                          </Field>
-                        </div>
-                        <Field label={t("Starting edition", "Startedition")}>
-                          <select
-                            value={j.story_template}
-                            onChange={(e) =>
-                              change({
-                                story_template: e.target
-                                  .value as Journey["story_template"],
-                              })
-                            }
-                          >
-                            <option value="quiet-atlas">Quiet Atlas</option>
-                            <option value="after-hours">After Hours</option>
-                          </select>
-                        </Field>
-                        <p className="inspector-note">
-                          {t(
-                            "A starting point. Each module can use either edition.",
-                            "Ein Startpunkt. Jedes Modul kann eine andere Edition verwenden.",
-                          )}
-                        </p>
-                        <Field label={t("Cover photograph", "Titelbild")}>
-                          <select
-                            value={j.cover_id || ""}
-                            onChange={(e) => {
-                              const p = j.photos.find(
-                                (p) => p.id === Number(e.target.value),
-                              );
-                              change({
-                                cover_id: p?.id || null,
-                                cover: p || null,
-                              });
-                            }}
-                          >
-                            {j.photos.map((p, i) => (
-                              <option key={p.id} value={p.id}>
-                                {t("Photograph", "Foto")} {i + 1}
-                                {p.edits?.show_title ? ` · ${p.title}` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                      </>
-                    )}
-                  </details>
-                  {!module && (
-                    <details className="inspector-section">
-                      <summary>{t("Story text", "Reisetexte")}</summary>
-                      {(
-                        [
-                          "introduction",
-                          "reflection",
-                          "closing",
-                          "description",
-                        ] as const
-                      ).map((key, i) => (
-                        <Field
-                          key={key}
-                          label={
-                            [
-                              t("Introduction", "Einleitung"),
-                              t("Reflection", "Rückblick"),
-                              t("Closing", "Abschluss"),
-                              t(
-                                "Archive description",
-                                "Beschreibung im Archiv",
-                              ),
-                            ][i]
-                          }
-                        >
-                          <textarea
-                            rows={3}
-                            maxLength={
-                              key === "introduction"
-                                ? 20000
-                                : key === "closing"
-                                  ? 5000
-                                  : 2000
-                            }
-                            value={j[key]}
-                            onChange={(e) => change({ [key]: e.target.value })}
-                          />
-                        </Field>
-                      ))}
-                    </details>
-                  )}
-                  {module && !["text", "quote"].includes(module.kind) && (
-                    <>
-                      <details className="inspector-section" open>
-                        <summary>
-                          {t("Layout & dimensions", "Layout & Abmessungen")}
-                        </summary>
-                        {["gallery", "wall", "pair", "chapter"].includes(
-                          module.kind,
-                        ) && (
-                          <>
-                            <WallSettings
-                              module={module}
-                              onChange={(p) => layoutChange(module.id, p)}
-                            />
-                          </>
-                        )}
-                        {(module.kind === "rail" ||
-                          (module.kind === "chapter" &&
-                            module.gallery_mode === "horizontal")) && (
-                          <RailSettings
-                            layout={layout}
-                            onChange={(p) => layoutChange(module.id, p)}
-                          />
-                        )}
-                        {module.kind !== "filmstrip" && (
-                          <MediaLayoutSettings
-                            layout={layout}
-                            onChange={(p) => layoutChange(module.id, p)}
-                          />
-                        )}
-                        <Field label={t("Image format", "Bildformat")}>
-                          <select
-                            value={layout.ratio || "original"}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                ratio: e.target.value as Layout["ratio"],
-                              })
-                            }
-                          >
-                            {ratios
-                              .filter((r) => r !== "free")
-                              .map((r) => (
-                                <option key={r} value={r}>
-                                  {r === "original"
-                                    ? t("Per photograph", "Pro Foto")
-                                    : r}
-                                </option>
-                              ))}
-                          </select>
-                        </Field>
-                        <Field
-                          label={`${t("Module spacing", "Modulabstand")} · ${layout.padding ?? 36} px`}
-                        >
-                          <input
-                            type="range"
-                            min={0}
-                            max={160}
-                            value={layout.padding ?? 36}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                padding: Number(e.target.value),
-                              })
-                            }
-                          />
-                        </Field>
-                      </details>
-                      <details className="inspector-section">
-                        <summary>
-                          {t("Mobile overrides", "Eigene Mobilwerte")}
-                          <Smartphone size={14} />
-                        </summary>
-                        <p className="inspector-note">
-                          {t(
-                            "Empty values inherit desktop spacing. Columns inherit up to two for a readable mobile layout.",
-                            "Leere Werte übernehmen die Desktopabstände. Spalten werden für lesbare Mobilansichten auf maximal zwei begrenzt.",
-                          )}
-                        </p>
-                        {(
-                          [
-                            "mobile_columns",
-                            "mobile_gap",
-                            "mobile_padding",
-                          ] as const
-                        ).map((key, i) => (
-                          <Field
-                            key={key}
-                            label={
-                              [
-                                t("Mobile columns", "Mobile Spalten"),
-                                t("Mobile image gap", "Mobiler Bildabstand"),
-                                t(
-                                  "Mobile outer spacing",
-                                  "Mobiler Außenabstand",
-                                ),
-                              ][i]
-                            }
-                          >
-                            <input
-                              type="number"
-                              min={i === 0 ? 1 : 0}
-                              max={i === 0 ? 4 : i === 1 ? 40 : 80}
-                              placeholder={t("Inherit", "Übernehmen")}
-                              value={layout[key] ?? ""}
-                              onChange={(e) =>
-                                layoutChange(module.id, {
-                                  [key]:
-                                    e.target.value === ""
-                                      ? undefined
-                                      : Number(e.target.value),
-                                })
-                              }
-                            />
-                          </Field>
-                        ))}
-                      </details>
-                    </>
-                  )}
-                  <h3 className="inspector-group-title">
-                    {t("Appearance & typography", "Darstellung & Typografie")}
-                  </h3>
-                  {module && (
-                    <details className="inspector-section">
-                      <summary>
-                        {t("Edition & placement", "Edition & Einordnung")}
-                      </summary>
-                      {module.kind !== "chapter" && (
-                        <Field
-                          label={t("Inside a day", "Innerhalb eines Tages")}
-                        >
-                          <select
-                            value={module.layout?.parent_id || ""}
-                            onChange={(e) =>
-                              layoutChange(module.id, {
-                                parent_id: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                          >
-                            <option value="">
-                              {t("Journey level", "Reiseebene")}
-                            </option>
-                            {j.chapters
-                              .filter(
-                                (c) =>
-                                  c.kind === "chapter" && !c.layout?.parent_id,
-                              )
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.title}
-                                </option>
-                              ))}
-                          </select>
-                        </Field>
-                      )}
-                      <Field label={t("Design world", "Gestaltungswelt")}>
-                        <select
-                          value={module.layout?.edition || "inherit"}
-                          onChange={(e) =>
-                            layoutChange(module.id, {
-                              edition: e.target.value as Layout["edition"],
-                            })
-                          }
-                        >
-                          <option value="inherit">
-                            {t(
-                              "Inherit journey edition",
-                              "Edition der Reise übernehmen",
-                            )}
-                          </option>
-                          <option value="quiet-atlas">Quiet Atlas</option>
-                          <option value="after-hours">After Hours</option>
-                        </select>
-                      </Field>{" "}
-                    </details>
-                  )}
-                  <AppearanceSettings
-                    moduleScope={!!module}
-                    layout={layout}
-                    edition={
-                      module?.layout?.edition &&
-                      module.layout.edition !== "inherit"
-                        ? module.layout.edition
-                        : j.story_template
-                    }
-                    inherited={
-                      module &&
-                      (!module.layout?.edition ||
-                        module.layout.edition === "inherit")
-                        ? j.layout?.background
-                        : undefined
-                    }
-                    onChange={(p) => layoutChange(module?.id ?? null, p)}
-                  />
-                  {(!module || module.kind === "hero") && (
-                    <>
-                      <Field label={t("Title composition", "Titelkomposition")}>
-                        <select
-                          value={layout.title_style || "overlay"}
-                          onChange={(e) =>
-                            layoutChange(module?.id ?? null, {
-                              title_style: e.target
-                                .value as Layout["title_style"],
-                            })
-                          }
-                        >
-                          <option value="overlay">
-                            {t("Over the image", "Auf dem Bild")}
-                          </option>
-                          <option value="overlap">
-                            {t("Compact overlap", "Kompakte Überlappung")}
-                          </option>
-                          <option value="below">
-                            {t("Close to the image", "Bildnah darunter")}
-                          </option>
-                        </select>
-                      </Field>
-                      <Field label={t("Heading size", "Überschriftengröße")}>
-                        <input
-                          type="range"
-                          min={28}
-                          max={160}
-                          value={layout.title_size || 100}
-                          onChange={(e) =>
-                            layoutChange(module?.id ?? null, {
-                              title_size: Number(e.target.value),
-                            })
-                          }
-                        />
-                      </Field>
-                    </>
-                  )}
-                  {module &&
-                    (["text", "quote", "chapter", "hero"].includes(
-                      module.kind,
-                    ) ||
-                      layout.show_title) && (
-                      <TypographySettings
-                        open={["text", "quote"].includes(module.kind)}
-                        layout={layout}
-                        background={
-                          layout.background ||
-                          (layout.edition && layout.edition !== "inherit"
-                            ? editionColors[layout.edition]
-                            : j.layout?.background ||
-                              editionColors[j.story_template])
-                        }
-                        onChange={(p) => layoutChange(module.id, p)}
-                      />
-                    )}
-                  <details className="inspector-section">
-                    <summary>
-                      {t("Movement & details", "Bewegung & Details")}
-                    </summary>
-                    {module?.kind === "filmstrip" && (
-                      <Field
-                        label={t(
-                          "Loop duration (seconds)",
-                          "Durchlaufdauer (Sekunden)",
-                        )}
-                      >
-                        <input
-                          type="range"
-                          min={10}
-                          max={180}
-                          value={layout.speed || 45}
-                          onChange={(e) =>
-                            layoutChange(module.id, {
-                              speed: Number(e.target.value),
-                            })
-                          }
-                        />
-                      </Field>
-                    )}
-                    {!module && (
-                      <label className="check-field">
-                        <input
-                          type="checkbox"
-                          checked={j.layout?.text_animations !== false}
-                          onChange={(e) =>
-                            layoutChange(null, {
-                              text_animations: e.target.checked,
-                            })
-                          }
-                        />
-                        {t(
-                          "Allow individual text animations",
-                          "Individuelle Textanimationen zulassen",
-                        )}
-                      </label>
-                    )}
-                    {(!module ||
-                      !["text", "quote", "filmstrip"].includes(module.kind)) && (
-                      <>
-                        <label className="check-field">
-                          <input
-                            type="checkbox"
-                            checked={
-                              imageParallax(layout, !module || module.kind === "hero").enabled
-                            }
-                            onChange={(e) =>
-                              layoutChange(module?.id ?? null, {
-                                image_parallax: e.target.checked,
-                              })
-                            }
-                          />
-                          {t("Parallax", "Parallax")}
-                        </label>
-                        <p className="inspector-note">
-                          {t(
-                            "Contained photographs and single-image rail pages stay still to preserve the full image.",
-                            "Vollständig eingepasste Fotos und Einzelbildseiten bleiben unbewegt, damit das ganze Motiv erhalten bleibt.",
-                          )}
-                        </p>
-                      </>
-                    )}
-                    {(!module || !["text", "quote"].includes(module.kind)) && (
-                      <HoverZoomControl
-                        value={layout.hover_zoom}
-                        onChange={(hover_zoom) =>
-                          layoutChange(module?.id ?? null, { hover_zoom })
-                        }
-                      />
-                    )}
-                    {module?.kind === "filmstrip" && (
-                      <p className="inspector-note">
-                        {t(
-                          "Parallax is unavailable for moving filmstrips to keep the automatic loop seamless.",
-                          "Parallax ist für laufende Fotostreifen nicht verfügbar, damit die automatische Schleife nahtlos bleibt.",
-                        )}
-                      </p>
-                    )}
-                    {module && (
-                      <MotionControl
-                        inherit={false}
-                        value={module.reveal || { effect: "none" }}
-                        label={t("Module motion", "Modulbewegung")}
-                        text={module.story || module.title}
-                        onChange={(v) => {
-                          moduleChange(module.id, { reveal: v });
-                          setReplay((r) => r + 1);
-                        }}
-                      />
-                    )}
-                    {module && (
-                      <div className="module-tools">
-                        <button
-                          disabled={moduleIndex === 0}
-                          aria-label={t("Move up", "Nach oben")}
-                          onClick={() => reorder(module.id, -1)}
-                        >
-                          <ArrowUp size={17} />
-                        </button>
-                        <button
-                          disabled={
-                            moduleIndex ===
-                            j.chapters.filter(
-                              (c) =>
-                                (c.layout?.parent_id || null) ===
-                                (module.layout?.parent_id || null),
-                            ).length -
-                              1
-                          }
-                          aria-label={t("Move down", "Nach unten")}
-                          onClick={() => reorder(module.id, 1)}
-                        >
-                          <ArrowDown size={17} />
-                        </button>
-                        <button
-                          aria-label={t(
-                            "Duplicate module",
-                            "Modul duplizieren",
-                          )}
-                          onClick={() => duplicate(module)}
-                        >
-                          <Copy size={17} />
-                        </button>
-                        <button
-                          aria-label={t(
-                            "Remove module; photographs are preserved",
-                            "Modul entfernen; Fotos bleiben erhalten",
-                          )}
-                          onClick={(e) => requestModuleRemoval(module.id, e.currentTarget)}
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </div>
-                    )}
-                  </details>
-                </>
-              )}
-            </div>
-          </aside>
+          <EditorContext.Provider value={editor}>
+            <VariantContext.Provider value={variantActions}>
+              <Inspector />
+            </VariantContext.Provider>
+          </EditorContext.Provider>
         )}
       </div>
       {mode === "edit" && (
@@ -2447,126 +2133,14 @@ export function ModularEditor() {
         <Modal
           title={t("Add module", "Modul hinzufügen")}
           onClose={() => setPicker(false)}
-          className="module-picker"
+          className="module-picker module-picker-v2"
         >
-          <h2>{t("Make it your own.", "Deine Geschichte, dein Rhythmus.")}</h2>
-          <p>
-            {t(
-              "Choose a module. Every detail can change later.",
-              "Wähle ein Modul. Jedes Detail lässt sich später anpassen.",
-            )}
-          </p>
-          <div className="module-picker-groups">
-            {([
-              {
-                title: t("Tell the story", "Erzählen"),
-                note: t(
-                  "Set a scene, add a thought, or keep a line.",
-                  "Einen Tag eröffnen, Gedanken teilen oder einen Satz bewahren.",
-                ),
-                kinds: ["chapter", "text", "quote"],
-              },
-              {
-                title: t("Show photographs", "Bilder zeigen"),
-                note: t(
-                  "Choose one frame or bring photographs into relation.",
-                  "Ein Motiv zeigen oder mehrere Bilder in Beziehung setzen.",
-                ),
-                kinds: ["image", "pair", "wall", "gallery", "hero"],
-              },
-              {
-                title: t("Build a sequence", "Sequenzen"),
-                note: t(
-                  "Let readers discover at their own pace, or add a moving accent.",
-                  "Lass Leser selbst entdecken oder setze einen bewegten Akzent.",
-                ),
-                kinds: ["rail", "filmstrip"],
-              },
-            ] as const).map((group) => (
-              <section className="module-picker-group" key={group.title}>
-                <div className="module-picker-group-heading">
-                  <h3>{group.title}</h3>
-                  <p>{group.note}</p>
-                </div>
-                <div className="module-picker-grid">
-                  {group.kinds.map((key) => {
-                    const names = moduleNames[key];
-                    const use = ({
-                      pair: t(
-                        "Show the relationship between two photographs.",
-                        "Die Beziehung zwischen zwei Fotos zeigen.",
-                      ),
-                      wall: t(
-                        "Give an overview of a place or a moment.",
-                        "Einen Überblick über einen Ort oder Moment geben.",
-                      ),
-                      rail: t(
-                        "Invite readers to explore the photographs at their own pace.",
-                        "Zum Entdecken im eigenen Tempo einladen.",
-                      ),
-                      filmstrip: t(
-                        "Add a moving, atmospheric accent.",
-                        "Einen bewegten, atmosphärischen Akzent setzen.",
-                      ),
-                      image: t(
-                        "Give one photograph room to speak.",
-                        "Einem einzelnen Foto Raum geben.",
-                      ),
-                      gallery: t(
-                        "Gather photographs into a browsable collection.",
-                        "Fotos in einer blätterbaren Sammlung bündeln.",
-                      ),
-                      hero: t(
-                        "Open with a defining photograph.",
-                        "Mit einem prägenden Foto eröffnen.",
-                      ),
-                    } as Partial<Record<Chapter["kind"], string>>)[key];
-                    return (
-                      <button key={key} onClick={() => add(key)}>
-                        <span className={`module-schematic schematic-${key}`}>
-                          {key === "quote" ? (
-                            <span className="quote-sample">
-                              <b>“</b>
-                              {t("A moment, kept.", "Ein Moment, der bleibt.")}
-                            </span>
-                          ) : key === "rail" || key === "filmstrip" ? (
-                            <span className="sequence-sample">
-                              {[
-                                "forest",
-                                "river",
-                                "mountains",
-                                "moss",
-                                "forest",
-                                "river",
-                              ].map((name, index) => (
-                                <img
-                                  key={index}
-                                  src={`/images/${name}-640.webp`}
-                                  alt=""
-                                />
-                              ))}
-                              <span className="sequence-cue">
-                                {key === "rail" ? "↔" : "∞"}
-                              </span>
-                            </span>
-                          ) : (
-                            <>
-                              <i />
-                              <i />
-                              <i />
-                              <i />
-                            </>
-                          )}
-                        </span>
-                        <span className="module-picker-card-copy">
-                          <strong>{t(...names)}</strong>
-                          {use && <small>{use}</small>}
-                        </span>
-                        <Plus size={16} />
-                      </button>
-                    );
-                  })}
-                </div>
+          <h2>{t("Add module", "Modul hinzufügen")}</h2>
+          <div className="mp-groups">
+            {pickerGroups.map((g) => (
+              <section key={g.id} className="mp-group">
+                <h3>{t(...g.title)}</h3>
+                <div className={`mp-grid mp-grid-${g.kinds.length}`}>{g.kinds.map(pickerCard)}</div>
               </section>
             ))}
           </div>
@@ -2590,6 +2164,8 @@ export function ModularEditor() {
             >
               <h2>{target.title}</h2>
               <Upload
+                photoIds={uploadPhotoIds}
+                onRemovePhoto={askDeleteUploaded}
                 journeyId={j.id}
                 multiple={!single}
                 disabled={backgroundSaving || conflicted}
@@ -2660,6 +2236,59 @@ export function ModularEditor() {
             </Modal>
           );
         })()}
+      {storyDraftOpen && (
+        <StoryDraftDialog
+          total={j.photos.length}
+          dated={j.photos.filter((p) => dayOf(p.taken_at)).length}
+          form={formOf(j)}
+          welcome={draftWelcome}
+          onCreate={createStoryDraft}
+          onClose={() => {
+            setStoryDraftOpen(false);
+            setDraftWelcome(false);
+          }}
+        />
+      )}
+      <div className="story-draft-toast-region" role="status" aria-live="polite">
+        {storyDraftUndo && (
+          <div className="story-draft-toast">
+            <span>
+              {t("Draft created", "Entwurf erstellt")} ·{" "}
+              {t(
+                `${storyDraftUndo.count} modules`,
+                `${storyDraftUndo.count} Module`,
+              )}
+            </span>
+            <button
+              type="button"
+              className="story-draft-undo"
+              onClick={undoStoryDraft}
+            >
+              {t("Undo", "Rückgängig")}
+            </button>
+            {(storyDraftUndo.mode === "days" ||
+              j.photos.some((p) => dayOf(p.taken_at))) && (
+              <button
+                type="button"
+                className="story-draft-undo"
+                onClick={switchStoryDraft}
+              >
+                {storyDraftUndo.mode === "days"
+                  ? t("By mood", "Nach Stimmung")
+                  : t("By days", "Nach Tagen")}
+              </button>
+            )}
+            <button
+              type="button"
+              className="story-draft-undo story-draft-close"
+              aria-label={t("Dismiss", "Schließen")}
+              onClick={() => setStoryDraftUndo(null)}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
       {replaceOpen && (
         <Modal
           title={t("Choose / upload image", "Bild auswählen / hochladen")}
@@ -2722,6 +2351,8 @@ export function ModularEditor() {
             )}
           </p>
           <Upload
+            photoIds={uploadPhotoIds}
+            onRemovePhoto={askDeleteUploaded}
             disabled={backgroundSaving || conflicted}
             composition={{ slug: j.slug, version: j.composition_version ?? 0 }}
             onConflict={markConflict}
@@ -2852,65 +2483,20 @@ export function ModularEditor() {
           </div>
         </Modal>
       )}
-      {(publishReview || publishResult) && (
+      {publishReview && (
         <Modal
-          key={publishResult ? "published" : "review"}
-          title={
-            publishResult
-              ? t("Version published", "Fassung veröffentlicht")
-              : t("Review before publishing", "Vor Veröffentlichung prüfen")
-          }
+          key="review"
+          title={t("Review before publishing", "Vor Veröffentlichung prüfen")}
           className="publish-review"
           onClose={() => {
             if (saving.current || busy) return;
             setPublishReview(null);
-            setPublishResult(null);
           }}
         >
           <span className="eyebrow">
-            {publishResult
-              ? t("VISITOR VERSION", "BESUCHERVERSION")
-              : t("CURRENT LOCAL DRAFT", "AKTUELLER LOKALER ENTWURF")}
+            {t("CURRENT LOCAL DRAFT", "AKTUELLER LOKALER ENTWURF")}
           </span>
-          <h2>{publishResult ? publishResult.title : j.title}</h2>
-          {publishResult ? (
-            <>
-              <p role="status">
-                {t(
-                  "The reviewed version is now available to visitors.",
-                  "Die geprüfte Fassung ist jetzt für Besucher verfügbar.",
-                )}
-                {(dirty || j.has_unpublished_changes) && (
-                  <>
-                    {" "}
-                    {t(
-                      "Newer changes remain in your draft and are not published.",
-                      "Neuere Änderungen bleiben im Entwurf und sind unveröffentlicht.",
-                    )}
-                  </>
-                )}
-              </p>
-              <div className="confirm-actions">
-                <button
-                  className="button button-outline"
-                  onClick={() => setPublishResult(null)}
-                >
-                  {t("Continue editing", "Weiter bearbeiten")}
-                </button>
-                <Link
-                  className="button"
-                  to={`/journeys/${publishResult.slug}`}
-                  target="_blank"
-                  rel="noopener"
-                >
-                  {t("Open visitor version", "Besucherversion öffnen")}
-                  <Eye size={17} />
-                </Link>
-              </div>
-            </>
-          ) : (
-            publishReview && (
-              <>
+          <h2>{j.title}</h2>
                 <dl className="publish-summary">
                   <div>
                     <dt>{t("Photo sources", "Fotoquellen")}</dt>
@@ -3001,10 +2587,16 @@ export function ModularEditor() {
                           )}
                   </button>
                 </div>
-              </>
-            )
-          )}
         </Modal>
+      )}
+      {publishResult && (
+        <PublishedDialog
+          title={publishResult.title}
+          slug={publishResult.slug}
+          cover={j.photos.find((p) => p.id === j.cover_id) ?? j.cover ?? null}
+          newerChanges={dirty || !!j.has_unpublished_changes}
+          onClose={() => setPublishResult(null)}
+        />
       )}
       {viewer !== null && (
         <PhotoViewer
@@ -3013,7 +2605,77 @@ export function ModularEditor() {
           onClose={() => setViewer(null)}
         />
       )}
-      {(pending || discard) && (
+      {overwriteAsk && conflicted && (
+        <Modal
+          title={t("Keep my version", "Meine Version behalten")}
+          onClose={() => setOverwriteAsk(false)}
+        >
+          <h2>{t("Overwrite the other version?", "Die andere Version überschreiben?")}</h2>
+          <p>
+            {t(
+              "Saving your version replaces the changes made elsewhere since you opened this story. They cannot be restored afterwards.",
+              "Wenn du deine Version speicherst, werden die Änderungen überschrieben, die seit dem Öffnen woanders gemacht wurden. Sie lassen sich danach nicht wiederherstellen.",
+            )}
+          </p>
+          <div className="confirm-actions">
+            <button className="button button-outline" onClick={() => setOverwriteAsk(false)}>
+              {t("Cancel", "Abbrechen")}
+            </button>
+            <button
+              className="button"
+              onClick={() => {
+                setOverwriteAsk(false);
+                void keepMyVersion();
+              }}
+            >
+              {t("Overwrite", "Überschreiben")}
+            </button>
+          </div>
+        </Modal>
+      )}
+      {(pending || discard) && uploadBusy && (
+        <Modal
+          title={t("Upload in progress", "Upload läuft")}
+          onClose={() => {
+            setPending("");
+            setDiscard(false);
+          }}
+        >
+          <h2>{t("Leave while uploading?", "Während des Uploads verlassen?")}</h2>
+          <p>
+            {t("An upload is still running.", "Ein Upload läuft noch.")}{" "}
+            {t(
+              "If you leave now, it may be interrupted.",
+              "Wenn du jetzt gehst, kann er abbrechen.",
+            )}
+          </p>
+          <div className="confirm-actions">
+            <button
+              className="button"
+              onClick={() => {
+                setPending("");
+                setDiscard(false);
+              }}
+            >
+              {t("Stay here", "Hier bleiben")}
+            </button>
+            {pending && (
+              <button
+                className="button button-outline"
+                onClick={() => {
+                  const next = pending;
+                  setPending("");
+                  setDiscard(false);
+                  navigate(next);
+                }}
+              >
+                {t("Leave anyway", "Trotzdem verlassen")}
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
+      {(pending || discard) && !uploadBusy && (
         <Modal
           title={t("Unsaved changes", "Ungespeicherte Änderungen")}
           onClose={() => {
@@ -3046,18 +2708,13 @@ export function ModularEditor() {
               className="button button-outline"
               disabled={busy || backgroundSaving || uploadBusy}
               onClick={async () => {
-                if (saving.current || busy || uploadBusy) return;
-                const cleared = await withRecoveryLock(j.id, () => {
-                  if (saving.current) return false;
-                  return !ownedRecovery.current || clearRecovery(ownedRecovery.current);
-                }).catch(() => false);
-                if (!cleared) {
+                const outcome = await discardChanges();
+                if (outcome === "blocked") return;
+                if (outcome === "failed") {
                   setError(t("The local draft could not be discarded.", "Der lokale Entwurf konnte nicht verworfen werden."));
                   setDiscard(false);
                   return;
                 }
-                setDirty(false);
-                setJourney(saved.current);
                 const next = pending;
                 setPending("");
                 setDiscard(false);
@@ -3070,5 +2727,6 @@ export function ModularEditor() {
         </Modal>
       )}
     </main>
+    </>
   );
 }

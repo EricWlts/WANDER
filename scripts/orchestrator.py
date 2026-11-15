@@ -184,6 +184,10 @@ def usage_from_log(path):
             info = event.get("usage") or (response.get("usage") if isinstance(response, dict) else {})
             info = info if isinstance(info, dict) else {}
             values = dict(info)
+            if 'total_tokens' not in values:
+                a, b = values.get('input_tokens'), values.get('output_tokens')
+                if type(a) is int and a >= 0 and type(b) is int and b >= 0:
+                    values['total_tokens'] = a + b
             for field, details_field, nested in (
                     ("cached_input_tokens", "input_tokens_details", "cached_tokens"),
                     ("reasoning_output_tokens", "output_tokens_details", "reasoning_tokens")):
@@ -209,8 +213,12 @@ def review_run(run, apply=False, selected=None, input_fn=None):
         report = json.loads(report_path.read_text())
     except (OSError, ValueError) as exc:
         raise Stop("Laufbericht fehlt oder ist ungültig.") from exc
-    if not isinstance(report, dict) or report.get("status") != "ready_for_manual_review":
+    if not isinstance(report, dict) or report.get("status") not in {
+            "ready_for_manual_review", "budget_exceeded_manual_review"}:
         raise Stop("Lauf ist nicht zur Übernahme freigegeben.")
+    if report['status'] == 'budget_exceeded_manual_review':
+        print('BUDGET ÜBERSCHRITTEN: nur lokal geprüft; manuelles Review erforderlich. '
+              'Offene Aufgaben: ' + ', '.join(report.get('pending_tasks', [])))
     workspace = run / "workspace"
     try:
         raw_allow, raw_changed = report.get("allowed"), report.get("files")

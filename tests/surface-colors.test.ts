@@ -23,11 +23,11 @@ function expectedContrast(foreground: string, background: string) {
 test("edition surfaces keep their established brand ink with accessible contrast", () => {
   const before = structuredClone(editionColors);
   assert.deepEqual(surfaceColors(editionColors["quiet-atlas"]), {
-    background: "#ECEDEB",
+    background: "#EEECE6",
     ink: "#26302B",
   });
   assert.deepEqual(surfaceColors(editionColors["after-hours"]), {
-    background: "#20241F",
+    background: "#1A1D18",
     ink: "#F2F3EF",
   });
   for (const background of Object.values(editionColors)) {

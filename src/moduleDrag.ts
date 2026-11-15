@@ -19,14 +19,30 @@ export function moduleScrollSpeed(y: number, top: number, bottom: number) {
   return 0;
 }
 
-/** Module transfers use heading bounds; a chapter heading is an explicit inside slot. */
+/**
+ * Module transfers use heading bounds; a chapter heading is an explicit inside slot.
+ * Below the last module of a day the pointer's x decides the level: left of the day's
+ * indentation (`parent` and `left` known) the module lands after the day, on the story level.
+ */
 export function moduleTransferTarget(
-  rows: (ModuleRowBounds & { chapter: boolean })[], source: number, y: number,
+  rows: (ModuleRowBounds & { chapter: boolean; parent?: number | null; left?: number })[],
+  source: number,
+  y: number,
+  x?: number,
 ) {
   const peers = rows.filter((row) => row.id !== source);
   const chapter = peers.find((row) => row.chapter && y >= row.top && y <= row.bottom);
   if (chapter) return { id: source, target: chapter.id, after: true, inside: true };
   const next = peers.find((row) => y < (row.top + row.bottom) / 2);
   const target = next || peers[peers.length - 1];
-  return target ? { id: source, target: target.id, after: !next, inside: false } : null;
+  if (!target) return null;
+  const previous = next ? peers[peers.indexOf(next) - 1] : target;
+  // The slot sits between the last child of a day and whatever follows outside that day.
+  if (previous?.parent && x !== undefined && previous.left !== undefined &&
+      (!next || next.parent !== previous.parent)) {
+    return x < previous.left
+      ? { id: source, target: previous.parent, after: true, inside: false }
+      : { id: source, target: previous.id, after: true, inside: false };
+  }
+  return { id: source, target: target.id, after: !next, inside: false };
 }

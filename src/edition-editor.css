@@ -1,0 +1,123 @@
+/* Studio: edition editor. Builds on hero-editor.css; two quiet image cards, one opens full width. */
+.edition-editors { margin-top: 28px; }
+.edition-editors-title {
+  margin: 0 0 12px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.edition-editors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.edition-editor { border-bottom: 0; padding-top: 0; }
+.edition-editor.is-open { grid-column: 1 / -1; border-bottom: 1px solid var(--line); }
+.edition-editor .hero-editor-toggle { height: 140px; }
+.edition-slots {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 8px;
+}
+.edition-slot {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  background: var(--c-stone);
+  border: 1px solid var(--line);
+  color: var(--c-linen, #f1ece2);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.edition-slot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.edition-slot:hover { border-color: var(--c-line-strong); }
+.edition-slot[aria-pressed="true"] { border-color: var(--c-moss); box-shadow: 0 0 0 2px var(--c-moss); }
+.edition-slot:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
+.edition-slot-label,
+.edition-slot-shape {
+  position: absolute;
+  left: 0;
+  padding: 2px 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  background: rgba(14, 22, 16, 0.62);
+}
+.edition-slot-label { top: 0; }
+.edition-slot-shape { bottom: 0; right: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+.edition-slot.is-cover .edition-slot-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+.edition-slot-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-linen, #f1ece2);
+  box-shadow: 0 0 0 1px rgba(14, 22, 16, 0.5);
+}
+.edition-warning { color: var(--c-clay, #8a5a3c); font-weight: 600; }
+.edition-subhead {
+  margin: 6px 0 -8px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 20px;
+}
+.edition-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+}
+.edition-field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+.edition-field input {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.edition-field input:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .edition-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .edition-editors-grid, .edition-fields { grid-template-columns: minmax(0, 1fr); }
+  .edition-editors-title { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .edition-slot { transition: none; } }
+[data-motion="off"] .edition-slot { transition: none; }
+
+/* New journey: edition cards show the real editions (same cover, crop and title as /inspiration). */
+html body .new-edition > div { aspect-ratio: 3 / 2; height: auto; background: var(--c-line); }
+html body .new-edition > div.is-loading { background: color-mix(in srgb, var(--c-line) 70%, transparent); }
+html body .new-edition.after-hours > div.is-loading { background: color-mix(in srgb, var(--c-night) 85%, var(--c-linen)); }
+html body .new-edition img { width: 100%; }
+html body .new-edition img.has-cover-focus { object-position: var(--cover-pos-desktop, 50% 50%); }
+@media (max-width: 1100px) { html body .new-edition img.has-cover-focus { object-position: var(--cover-pos-tablet, 50% 50%); } }
+@media (max-width: 760px) { html body .new-edition img.has-cover-focus { object-position: var(--cover-pos-mobile, 50% 50%); } }
+
+/* Edition cards as miniatures of the result: light = photograph in a paper frame, dark = full-bleed. */
+html body .new-edition > div { position: relative; box-sizing: border-box; }
+html body .new-edition.quiet-atlas > div { padding: 7%; background: var(--c-paper); }
+html body .new-edition.quiet-atlas > div.is-loading { background: var(--c-paper); }
+html body .new-edition.after-hours img { filter: none; }
+html body .new-edition > div img { display: block; height: 100%; object-fit: cover; }
+
+/* Upload list with thumbnails and remove buttons (new journey). */
+.upload-thumb { width: 44px; height: 44px; flex: 0 0 44px; object-fit: cover; border-radius: 2px; background: var(--c-line); }
+.upload-progress-card .upload-file-name { display: flex; align-items: center; gap: 10px; }
+.upload-progress-card .upload-file-name .upload-remove { margin-left: auto; }
+.upload-results.is-removable li > svg { display: none; }
+.upload-results li > .upload-remove,
+.upload-progress-card .upload-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; min-height: 44px; flex: 0 0 auto; margin-left: auto; padding: 0;
+  color: var(--c-muted); background: none; border: 0; cursor: pointer;
+}
+.upload-remove:hover, .upload-remove:focus-visible { color: var(--c-clay); }
+.upload-remove:disabled { opacity: 0.4; cursor: default; }

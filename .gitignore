@@ -8,3 +8,14 @@ __pycache__/
 .env
 .DS_Store
 artifacts/
+
+# Lokales Sicherungs-Repo der Praesentationsvorbereitung
+.wander-praesentation.git/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Lokale Werkzeuge und Papierkorb
+.codex/
+_to_delete/

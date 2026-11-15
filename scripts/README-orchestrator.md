@@ -29,8 +29,23 @@ Die Rollen werden durch gezielte Codex-CLI-Aufrufe umgesetzt:
   Aufgaben an Luna/Sol, schreibt selbst keine Projektdateien.
 
 Zuerst läuft eine lokale deterministische Suche. Ein kurzer Änderungswunsch mit genau
-einem vorhandenen `src/`-Pfad oder einem eindeutigen zitierten Text kann direkt an Luna
+einem vorhandenen `src/`-Pfad oder einem eindeutigen Text kann direkt an Luna
 Low gehen, beispielsweise `Entferne "Beispieltext"` oder `Hover in src/refinement.css sanfter`.
+Auch `Entferne … den folgenden Text vollständig: … Erhalte …` wird lokal erkannt.
+Die Textsuche prüft vollständige erfasste `src/`-Quelldateien (TS/TSX, CSS, JSON, Markdown),
+vereinheitlicht Leerzeichen, Zeilenumbrüche und `<br>` und verlangt genau ein Vorkommen.
+Statische `t("Schlüssel")`-/`tr("Schlüssel")`-Aufrufe aus `src/I18n.tsx` werden lokal
+mit `src/translations.json` verbunden. Auch mehrere übersetzte Sätze innerhalb
+eines zusammenhängenden JSX-Textbereichs (einschließlich `<br />`) werden erkannt.
+So führt `Entferne „Die Orte, an die wir reisen. Und die Gefühle, die sie in uns wecken.“`
+direkt zur verwendenden Komponente `src/Public.tsx`; der Katalog dient nur als
+Lesekontext und erhält keine Schreibfreigabe. Mehrere Komponenten oder Vorkommen,
+getrennte JSX-Bereiche, dynamische Ausdrücke und nicht unterstützte Aufrufsyntax
+erhalten keinen automatischen Direktplan. Die Auflösung ersetzt keinen JSX-Parser.
+Sie ist auf 2 MB je Datei und 8 MB insgesamt begrenzt; bei unvollständiger Suche,
+mehreren Treffern oder unklarer Formulierung bleibt die begrenzte Planung zuständig.
+Die direkte Aufgabe durchläuft dieselbe EXECUTE-Dateifreigabe, isolierte Ausführung,
+Frontendtests, Build, Vorschau und ausdrückliche APPLY-Bestätigung wie geplante Aufgaben.
 Risikoregeln haben Vorrang. Sonst plant Luna Low anhand begrenzter Ausschnitte.
 Unveränderte Quelldateien werden innerhalb der Sitzung anhand ihres Inhalts-Hashes
 wiederverwendet; identische Planungseingaben können den lokalen Sitzungscache nutzen.
@@ -44,8 +59,12 @@ Die Erkennung negativer Formulierungen ist eine lokale Heuristik, kein semantisc
 klare Formulierungen wie „immer noch falsch“ werden erkannt.
 
 Der Eskalationsbericht enthält das ursprüngliche Nutzerziel, aktuellen Wunsch, relevante
-Dateiausschnitte, Regeln, bestätigtes Gedächtnis, die letzten vier Lösungs-/Feedbackberichte
-und konkrete offene Fragen. Gründe, Bericht und Delegation liegen unter
+Dateiausschnitte, Regeln, bestätigtes Gedächtnis, gekürzte Lösungs-/Feedbackberichte
+und konkrete offene Fragen. Im Modellkontext stehen nur die letzten zwei Runden mit
+je höchstens zwei Versuchen, gekürzten Wünschen/Berichten (500 Zeichen) und
+Ergebnistexten (400 Zeichen). Die Nachanalyse ersetzt die Quellausschnitte, statt
+den ersten Kontext um einen zweiten vollständigen Suchkontext zu erweitern.
+Gründe, Bericht und Delegation liegen unter
 `planning-*/report.json`. Astra entscheidet keine fehlenden Produktanforderungen durch
 Raten: verbleibendes `unclear` oder eine offene `architecture`-Entscheidung stoppt vor
 jeder Schreibfreigabe. Eine Worker-Fehlerrunde erhält höchstens **eine** automatische
@@ -94,7 +113,8 @@ python3 -B scripts/orchestrator.py --interactive --max-tokens 20000 --session-to
 
 `--max-tokens` gilt in der interaktiven Sitzung **je Nutzerauftrag**, gemeinsam für
 Planung, Astra und Umsetzung einschließlich automatischer Wiederaufnahme. Ein neuer
-Wunsch erhält ein neues Aufgabenbudget. `--max-calls` begrenzt Luna-Planung (1–2),
+Wunsch erhält ein neues Aufgabenbudget, sofern die Sitzung nicht nach einer
+Worker-Budgetüberschreitung gesperrt ist. `--max-calls` begrenzt Luna-Planung (1–2),
 zusätzlich höchstens ein Astra-Aufruf je Planung; `--worker-calls` begrenzt alle
 Coding-Aufrufe des Nutzerauftrags einschließlich Reparatur/Delegation (1–16).
 
@@ -107,6 +127,20 @@ STATUS, DIFF, APPLY eines zuvor geprüften Stands und DISCARD bleiben möglich.
 Unbekannte Usage stoppt sicher weitere Modellaufrufe der Sitzung. Die Limits sind
 Zulassungsprüfungen **zwischen** Aufrufen: ein laufender Aufruf kann sie überschreiten.
 Es gibt kein garantiertes hartes Kostenlimit und keine unbelegte Preisschätzung.
+
+Überschreitet ein Worker ein Aufgaben- oder Sitzungsbudget, starten in dieser Sitzung
+keine weiteren Modelle, auch keine Reparatur, Folgeaufgabe oder Astra-Eskalation.
+Die Sperre bleibt nach DISCARD erhalten; neue Modellarbeit erfordert einen neuen
+CLI-Start. Nur bei Exitcode 0, gültigem `complete`, tatsächlicher freigegebener Änderung
+und bestandenen Integritäts-/Sandboxkontrollen prüft Python den Kandidaten noch lokal
+mit Tests und Produktionsbuild. Erfolgreiche Ergebnisse erhalten den Status
+`budget_exceeded_manual_review` (Anzeige: „budgetüberschritten, manuell prüfbar“).
+Bei mehreren Planaufgaben endet der Lauf nach dieser lokal geprüften Aufgabe;
+`completed_tasks` und `pending_tasks` kennzeichnen den tatsächlich erreichten Umfang.
+DIFF und das explizit bestätigte APPLY bleiben mit denselben Hash-, Originalstand-,
+Dateifreigabe- und Manipulationskontrollen möglich. Es gibt keine automatische Übernahme.
+Ohne erfolgreichen Abschluss oder bei fehlgeschlagenen Tests wird der vorherige Stand
+wiederhergestellt; unsichere Änderungen sperren den Entwurf weiterhin vollständig.
 
 Gewöhnliche Worker-/Prozessfehler und fehlgeschlagene Tests stellen den letzten
 geprüften Stand samt Apply-Bericht wieder her. Ein neuer Wunsch ist bei verbleibendem
@@ -218,11 +252,41 @@ Architektur-/unklare Pläne sind von der automatischen Coding-Ausführung ausges
 `--max-tokens` (Standard 20.000) gilt je Planung bzw. gesondertem Ausführungslauf und zählt
 beobachteten Input einschließlich Cache plus Output. Cache-/Reasoning-Teilwerte werden
 nicht zusätzlich gezählt. Bei unbekannter Usage oder ausgeschöpftem Budget wird kein
-weiterer Modellaufruf zugelassen; lokale Tests können noch laufen. **Ein einzelner Aufruf
+weiterer Modellaufruf zugelassen. Ein bereits erfolgreich abgeschlossener Coding-Aufruf
+darf nach der Überschreitung ausschließlich noch lokal geprüft werden (siehe oben).
+Unvollständige oder unsichere Ergebnisse werden nicht zur Übernahme freigegeben.
+`budget_scopes` zeigt Worker-, Aufgaben- und Sitzungswerte getrennt; eine Überschreitung
+des Aufgabenbudgets bleibt sichtbar, auch wenn das Sitzungsbudget noch ausreicht.
+`model_calls_stopped` kennzeichnet die zusätzliche Sitzungssperre.
+**Ein einzelner Aufruf
 kann das Budget überschreiten. Es gibt keine garantierte harte Token- oder Kostengrenze.**
 Der Bericht zeigt `over_budget`, `overrun_tokens`, `limit_reached`, `hard_cost_limit: false`,
 Aufrufzahlen sowie Input-, Cache-, ungecachte Input-, Output-, Total- und Reasoning-Token
 pro Aufruf. Fehlende Werte bleiben `unknown`. Eine Preis-/Euro-Schätzung erfolgt nicht.
+
+Der Worker-Lauf `20261101-150813-session-5b234976` hatte einen gültigen `complete`-Abschluss,
+aber 65.888 Input- und 404 Output-Token (= 66.292, darin 40.064 gecachte Input-Token).
+Ein Toolaufruf las AGENTS.md, ARCHITECTURE.md, TASKS.md, Public.tsx, den vollständigen
+Übersetzungskatalog und I18n.tsx. Die Budgetprüfung lief vor der Ergebnisauswertung und
+verwarf deshalb auch die erfolgreiche Änderung. Es gab einen Worker-Aufruf; die Logs
+belegen keine doppelte Zählung. CLI-Grundkontext und wiederverarbeitete Toolkontexte
+lassen sich aus den aggregierten Nutzungswerten nicht getrennt beziffern.
+
+Für lokale Aufgaben in genau einer Datei ohne zusätzliche Lesepfade übergibt Python
+jetzt die lokalisierte Evidenz: Zielpfad, Zeilennummern, maximal 6.000 Zeichen um den
+Treffer sowie tatsächlich verwendete Übersetzungsschlüssel und Werte (gesamte Evidenz
+maximal 10.000 Zeichen). Bereits lokal gelesene Quellen werden über ihre Hashes gecacht.
+Der Worker erhält die verbindlichen AGENTS-/Architekturregeln einmal im Prompt
+(einschließlich zutreffender untergeordneter AGENTS.md, insgesamt maximal 16.000 Zeichen)
+und nur ausdrücklich referenzierte TASKS-Einträge. `--ignore-rules` verhindert zusätzliche
+automatische Regelkontexte; der Prompt untersagt redundante Dateiabrufe, breite
+Projektanalyse, vollständige Kataloge und große Logs. Nur gezielte Nachbarzeilen der
+Zieldatei dürfen bei Bedarf gelesen werden; fehlender Kontext bedeutet `blocked`.
+Diese Lesevorgabe ist eine Promptbegrenzung, keine zusätzliche Dateilesesandbox.
+Die vorhandene Schreibsandbox bleibt aktiv. Frische ephemere CLI-Aufrufe übernehmen
+keine alten Codex-Threads; Tests und Build bleiben zentral in Python. `calls[].context`
+protokolliert Promptzeichenzahl, lokalen Kontextmodus und Lesebereich. Zeichen sind
+keine gemessenen Token; nur CLI-Nutzungsereignisse zählen zum Tokenbudget.
 
 ### Cache, Gültigkeit und Manipulationsschutz
 
@@ -351,6 +415,11 @@ python3 -B -m unittest discover -s scripts -p 'test_orchestrator*.py' -v
 
 Die Tests verwenden Mocks und lokale Python-Schlafprozesse zur Timeoutprüfung;
 sie starten keine Codex-Worker und verursachen keine Modellaufrufe.
+Die Budgetregressionen prüfen den begrenzten Kontext bei realen WANDER-Übersetzungsschlüsseln,
+lokales Review nach erfolgreichem Budgetüberlauf, Abbruch bei unerlaubten Dateien,
+fehlenden/ungültigen Abschlüssen und fehlschlagenden Tests sowie unveränderte APPLY-,
+Hash-, Sandbox- und Dateifreigabekontrollen. Mock-Tokenwerte belegen die Budgetlogik,
+keine reale Verbrauchsprognose. Produktionsprüfung zusätzlich: `npm run build`.
 
 CLI-Referenz: [Offizielle OpenAI-Dokumentation](https://learn.chatgpt.com/docs/developer-commands).
 Die verwendeten Flags wurden zusätzlich mit der installierten `codex exec --help`

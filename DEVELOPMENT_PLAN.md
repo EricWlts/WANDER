@@ -106,3 +106,9 @@ W13-Auditbericht für den lokal integrierten Stand `89a04da783b6f2f76e5934fc8683
 **G6 nicht freigegeben; 9/10-Ziel verfehlt.** Fachliche, subjektive Noten mit den ursprünglichen sechs Gewichten: 8,345 ≈ 8,3/10. Mobiler Archivindex schneidet einen gültigen langen Titel ab; mehrere Bereiche liegen unter 8,5. Intermittierender Studio-CLS 0,150 überschreitet den Zielwert. Neue Labormessungen ersetzen weder reale Geräte/Screenreader/Leistungsprofil noch die qualitative Nutzerbeurteilung. Offene Pflichtfälle bleiben offen, keine Umdeutung fertiger W-Aufgaben in eine Produktfreigabe.
 
 Priorisierte Empfehlung (keine neue Aufgabe gestartet): zuerst begrenzter Archivindex-/Langtitelfix, danach Studio-Ladegeometrie mit CLS-Nachweis, danach gemeinsamer Picture-Lade-/Fehler-/Quellenwechsel. Reale Abnahmematrix und Nutzerurteil vor G6 nachholen. Kein Architekturwechsel empfohlen.
+
+## F05-/G6-Abschluss nach F01–F04 — 02.11.2026
+
+F05 prüfte die integrierte Basis `28888555aeaf3a125bb765b68e1599bb0b180a37`. Die vier Nachbesserungen schließen die jeweils dokumentierten Titel-, Metadaten-, Studio-CLS- und Picture-Zustandsbefunde innerhalb ihrer geprüften Fälle. Die neue fachliche Bewertung beträgt **8,545 ≈ 8,5/10** mit den ursprünglichen sechs Gewichten; Mobil/Performance/Accessibility liegt bei 7,9. F01–F04 werden nicht automatisch als Qualitätsnote angerechnet.
+
+**9/10 nicht erreicht. G6 bleibt fachlich offen und ist nicht durch den Nutzer freigegeben.** F03s 1-px-Überstand des englischen Editorial-Footers bei 319 px ist im Bericht als nicht erneut live vermessener offener Fall geführt. Reale Geräte, Screenreader, aktualisierte LCP-/INP-Leistung und qualitative Nutzerbeurteilung fehlen. Regression: 51 Frontendtests, 77 Backendtests und Produktionsbuild erfolgreich. Einzelheiten und priorisierte nächste Prüfungen stehen in `PRODUCT_AUDIT.md` unter F05.

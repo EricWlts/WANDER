@@ -10,7 +10,7 @@ import {
   rootPhotos,
   replaceSourceReferences,
 } from "../src/journalModel.ts";
-import { centerRevealOpacity } from "../src/revealMath.ts";
+import { centerRevealOpacity, maxRevealDistance, revealDistance } from "../src/revealMath.ts";
 import type { Journey, Chapter } from "../src/types.ts";
 const journey = {
   id: 1,
@@ -234,15 +234,27 @@ test("local module order survives while IDs and parent references follow submitt
   assert.equal(merged.has_unpublished_changes, false);
   assert.deepEqual({ current, pending, saved }, before);
 });
-test("continuous reveal fades symmetrically on both sides of the central reading area", () => {
+test("continuous reveal is edge based, symmetric and never hides a block that covers the zone", () => {
   assert.equal(centerRevealOpacity(350, 450, 0, 800), 1);
-  assert.equal(centerRevealOpacity(760, 860, 0, 800), 0);
-  assert.equal(centerRevealOpacity(-60, 40, 0, 800), 0);
-  const below = centerRevealOpacity(600, 700, 0, 800),
-    above = centerRevealOpacity(100, 200, 0, 800);
+  assert.equal(centerRevealOpacity(860, 960, 0, 800), 0);
+  assert.equal(centerRevealOpacity(-140, -60, 0, 800), 0);
+  const below = centerRevealOpacity(720, 820, 0, 800),
+    above = centerRevealOpacity(-20, 80, 0, 800);
   assert.equal(below, above);
   assert.ok(below > 0 && below < 1);
-  assert.ok(centerRevealOpacity(500, 600, 0, 800) > below);
+  assert.ok(centerRevealOpacity(600, 700, 0, 800) > below);
+  // Starts before the element's top edge is on screen, and is complete early.
+  assert.ok(centerRevealOpacity(810, 910, 0, 800) > 0);
+  assert.equal(centerRevealOpacity(680, 780, 0, 800), 1);
+  // A tall block spanning the viewport stays fully visible at every offset.
+  for (const top of [-900, -500, -100, 0, 300])
+    assert.equal(centerRevealOpacity(top, top + 1600, 0, 800), 1);
+});
+test("reveal travel is capped to a quiet settle", () => {
+  assert.equal(revealDistance(30), maxRevealDistance);
+  assert.equal(revealDistance(12), 12);
+  assert.equal(revealDistance(-5), 0);
+  assert.equal(revealDistance(Number.NaN), 0);
 });
 test("signed offsets and automatic contrast support light and dark editorial surfaces", () => {
   assert.deepEqual(

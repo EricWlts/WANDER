@@ -1,0 +1,71 @@
+/* Motion polish: one calm vocabulary, loaded last. Short, never-empty reveals,
+   a seamless masthead hand-over and shared hover/focus timing. */
+:root {
+  --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.45, 0, 0.25, 1);
+  --dur-quick: 180ms;
+  --dur-base: 420ms;
+  --dur-slow: 900ms;
+  --reveal-max-delay: 120ms;
+}
+
+/* Reveals: scroll position decides the state, time only smooths it (<= 280 ms),
+   so a fast scroll can never leave a hole behind. */
+[data-motion="scroll"][data-reveal] {
+  transition:
+    opacity var(--scroll-smoothing, 240ms) var(--ease-out-soft),
+    transform var(--scroll-smoothing, 240ms) var(--ease-out-soft);
+}
+.picture[data-motion="scroll"] {
+  transition-duration: var(--scroll-smoothing, 280ms);
+}
+[data-motion="scroll"] {
+  transition-delay: min(var(--reveal-delay, 0ms), var(--reveal-max-delay)) !important;
+}
+/* Time-based (preview) reveals: short travel. */
+[data-reveal="up"] { --reveal-y: 20px; }
+[data-reveal="down"] { --reveal-y: -20px; }
+[data-reveal="left"] { --reveal-x: -20px; }
+[data-reveal="right"] { --reveal-x: 20px; }
+[data-reveal="zoom"] { --reveal-scale: 0.98; }
+[data-motion="preview"][data-reveal="up"] { --reveal-y: min(var(--reveal-distance, 20px), 24px); }
+[data-motion="preview"][data-reveal="down"] { --reveal-y: max(calc(-1 * var(--reveal-distance, 20px)), -24px); }
+[data-motion="preview"][data-reveal="left"] { --reveal-x: max(calc(-1 * var(--reveal-distance, 20px)), -24px); }
+[data-motion="preview"][data-reveal="right"] { --reveal-x: min(var(--reveal-distance, 20px), 24px); }
+[data-reveal]:not([data-motion="scroll"]) {
+  transition-timing-function: var(--ease-out-soft);
+}
+/* Anchor jumps / restored scroll positions land instantly. */
+html[data-reveal-jump] [data-reveal] {
+  transition: none !important;
+}
+html[data-motion="off"] [data-reveal],
+html[data-motion="off"] [data-motion="scroll"][data-reveal] {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Hover and focus: links and buttons share quick colour feedback. */
+.text-link,
+.footer-bottom a,
+.site-footer a {
+  transition:
+    color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft),
+    border-color var(--dur-quick) var(--ease-out-soft);
+}
+/* Keep the photograph at its saved crop during hover and focus. */
+.picture img {
+  transition: transform var(--dur-slow) var(--ease-out-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-motion="scroll"][data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .picture img { transition: none; }
+}

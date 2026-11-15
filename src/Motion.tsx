@@ -4,11 +4,22 @@ import {
   useState,
   useEffect,
   useRef,
+  useMemo,
+  useCallback,
   type ReactNode,
   type RefObject,
 } from "react";
 import { Pause, Play } from "lucide-react";
 import { t, useLocale } from "./I18n";
+import { parallaxShift, coverParallaxIntensity } from "./imageParallax";
+import {
+  cachedQuery,
+  joinScrollFrames,
+  prefersReducedMotion,
+  reducedMotionQuery,
+  requestScrollFrame,
+  type ScrollFrameEntry,
+} from "./motionState";
 const MotionContext = createContext({
   off: false,
   reduced: false,
@@ -23,11 +34,10 @@ export function MotionProvider({ children }: { children: ReactNode }) {
       return false;
     }
   });
-  const [reduced, setReduced] = useState(
-    matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
+  const [reduced, setReduced] = useState(() => prefersReducedMotion());
   useEffect(() => {
-    const q = matchMedia("(prefers-reduced-motion: reduce)");
+    const q = reducedMotionQuery();
+    if (!q) return;
     const update = () => setReduced(q.matches);
     q.addEventListener("change", update);
     return () => q.removeEventListener("change", update);
@@ -38,7 +48,7 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event("wander-motion"));
   }, [disabled, reduced]);
   const off = disabled || reduced;
-  function toggle() {
+  const toggle = useCallback(() => {
     const next = !disabled;
     setDisabled(next);
     try {
@@ -46,9 +56,10 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     } catch {
       /* Session setting. */
     }
-  }
+  }, [disabled]);
+  const value = useMemo(() => ({ off, reduced, toggle }), [off, reduced, toggle]);
   return (
-    <MotionContext.Provider value={{ off, reduced, toggle }}>
+    <MotionContext.Provider value={value}>
       {children}
       <MotionToggle className="global-motion" />
     </MotionContext.Provider>
@@ -83,7 +94,8 @@ export function MotionToggle({ className }: { className: string }) {
 export function Parallax({
   children,
   enabled = true,
-  intensity = 90,
+  // Default = the story cover (the only caller without an explicit strength): twice the old shift.
+  intensity = coverParallaxIntensity,
   image = false,
   visibilityTarget,
 }: {
@@ -102,51 +114,46 @@ export function Parallax({
       return;
     }
     const ownerWindow = el.ownerDocument.defaultView || window;
-    const media = ownerWindow.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0,
-      visible = false;
-    const draw = () => {
-      frame = 0;
-      if (!visible || media.matches) return;
-      const r = el.getBoundingClientRect();
-      const viewportHeight =
-        el.ownerDocument.defaultView?.innerHeight || innerHeight;
-      const y = Math.max(
-        -1,
-        Math.min(
-          1,
-          (viewportHeight / 2 - r.top - r.height / 2) / viewportHeight,
-        ),
-      );
-      el.style.setProperty("--parallax-y", `${y * intensity * 0.5}px`);
+    const media = reducedMotionQuery(ownerWindow);
+    const compactQuery = cachedQuery(
+      "(max-width: 760px) and (pointer: coarse)",
+      ownerWindow,
+    );
+    if (!media || !compactQuery) return;
+    // Read the rect now, hand back one write: the shared scheduler runs all reads
+    // before all writes, so many images never thrash layout.
+    const entry: ScrollFrameEntry = {
+      read: () => {
+        if (media.matches) return;
+        const r = el.getBoundingClientRect();
+        const viewportHeight =
+          el.ownerDocument.defaultView?.innerHeight || innerHeight;
+        const y = (viewportHeight / 2 - r.top - r.height / 2) / viewportHeight;
+        const value = `${parallaxShift(y, intensity, compactQuery.matches).toFixed(2)}px`;
+        return () => el.style.setProperty("--parallax-y", value);
+      },
     };
-    const scroll = () => {
-      if (!frame) frame = ownerWindow.requestAnimationFrame(draw);
-    };
+    // Listening only while the element is (nearly) in view: off-screen images cost nothing.
+    let leave: (() => void) | undefined;
     const observer = new ownerWindow.IntersectionObserver(([e]) => {
-      visible = e.isIntersecting;
-      scroll();
-    });
+      if (e.isIntersecting) leave ??= joinScrollFrames(ownerWindow, entry, window);
+      else {
+        leave?.();
+        leave = undefined;
+      }
+    }, { rootMargin: "12% 0px" });
     observer.observe(visibilityTarget?.current ?? el);
     const reduced = () => {
       el.classList.toggle("parallax-active", !media.matches);
       if (media.matches) el.style.setProperty("--parallax-y", "0px");
-      else scroll();
+      else requestScrollFrame(ownerWindow);
     };
     media.addEventListener("change", reduced);
     reduced();
-    if (ownerWindow && ownerWindow !== window)
-      ownerWindow.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("scroll", scroll, { passive: true });
-    ownerWindow.addEventListener("resize", scroll);
     return () => {
       observer.disconnect();
-      if (ownerWindow && ownerWindow !== window)
-        ownerWindow.removeEventListener("scroll", scroll);
+      leave?.();
       media.removeEventListener("change", reduced);
-      ownerWindow.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", scroll);
-      ownerWindow.removeEventListener("resize", scroll);
     };
   }, [enabled, intensity, off, visibilityTarget]);
   return (

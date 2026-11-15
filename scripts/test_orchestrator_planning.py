@@ -127,6 +127,23 @@ class ValidationTests(unittest.TestCase):
             log.write_text('{"type":"turn.completed","usage":{"input_tokens":true,"output_tokens_details":null}}')
             self.assertEqual(o.usage_from_log(log)["input_tokens"], "unknown")
 
+    def test_usage_derives_each_turn_total_without_double_counting_cache_or_responses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / 'usage.log'
+            log.write_text('\n'.join(json.dumps(event) for event in [
+                {'type': 'turn.completed', 'usage': {'input_tokens': 65888, 'output_tokens': 404,
+                    'cached_input_tokens': 40064, 'reasoning_output_tokens': 12}},
+                {'type': 'response.completed', 'response': {'usage': {'total_tokens': 66292}}},
+                {'type': 'turn.completed', 'usage': {'input_tokens': 5, 'output_tokens': 2,
+                    'total_tokens': 7, 'input_tokens_details': {'cached_tokens': 3}}}]))
+            usage = o.usage_from_log(log)
+            self.assertEqual(usage['total_tokens'], 66299)
+            self.assertEqual(usage['input_tokens'], 65893)
+            self.assertEqual(usage['output_tokens'], 406)
+            self.assertEqual(usage['cached_input_tokens'], 40067)
+            self.assertEqual(usage['uncached_input_tokens'], 25826)
+            self.assertEqual(usage['reasoning_output_tokens'], 'unknown')
+
 
 class LifecycleTests(unittest.TestCase):
     def simulate(self, values, tokens=10, max_calls=2, mutate=False, code=0, changed_original=False, request="Menü schließen"):

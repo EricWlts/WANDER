@@ -1,0 +1,608 @@
+/* Zwei Editionen: Schritt 03 und zwei Karten im Stil von /inspiration */
+.home-page .home-diptych-section { margin-top: clamp(12px, 1.6vw, 22px); padding-top: clamp(12px, 1.4vw, 18px); border-top: 1px solid var(--c-line-strong, var(--c-line)); }
+.home-page .home-diptych-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: end;
+  gap: clamp(14px, 2.4vw, 36px);
+  margin-bottom: clamp(12px, 1.4vw, 20px);
+}
+.home-page .home-diptych-head h2 {
+  margin: 0;
+  font: 400 clamp(26px, 2.8vw, 42px) / 1.05 var(--serif);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.home-page .home-diptych-head h2 em { font-style: italic; color: var(--c-moss, var(--c-olive)); }
+.home-page .home-diptych-head p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--c-ink-soft);
+  font: 400 14px / 1.5 var(--sans, "Manrope", sans-serif);
+}
+.home-page .home-diptych {
+  --dip-h: clamp(340px, 52svh, 560px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 24px);
+}
+.home-page .home-diptych-page {
+  position: relative;
+  display: block;
+  height: var(--dip-h);
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--c-ink);
+  background: var(--c-stone);
+  text-decoration: none;
+}
+.home-page .home-diptych-page.is-light { box-shadow: 0 0 0 1px var(--c-line) inset; }
+.home-page .home-diptych-page.is-dark { color: var(--c-linen); background: var(--c-night); }
+.home-page .home-diptych-page:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
+.home-page .home-diptych-photo { position: absolute; inset: 0; z-index: -2; display: block; }
+.home-page .home-diptych-photo .picture {
+  display: block;
+  width: 100%;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+  margin: 0 !important;
+  background: var(--c-forest-raised);
+}
+.home-page .home-diptych-photo .picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover !important;
+  transition: transform 700ms ease;
+}
+.home-page .home-diptych-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.home-page .home-diptych-page.is-light::before {
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--c-chalk) 98%, transparent) 0%,
+    color-mix(in srgb, var(--c-chalk) 94%, transparent) 26%,
+    color-mix(in srgb, var(--c-chalk) 0%, transparent) 62%);
+}
+.home-page .home-diptych-page.is-dark::before {
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--c-night) 96%, transparent) 0%,
+    color-mix(in srgb, var(--c-night) 86%, transparent) 28%,
+    color-mix(in srgb, var(--c-night) 0%, transparent) 64%);
+}
+.home-page .home-diptych-type {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0 clamp(18px, 2.2vw, 32px) clamp(14px, 1.7vw, 24px);
+}
+.home-page .home-diptych-kicker {
+  font: 500 var(--fs-xs) / 1.4 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--c-olive);
+}
+.home-page .is-dark .home-diptych-kicker { color: var(--c-mist); }
+.home-page .home-diptych-name {
+  margin: 6px 0 4px;
+  font: 400 clamp(40px, 4.2vw, 64px) / 0.98 var(--serif);
+  letter-spacing: -0.025em;
+}
+.home-page .home-diptych-sample { font: italic 400 clamp(15px, 1.35vw, 19px) / 1.3 var(--serif); color: var(--c-ink-soft); }
+.home-page .is-dark .home-diptych-sample { color: var(--c-fog); }
+.home-page .home-diptych-foot {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 20px;
+  margin-top: clamp(10px, 1.2vw, 16px);
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  transition: border-color 0.5s ease;
+}
+.home-page .home-diptych-traits {
+  font: 500 13px / 1.5 var(--sans, "Manrope", sans-serif);
+  font-variant-caps: all-small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.14em;
+  opacity: 0.75;
+}
+.home-page .home-diptych-traits span + span::before { content: "\00b7"; margin: 0 0.7em; }
+.home-page .home-diptych-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+  color: var(--c-moss);
+  font: 500 13px / 1.4 var(--sans, "Manrope", sans-serif);
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+  transition: background-size 500ms ease;
+}
+.home-page .is-dark .home-diptych-link { color: var(--c-linen); }
+.home-page .home-diptych-link svg { transition: transform 0.4s ease; }
+@media (hover: hover) {
+  .home-page .home-diptych-page:hover .home-diptych-photo .picture img,
+  .home-page .home-diptych-page:focus-visible .home-diptych-photo .picture img { transform: scale(1.025); }
+  .home-page .home-diptych-page:hover .home-diptych-link,
+  .home-page .home-diptych-page:focus-visible .home-diptych-link { background-size: 100% 1px; }
+  .home-page .home-diptych-page:hover .home-diptych-link svg { transform: translate(2px, -2px); }
+  .home-page .home-diptych-page:hover .home-diptych-foot { border-top-color: color-mix(in srgb, currentColor 55%, transparent); }
+}
+@media (max-width: 1023px) {
+  .home-page .home-diptych-head { grid-template-columns: auto minmax(0, 1fr); }
+  .home-page .home-diptych-head p { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .home-page .home-diptych { grid-template-columns: minmax(0, 1fr); --dip-h: min(120vw, 560px); }
+  .home-page .home-diptych-head { grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: start; }
+  .home-page .home-diptych-head p { grid-column: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-page .home-diptych-photo .picture img, .home-page .home-diptych-link, .home-page .home-diptych-link svg, .home-page .home-diptych-foot { transition: none; }
+  @media (hover: hover) and (pointer: fine) {
+    .home-page .home-diptych-page:hover .home-diptych-photo .picture img { transform: none; }
+  }
+}
+html[data-motion="off"] .home-page :is(.home-diptych-photo .picture img, .home-diptych-link, .home-diptych-link svg, .home-diptych-foot) { transition: none; }
+html[data-motion="off"] .home-page .home-diptych-page:focus-visible .home-diptych-photo .picture img { transform: none; }
+@media (hover: hover) and (pointer: fine) {
+  html[data-motion="off"] .home-page .home-diptych-page:hover .home-diptych-photo .picture img { transform: none; }
+}
+/* Coordinator tuning: both cards keep traits and link on one line, so their text sits at the same height. */
+@media (min-width: 760px) {
+  .home-page .home-diptych-foot { flex-wrap: nowrap; }
+  .home-page .home-diptych-traits { min-width: 0; white-space: nowrap; letter-spacing: 0.08em; }
+  .home-page .home-diptych-traits span + span::before { margin: 0 0.5em; }
+  .home-page .home-diptych-link { flex: 0 0 auto; white-space: nowrap; }
+}
+.home-page .home-diptych-head h2 { font-size: clamp(28px, 3.2vw, 48px); }
+.home-page .home-diptych-traits span { white-space: nowrap; display: inline-block; }
+
+/* ==========================================================================
+   H2 „Zwei Editionen“: ein Band, das die Stimmung wechselt.
+   Umschalter (zwei Reiter im Raster der Editions-Karten) → kompakte Doppelseite
+   → die zwei Karten. Beim Umschalten blendet das ganze Band in ca. 600 ms von
+   Papier zu Nacht (nur Farben und opacity), die Karte der gewählten Edition
+   bleibt vorn, die andere tritt zurück. Farben nur aus Palette/--ed-* Tokens.
+   ========================================================================== */
+.home-page .home-band.home-editions-band {
+  --mood-bg: var(--c-paper);
+  --mood-ink: var(--c-ink);
+  --mood-soft: var(--c-ink-soft);
+  --mood-kicker: var(--c-olive);
+  --mood-accent: var(--c-moss);
+  --mood-line: var(--c-line);
+  --mood-line-strong: var(--c-line-strong, var(--c-line));
+  --mood-ease: 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--mood-bg);
+  color: var(--mood-ink);
+  transition: background-color var(--mood-ease), color var(--mood-ease);
+}
+.home-page .home-band.home-editions-band[data-mood="after-hours"] {
+  --mood-bg: var(--c-night-deep);
+  --mood-ink: var(--c-linen);
+  --mood-soft: var(--c-fog);
+  --mood-kicker: var(--c-mist);
+  --mood-accent: var(--c-mist);
+  --mood-line: var(--c-forest-line);
+  --mood-line-strong: color-mix(in srgb, var(--c-linen) 32%, transparent);
+}
+/* Der Kopf des Abschnitts (aus Inspiration) folgt dem Band. */
+html body .home-page .home-editions-band .inspiration-head > .eyebrow { color: var(--mood-kicker); font: 500 12px / 1.6 var(--sans, "Manrope", sans-serif); letter-spacing: 0.26em; transition: color var(--mood-ease); }
+html body .home-page .home-editions-band .inspiration-head :is(h1, h2) { color: var(--mood-ink); transition: color var(--mood-ease); }
+html body .home-page .home-editions-band .inspiration-head :is(h1, h2) em { color: var(--mood-accent); transition: color var(--mood-ease); }
+html body .home-page .home-editions-band .inspiration-head .page-lead,
+html body .home-page .home-editions-band .reference-note { color: var(--mood-soft); transition: color var(--mood-ease); }
+html body .home-page .home-editions-band .ed-dot::after { border-color: var(--mood-soft); }
+html body .home-page .home-editions-band[data-mood="after-hours"] .ed-dot[aria-current="true"]::after { background: var(--c-linen); border-color: var(--c-linen); }
+html body .home-page .home-editions-band :is(a, button):focus-visible { outline-color: var(--mood-accent); }
+
+.home-page .mood-demo { margin: clamp(18px, 2.4vw, 32px) 0 clamp(28px, 3.6vw, 52px); }
+.home-page .mood-demo-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 18px;
+  margin: 0 0 10px;
+}
+.home-page .mood-demo-kicker {
+  color: var(--mood-kicker);
+  font: 500 12px / 1.4 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  transition: color var(--mood-ease);
+}
+.home-page .mood-demo-note {
+  color: var(--mood-soft);
+  font: italic 400 clamp(15px, 1.2vw, 17px) / 1.4 var(--serif);
+  transition: color var(--mood-ease);
+}
+/* Reiter: dasselbe Raster und dieselbe Lücke wie die Karten darunter. */
+.home-page .mood-switch {
+  --mood-switch-gap: clamp(14px, 1.6vw, 24px);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--mood-switch-gap);
+  margin-bottom: clamp(14px, 1.6vw, 22px);
+}
+/* One line slides between the two options (2 columns: half the width minus half the gap). */
+.home-page .mood-switch-line {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: calc((100% - var(--mood-switch-gap)) / 2);
+  height: 2px;
+  background: var(--mood-ink);
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform 500ms cubic-bezier(0.2, 0.7, 0.2, 1), background-color var(--mood-ease);
+}
+.home-page .mood-switch[data-mood="after-hours"] .mood-switch-line { transform: translateX(calc(100% + var(--mood-switch-gap))); }
+.home-page .mood-switch-button {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+  min-height: 52px;
+  padding: 12px 0 8px;
+  border: 0;
+  border-top: 1px solid var(--mood-line);
+  border-radius: 0;
+  color: var(--mood-soft);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--mood-ease), border-color var(--mood-ease), opacity var(--mood-ease);
+}
+.home-page .mood-switch-button[aria-pressed="true"] { color: var(--mood-ink); }
+.home-page .mood-switch-button[aria-pressed="false"] { opacity: 0.72; }
+@media (hover: hover) and (pointer: fine) {
+  .home-page .mood-switch-button[aria-pressed="false"]:hover { opacity: 1; color: var(--mood-ink); }
+}
+.home-page .mood-switch-button:focus-visible { outline: 2px solid var(--mood-accent); outline-offset: 4px; }
+.home-page .mood-switch-no {
+  font: 500 12px / 1.4 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.home-page .mood-switch-name {
+  font: 400 clamp(24px, 2.2vw, 32px) / 1.05 var(--serif);
+  letter-spacing: -0.015em;
+}
+
+/* Vorschau: ein Ausschnitt einer echten Geschichtsseite, zwei gestapelte Ebenen in derselben Rasterzelle. */
+.home-page .mood-spread { display: grid; min-width: 0; }
+.home-page .mood-layer {
+  position: relative;
+  grid-area: 1 / 1;
+  display: grid;
+  min-width: 0;
+  opacity: 1;
+  transition: opacity var(--mood-ease, 600ms ease);
+}
+.home-page .mood-layer[aria-hidden="true"] { opacity: 0; pointer-events: none; }
+.home-page .mood-photo { margin: 0; min-width: 0; }
+.home-page .mood-photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 45%; }
+.home-page .mood-copy { position: relative; min-width: 0; }
+.home-page .mood-kicker {
+  display: block;
+  margin-bottom: clamp(10px, 1.2vw, 16px);
+  font: 500 12px / 1.4 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+.home-page .mood-title {
+  margin: 0 0 clamp(10px, 1.2vw, 16px);
+  font: 400 clamp(34px, 3.6vw, 54px) / 1.02 var(--serif);
+  letter-spacing: -0.025em;
+}
+.home-page .mood-body {
+  max-width: 40ch;
+  margin: 0;
+  font: 400 clamp(15px, 1.15vw, 17px) / 1.6 var(--serif);
+  text-wrap: pretty;
+}
+/* Erstes Licht: gleiche Größe wie Letztes Licht – das Foto groß im Passepartout mit Haarlinie, darunter ruhige dunkle Typografie auf Papier. */
+.home-page .mood-layer.is-light {
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: clamp(14px, 1.8vw, 24px);
+  min-height: clamp(440px, 120vw, 560px);
+  padding: clamp(10px, 1.6vw, 22px) clamp(10px, 1.6vw, 22px) clamp(18px, 2.4vw, 32px);
+  color: var(--c-ink);
+  background: var(--c-paper);
+}
+.home-page .mood-layer.is-light .mood-photo {
+  display: flex;
+  min-height: 0;
+  padding: clamp(8px, 1.1vw, 14px);
+  background: var(--c-chalk);
+  border: 1px solid color-mix(in srgb, var(--c-ink) 14%, transparent);
+}
+.home-page .mood-layer.is-light .mood-photo img { min-height: 0; flex: 1; }
+.home-page .mood-layer.is-light .mood-copy { padding: 0 clamp(4px, 1vw, 14px); }
+.home-page .mood-layer.is-light .mood-title { font-size: clamp(28px, 3vw, 42px); margin-bottom: clamp(6px, 0.8vw, 10px); }
+.home-page .mood-layer.is-light .mood-kicker { color: var(--c-olive); margin-bottom: clamp(6px, 0.8vw, 10px); }
+.home-page .mood-layer.is-light .mood-body { color: var(--c-ink-soft); }
+/* Letztes Licht: randlos und filmisch, das Foto füllt die Fläche, der Text liegt in hellem Ton darüber. */
+.home-page .mood-layer.is-dark {
+  align-items: end;
+  min-height: clamp(440px, 120vw, 560px);
+  overflow: hidden;
+  color: var(--c-linen);
+  background: var(--c-night-deep);
+}
+.home-page .mood-layer.is-dark .mood-photo { position: absolute; inset: 0; }
+.home-page .mood-layer.is-dark .mood-photo img { filter: saturate(0.82) contrast(1.06) brightness(0.88); }
+.home-page .mood-layer.is-dark .mood-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, color-mix(in srgb, var(--c-night-deep) 88%, transparent) 0%, color-mix(in srgb, var(--c-night-deep) 45%, transparent) 34%, transparent 66%);
+}
+.home-page .mood-layer.is-dark .mood-copy { padding: clamp(20px, 3vw, 48px); }
+.home-page .mood-layer.is-dark .mood-kicker { color: var(--c-mist); }
+.home-page .mood-layer.is-dark .mood-title { font-style: italic; }
+.home-page .mood-layer.is-dark .mood-body { color: color-mix(in srgb, var(--c-linen) 86%, transparent); }
+@media (min-width: 900px) {
+  .home-page .mood-layer { height: clamp(420px, calc(100svh - 64px - 300px), 540px); }
+  .home-page .mood-layer.is-light, .home-page .mood-layer.is-dark { min-height: 0; }
+  .home-page .mood-layer.is-light .mood-copy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: clamp(20px, 3vw, 48px); align-items: end; }
+  .home-page .mood-layer.is-light .mood-kicker { grid-column: 1; }
+  .home-page .mood-layer.is-light .mood-title { grid-column: 1; margin-bottom: 0; }
+  .home-page .mood-layer.is-light .mood-body { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
+  .home-page .mood-layer.is-dark .mood-copy { max-width: 52%; }
+}
+.home-page .home-editions-more { margin: clamp(22px, 2.6vw, 36px) 0 0; }
+.home-page .home-editions-band .home-editions-more .text-link { color: var(--mood-ink); transition: color var(--mood-ease); }
+/* J2: Übergang vom Umschalter zu den Karten – Dachzeile und eine Serifenzeile auf einer Haarlinie. */
+.home-page .home-editions-bridge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 20px;
+  margin: 0 0 clamp(16px, 1.8vw, 26px);
+  padding-top: clamp(14px, 1.6vw, 20px);
+  border-top: 1px solid var(--mood-line);
+  transition: border-color var(--mood-ease);
+}
+.home-page .home-editions-bridge-kicker {
+  color: var(--mood-kicker);
+  font: 500 12px / 1.4 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  transition: color var(--mood-ease);
+}
+.home-page .home-editions-bridge-line {
+  margin: 0;
+  color: var(--mood-ink);
+  font: 400 clamp(24px, 2.4vw, 34px) / 1.12 var(--serif);
+  letter-spacing: -0.015em;
+  transition: color var(--mood-ease);
+}
+/* Die Karten gehören dazu: die gewählte Edition trägt eine feine Rahmenlinie mit Abstand,
+   die andere tritt nur leicht zurück (kein grauer Schleier). */
+html body .home-page .home-editions-band .ed-card { transition: box-shadow 0.6s ease, opacity var(--mood-ease); }
+html body .home-page .home-editions-band .ed-card:not([aria-current="true"]) { opacity: 0.84; }
+html body .home-page .home-editions-band .ed-card:focus-visible { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  html body .home-page .home-editions-band .ed-card:hover { opacity: 1; }
+}
+@media (min-width: 761px) {
+  html body .home-page .home-editions-band .ed-card[aria-current="true"] {
+    box-shadow: 0 0 0 7px var(--mood-bg), 0 0 0 8px var(--mood-line-strong);
+  }
+}
+/* Unter 900 px steht die Vorschau einspaltig; „Letztes Licht“ läuft randlos bis an die Kanten. */
+@media (max-width: 899px) {
+  .home-page .mood-layer.is-dark { margin-inline: calc(-1 * var(--gutter)); }
+  .home-page .mood-layer.is-dark .mood-copy { padding-inline: var(--gutter); }
+  .home-page .mood-layer.is-light { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .home-page .mood-switch-button { min-height: 56px; flex-direction: column; gap: 2px; }
+  .home-page .mood-switch-name { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-page .home-band.home-editions-band,
+  .home-page .home-editions-band :is(.mood-layer, .mood-switch-button, .mood-switch-line, .mood-demo-kicker, .mood-demo-note, .inspiration-head *, .reference-note, .ed-card, .home-editions-bridge, .home-editions-bridge-kicker, .home-editions-bridge-line) { transition: none !important; }
+  }
+html[data-motion="off"] .home-page .home-band.home-editions-band,
+html[data-motion="off"] .home-page .home-editions-band :is(.mood-layer, .mood-switch-button, .mood-switch-line, .mood-demo-kicker, .mood-demo-note, .inspiration-head *, .reference-note, .ed-card, .home-editions-bridge, .home-editions-bridge-kicker, .home-editions-bridge-line) { transition: none !important; }
+html[data-motion="off"] /* J2: die Rahmenlinie der gewählten Karte braucht Luft zur Fußnote. */
+html body .home-page .home-editions-band .reference-note { margin-top: clamp(22px, 2.4vw, 32px); }
+
+/* ==========================================================================
+   15.11. – „Ein Tag vergeht“: eine ruhige Zeile auf hellem Grund führt zu „Erstes Licht“.
+   Danach wird es Abend: ein Band (ca. 40 % der Bildschirmhöhe) verläuft weich von Leinen
+   nach Tinte, der Satz in der Mitte wechselt seine Farbe mit. Kein Scroll-Effekt, keine Bewegung.
+   ========================================================================== */
+html body .home-page .home-band.home-lights-intro {
+  padding-block: clamp(56px, 9svh, 112px) 0;
+  scroll-margin-top: 96px;
+}
+html body .home-page .home-band.home-lights-intro:focus { outline: none; }
+html body .home-page .home-lights-intro-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px 22px;
+  text-align: center;
+}
+html body .home-page .home-lights-intro .eyebrow { color: var(--c-olive); }
+html body .home-page .home-lights-intro-title {
+  margin: 0;
+  color: var(--c-ink);
+  font: italic 400 clamp(26px, 2.6vw, 40px) / 1.15 var(--serif);
+  letter-spacing: -0.01em;
+}
+/* Die erste Beispielgeschichte rückt näher heran. */
+html body .home-page .home-lights-intro + .home-band.is-light { padding-top: clamp(36px, 5svh, 64px); }
+
+/* Harte Kante: die helle Geschichte stößt direkt an die dunkle, ohne weichen Saum. */
+html body .home-page .home-band.is-dark.home-lastlight::before { display: none; }
+
+/* Der Editionen-Block: ruhig, viel Luft, etwa ein Drittel Bildschirmhöhe. */
+html body .home-page .home-lights-intro-inner {
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+  justify-content: center;
+}
+html body .home-page .home-lights-diptych {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 1080px);
+  margin: clamp(22px, 3.6svh, 40px) 0 0;
+  text-align: left;
+  box-shadow: 0 40px 70px -48px color-mix(in srgb, var(--c-ink-black, #10130f) 55%, transparent);
+}
+html body .home-page .home-lights-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 0;
+  padding: clamp(26px, 2.8vw, 40px) clamp(28px, 3.2vw, 48px);
+  overflow: hidden;
+}
+/* Erstes Licht: ein heller Abzug mit feinem Papierrahmen. */
+html body .home-page .home-lights-panel.is-first {
+  background: color-mix(in srgb, #ffffff 55%, var(--c-paper, #eeece6));
+  color: var(--c-ink);
+}
+html body .home-page .home-lights-panel.is-first::before {
+  content: "";
+  position: absolute;
+  inset: clamp(10px, 1.1vw, 16px);
+  border: 1px solid color-mix(in srgb, var(--c-ink) 16%, transparent);
+  pointer-events: none;
+}
+/* Letztes Licht: randlos, Nacht, ein letzter Lichtschein am Rand. */
+html body .home-page .home-lights-panel.is-last {
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, #d9b98a 26%, transparent) 0%, transparent 55%),
+    var(--c-night);
+  color: var(--c-linen);
+}
+html body .home-page .home-lights-edition {
+  font: 500 12px / 1.4 var(--sans);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+}
+html body .home-page .home-lights-panel strong {
+  font: 400 clamp(32px, 3vw, 46px) / 1 var(--serif);
+  letter-spacing: -0.02em;
+}
+html body .home-page .home-lights-panel p {
+  max-width: 34ch;
+  margin: 2px 0 0;
+  font: 400 15px / 1.55 var(--sans);
+  color: color-mix(in srgb, currentColor 78%, transparent);
+}
+html body .home-page .home-lights-panel.is-first p { font-family: var(--serif); font-style: italic; font-size: 19px; line-height: 1.3; letter-spacing: 0; }
+html body .home-page .home-lights-panel.is-last p { font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; }
+/* Feste Farben je Tafel, unabhängig vom hellen Band drumherum. */
+html body .home-page .home-band .home-lights-panel.is-first :is(strong, p) { color: var(--c-ink); }
+html body .home-page .home-band .home-lights-panel.is-first .home-lights-edition { color: color-mix(in srgb, var(--c-ink) 60%, transparent); }
+html body .home-page .home-band .home-lights-panel.is-last strong { color: var(--c-linen); }
+html body .home-page .home-band .home-lights-panel.is-last :is(p, .home-lights-edition) { color: color-mix(in srgb, var(--c-linen) 72%, transparent); }
+@media (max-width: 760px) {
+  html body .home-page .home-lights-diptych { grid-template-columns: 1fr; }
+  html body .home-page .home-lights-panel { min-height: 200px; }
+}
+html body .home-page .home-lights-choose {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px 18px;
+  margin: clamp(10px, 2svh, 22px) 0 0;
+  color: color-mix(in srgb, var(--c-ink) 74%, transparent);
+  font: 400 15px / 1.5 var(--sans);
+}
+html body .home-page .home-lights-choose .text-link { color: var(--c-ink); }
+
+/* „Foto wird geladen“ ist auf der Startseite nie zu sehen: Platzhalter ist eine ruhige Farbfläche. */
+html body .home-page .picture-status { display: none !important; }
+html body .home-page .picture[data-image-status="loading"] { background-color: color-mix(in srgb, currentColor 7%, transparent); }
+
+/* Variante 1 (wie „Die Editionen“): das Titelbild füllt die Tafel, der Text liegt unten auf
+   einem Verlauf – hell: Papiernebel und Tinte, dunkel: Nacht und Leinen. */
+html body .home-page .home-lights-panel,
+html body .home-page .home-lights-panel.is-last {
+  min-height: clamp(240px, 30svh, 320px);
+  padding: clamp(24px, 2.6vw, 40px);
+  background: var(--c-night);
+  isolation: isolate;
+}
+html body .home-page .home-lights-panel.is-first { background: var(--c-paper, #eeece6); }
+html body .home-page .home-lights-panel.is-first::before { content: none; }
+html body .home-page .home-lights-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+}
+html body .home-page .home-lights-photo :is(.picture, picture, img) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  aspect-ratio: auto !important;
+}
+html body .home-page .home-lights-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+html body .home-page .home-lights-panel.is-first::after {
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--c-chalk, #f3f1ec) 96%, transparent) 0%,
+    color-mix(in srgb, var(--c-chalk, #f3f1ec) 86%, transparent) 30%,
+    color-mix(in srgb, var(--c-chalk, #f3f1ec) 0%, transparent) 72%);
+}
+html body .home-page .home-lights-panel.is-last::after {
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--c-night) 94%, transparent) 0%,
+    color-mix(in srgb, var(--c-night) 80%, transparent) 30%,
+    color-mix(in srgb, var(--c-night) 0%, transparent) 72%);
+}
+html body .home-page .home-lights-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+html body .home-page .home-band .home-lights-panel.is-first .home-lights-edition { color: var(--c-olive, color-mix(in srgb, var(--c-ink) 60%, transparent)); }
+html body .home-page .home-band .home-lights-panel.is-last :is(p, .home-lights-edition) { color: var(--c-mist, color-mix(in srgb, var(--c-linen) 72%, transparent)); }
+
+/* Der Block rückt nach oben; die Geschichte darunter füllt wieder einen ganzen Bildschirm. */
+html body .home-page .home-band.home-lights-intro {
+  padding-block: clamp(40px, 6svh, 72px) clamp(28px, 4svh, 48px);
+}
+html body .home-page .home-lights-intro-inner { gap: 10px; }
+html body .home-page .home-lights-diptych { margin-top: clamp(16px, 2.4svh, 28px); }
+html body .home-page .home-lights-intro + .home-band.is-light {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100svh;
+  padding-block: clamp(24px, 4svh, 48px);
+}
+html body .home-page .home-lights-intro + .home-band.is-light > .home-feature { padding-top: 0; }

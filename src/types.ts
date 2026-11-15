@@ -1,3 +1,4 @@
+import type { JourneyForm } from "./journeyForm.ts";
 export interface ImageEdits {
   ratio?: Ratio;
   fit?: "cover" | "contain";
@@ -14,8 +15,12 @@ export interface ImagePlacement {
   id: string;
   photo_id: number;
   edits?: ImageEdits;
+  /** Photo wall weight within its row: small · normal · large (unset = normal). */
+  size?: "s" | "m" | "l";
 }
 export interface Layout {
+  /** Story form: absent means "journey". */
+  form?: JourneyForm;
   placements?: ImagePlacement[];
   filmstrip_placements?: ImagePlacement[];
   hover_zoom?: number;
@@ -38,6 +43,8 @@ export interface Layout {
   media_spacing?: number;
   media_spacing_top?: number;
   media_spacing_bottom?: number;
+  /** „Gerahmt“: a fine paper frame in Erstes Licht, only the space in Letztes Licht. */
+  frame?: boolean;
   edition?: "inherit" | "quiet-atlas" | "after-hours";
   photo_ids?: number[];
   parent_id?: number;
@@ -54,11 +61,32 @@ export interface Layout {
   align?: "flush" | "staggered";
   title_style?: "overlay" | "overlap" | "below";
   title_size?: number;
+  /** Journey cover: anchor of the title block in % of the cover (unset = bottom left). */
+  title_x?: number;
+  title_y?: number;
+  /** Module with its own edition: tint the whole section in the edition colour. */
+  edition_fill?: boolean;
+  /** Side margin (px) around the module content; unset = theme default. */
+  margin_x?: number;
+  /** Pair: vertical stagger -100..100 (negative = left image lower). */
+  stagger?: number;
+  /** Journey layout: start/end follow the photographs' capture dates (false = set by hand). */
+  dates_from_photos?: boolean;
+  /** Journey layout: crop of the cover in the archive band; unset = cover_focus. */
+  archive_focus?: FocusMap | null;
   show_title?: boolean;
   parallax?: boolean;
   speed?: number;
   rail_mode?: "free" | "single";
   rail_loop?: boolean;
+  /** Photo wall: „Ausgewogen“ (rows of equal height) or the classic grid; unset = grid (legacy walls). */
+  wall_mode?: "balanced" | "grid";
+  /** Photo wall: centre an incomplete last row. */
+  wall_center?: boolean;
+  /** Photo wall: photographs per row 1–6; unset = automatic. */
+  wall_row?: number;
+  /** Filmstrip: show every photograph of the story, new uploads included. */
+  all_photos?: boolean;
 }
 export interface Photo {
   placement_id?: string;
@@ -74,6 +102,8 @@ export interface Photo {
   height: number;
   featured: boolean;
   position: number;
+  /** Capture time from EXIF (naive local ISO string), when known. */
+  taken_at?: string | null;
   url: string;
   srcset: string;
   credit: string;
@@ -110,6 +140,8 @@ export interface Journey {
   studio_step: number;
   filmstrip_ids: number[];
   is_example?: boolean;
+  /** Examples and showcases only: studio-chosen cover focus per screen size (null = centred). */
+  cover_focus?: FocusMap | null;
   reveal_settings: RevealSettings;
   id: number;
   slug: string;
@@ -131,6 +163,8 @@ export interface Journey {
   photo_count: number;
   chapter_count: number;
   photos: Photo[];
+  /** Public list only: up to three non-cover photos (subset of Photo fields) from the published snapshot. */
+  highlights?: Array<Pick<Photo, "id" | "url" | "srcset" | "alt" | "width" | "height"> & Partial<Photo>>;
   chapters: Chapter[];
 }
 export type RevealEffect =
@@ -156,4 +190,35 @@ export interface StoryTemplate {
   cover: string;
   preset: Journey["preset"];
   prompts: string[];
+  /** Studio override of the edition cover (null = shipped image) and its focus (null = centred). */
+  cover_photo?: Photo | null;
+  cover_focus?: FocusMap | null;
+  title_override?: Record<"de" | "en", string>;
+}
+
+export type FocusMap = Record<"desktop" | "tablet" | "mobile", { x: number; y: number }>;
+
+/** Studio override of one edition (GET /api/site/editions). Negative photo ids are the edition's shipped photographs. */
+export interface SiteEdition {
+  id: Journey["story_template"];
+  custom: boolean;
+  cover_photo_id: number | null;
+  cover: Photo | null;
+  default_cover: Photo;
+  default_cover_index: number;
+  focus: FocusMap;
+  slots: (number | null)[];
+  slot_photos: (Photo | null)[];
+  assets: Photo[];
+  slot_shapes: ("portrait" | "landscape")[];
+  title: Record<"de" | "en", string>;
+  subtitle: Record<"de" | "en", string>;
+  /** Slugs of the editable edition journeys per language; absent while the edition is still code-based. */
+  journey_slugs?: Partial<Record<"de" | "en", string>>;
+}
+
+/** Public home-hero setting: a chosen photograph (or null = automatic) and a focus per device size. */
+export interface SiteHero {
+  photo: Photo | null;
+  focus: Record<"desktop" | "tablet" | "mobile", { x: number; y: number }>;
 }

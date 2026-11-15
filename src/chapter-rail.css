@@ -1,0 +1,1183 @@
+/* Owner of all .chapter-* rules (14b): the chapter bar, a dropdown below 1320px.
+   Loaded early (imported by QuietAtlasChapterCompass), so higher-specificity selectors
+   and the remaining !important declarations carry the overrides over later files.
+   Story-wide chrome (.story-*, .title-dock*, .journal-cover*) lives in story-chrome.css. */
+html .chapter-bar {
+  --rail-halo: color-mix(in srgb, var(--canvas-paper) 88%, transparent);
+  --rail-panel: color-mix(in srgb, var(--canvas-paper) 92%, transparent);
+  --rail-line: color-mix(in srgb, var(--canvas-ink) 22%, transparent);
+  --rail-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+html .canvas-theme-after-hours .chapter-bar {
+  --rail-halo: color-mix(in srgb, var(--canvas-paper) 85%, transparent);
+  --rail-panel: color-mix(in srgb, var(--canvas-paper) 88%, transparent);
+}
+html .chapter-bar .chapter-rail-tick,
+html .chapter-bar .chapter-rail-line {
+  display: none;
+}
+html .chapter-bar {
+  position: sticky;
+  top: calc(var(--header-visible) + var(--story-line-h, 0px));
+}
+html body:has(.story-experience .example-banner) .chapter-bar {
+  top: calc(var(--header-visible) + var(--story-line-h, 0px));
+}
+/* story-chrome.css hides the toggle with display: none !important (old horizontal bar);
+     only an !important rule of higher specificity can win it back below the rail width. */
+html .chapter-bar .chapter-bar-toggle {
+  display: flex !important;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+html .chapter-bar-count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+html .chapter-bar-count > span {
+  opacity: 0.5;
+}
+html .chapter-bar-current {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 18px/1.3 var(--serif);
+  letter-spacing: 0;
+  text-transform: none;
+}
+html .chapter-bar-toggle svg {
+  flex: 0 0 auto;
+  transition: transform 220ms ease;
+}
+html .chapter-bar.is-open .chapter-bar-toggle svg {
+  transform: rotate(180deg);
+}
+html .chapter-bar-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  max-height: min(70svh, 520px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--canvas-ink);
+  border: 0;
+  /* inset hairline shares the bar's bottom line; soft shadow falls below */
+  pointer-events: none;
+}
+html .chapter-bar.is-open .chapter-bar-list {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+html .chapter-bar-list li {
+  flex: 0 0 auto;
+}
+html .chapter-bar-list a,
+html .chapter-bar.is-docked .chapter-bar-list a {
+  min-height: 48px;
+  gap: 16px;
+  padding-inline: clamp(20px, 5vw, 92px);
+  opacity: 1;
+}
+html .chapter-bar-list a::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0;
+  margin-right: -6px;
+}
+html .canvas-theme-after-hours .chapter-bar-list a::before {
+  background: var(--ed-accent, currentColor);
+}
+html .chapter-bar-list a[aria-current]::before {
+  opacity: 1;
+}
+html .chapter-bar-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  max-width: none;
+  white-space: normal;
+  font: 400 18px/1.3 var(--serif);
+  letter-spacing: 0;
+  text-transform: none;
+}
+html .chapter-bar-list a[aria-current] .chapter-bar-name {
+  text-decoration: none;
+  font-weight: 600;
+}
+html .chapter-bar-title {
+  flex: 1;
+  min-width: 0;
+}
+html .chapter-bar-date {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font: 500 var(--fs-xs)/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.55;
+}
+@media (max-width: 420px) {
+  html .chapter-bar-date {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  html .chapter-bar-list a,
+  html .chapter-bar.is-docked .chapter-bar-list a {
+    padding-inline: 16px;
+  }
+}
+/* ---------- Motion off ---------- */
+html[data-motion="off"] .chapter-bar,
+html[data-motion="off"] .chapter-bar *,
+html[data-motion="off"] .chapter-bar *::before,
+html[data-motion="off"] .chapter-bar *::after,
+html .chapter-bar.is-motion-off,
+html .chapter-bar.is-motion-off *,
+html .chapter-bar.is-motion-off *::before,
+html .chapter-bar.is-motion-off *::after {
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html .chapter-bar,
+  html .chapter-bar *,
+  html .chapter-bar *::before,
+  html .chapter-bar *::after {
+    transition: none !important;
+  }
+}
+html .chapter-bar .chapter-bar-list {
+  background: var(--canvas-paper) !important;
+}
+html .chapter-bar .chapter-bar-list a[aria-current] .chapter-bar-name {
+  font: 400 18px/1.3 var(--serif);
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 1;
+}
+html .chapter-bar .chapter-bar-list a:not([aria-current]) .chapter-bar-name {
+  opacity: 0.72;
+}
+html .chapter-bar .chapter-bar-list a .chapter-bar-name,
+html .chapter-bar .chapter-bar-list a[aria-current] .chapter-bar-name {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+  max-width: none;
+}
+/* Current chapter's date in the bar, after the title (hidden on narrow phones). */
+html .chapter-bar .chapter-bar-current-date {
+  flex: 0 0 auto;
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid color-mix(in srgb, var(--canvas-ink) 18%, transparent);
+  font: 500 var(--fs-xs)/1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+@media (max-width: 480px) {
+  html .chapter-bar .chapter-bar-current-date {
+    display: none;
+  }
+}
+/* Date follows the title directly; only the chevron sits at the far right. */
+html .chapter-bar .chapter-bar-toggle .chapter-bar-current {
+  flex: 0 1 auto !important;
+  min-width: 0;
+}
+/* Shared title column (width set by the component): dates line up in bar and list, the chevron follows the date. */
+html .chapter-bar[style*="--chapter-title-col"] .chapter-bar-toggle .chapter-bar-current {
+  flex: 0 0 var(--chapter-title-col) !important;
+}
+html .chapter-bar[style*="--chapter-title-col"] .chapter-bar-list .chapter-bar-title {
+  flex: 0 0 var(--chapter-title-col);
+  margin-right: 0;
+}
+html .chapter-bar .chapter-bar-toggle .chapter-bar-current-date {
+  margin-left: 0;
+}
+html .chapter-bar .chapter-bar-list .chapter-bar-date {
+  margin-left: 4px;
+}
+html .chapter-bar .chapter-bar-toggle > svg {
+  margin-left: 14px;
+  flex: 0 0 auto;
+}
+html .chapter-bar .chapter-bar-toggle {
+  justify-content: flex-start;
+}
+html .chapter-bar[style*="--chapter-title-shift"] .chapter-bar-list .chapter-bar-title {
+  margin-left: var(--chapter-title-shift);
+}
+/* Same colour and glass as the header, in both editions; the list continues the bar seamlessly. */
+html .chapter-bar {
+  --canvas-ink: var(--c-linen);
+  --canvas-paper: var(--c-night);
+  color: var(--c-linen);
+}
+html .chapter-bar::before,
+html .chapter-bar.is-docked::before {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+html .chapter-bar .chapter-bar-list {
+  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border-top: 0;
+  margin-top: 0;
+  top: 100%;
+}
+/* Calmer list: no rules between rows or before dates, spacing does the work. */
+html .chapter-bar .chapter-bar-list li + li {
+  border-top: 0;
+}
+html .chapter-bar .chapter-bar-list {
+  box-shadow: 0 24px 40px -24px rgba(0, 0, 0, 0.55);
+  padding: 6px 0 12px !important;
+}
+html .chapter-bar .chapter-bar-list .chapter-bar-date,
+html .chapter-bar .chapter-bar-toggle .chapter-bar-current-date {
+  border-left: 0;
+  padding-left: 0;
+}
+html .chapter-bar .chapter-bar-list a {
+  min-height: 42px !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  html .chapter-bar .chapter-bar-list a:hover {
+    background: color-mix(in srgb, var(--c-linen) 5%, transparent);
+  }
+}
+html .chapter-bar .chapter-bar-list a[aria-current] {
+  background: transparent;
+}
+/* Running title line and docked chapter bar: each its own glass, identical to the header's. */
+html .chapter-bar.is-docked::before {
+  opacity: 1 !important;
+}
+/* Opening without flicker: the list stays attached and fully opaque; it is revealed by a clip
+   from the top edge (no fade on the blurred glass, no translate that opens a light gap). */
+html .chapter-bar .chapter-bar-list {
+  display: flex !important;
+  opacity: 1 !important;
+  transform: none !important;
+  clip-path: inset(0 0 100% 0);
+  visibility: hidden;
+  transition: clip-path 260ms cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 260ms !important;
+  will-change: clip-path;
+}
+html .chapter-bar.is-open .chapter-bar-list {
+  clip-path: inset(0 0 -60px 0);
+  visibility: visible;
+  transition: clip-path 260ms cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html .chapter-bar .chapter-bar-list {
+    transition: none !important;
+  }
+}
+html[data-motion="off"] .chapter-bar .chapter-bar-list {
+  transition: none !important;
+}
+/* The bar is dark in both editions, so the active dot uses the same light tone everywhere. */
+html .chapter-bar .chapter-bar-list a::before,
+html .canvas-theme-after-hours .chapter-bar .chapter-bar-list a::before {
+  background: var(--c-fog, var(--c-linen));
+}
+@media (min-width: 900px) {
+  html .chapter-bar.is-docked,
+  html body:has(.story-experience .example-banner) .chapter-bar.is-docked,
+  html .chapter-bar {
+    top: var(--header-visible) !important;
+  }
+  html .chapter-bar.is-docked::before {
+    opacity: 0 !important;
+  }
+  html .chapter-bar.is-docked .chapter-bar-toggle {
+    width: auto;
+    min-height: 52px;
+  }
+  html .chapter-bar.is-docked .chapter-bar-inner {
+    pointer-events: none;
+  }
+  html .chapter-bar.is-docked .chapter-bar-toggle,
+  html .chapter-bar.is-docked .chapter-bar-list {
+    pointer-events: auto;
+  }
+  html .chapter-bar .chapter-bar-list {
+    right: auto;
+    width: max-content;
+    min-width: 360px;
+    max-width: min(640px, 92vw);
+    padding-right: 36px !important;
+  }
+}
+html .chapter-bar .chapter-bar-list li::after,
+html .chapter-bar .chapter-bar-list a::after,
+html .chapter-bar .chapter-bar-list li::before {
+  display: none;
+  content: none;
+}
+@media (max-width: 480px) {
+  html .chapter-bar .chapter-bar-toggle > svg {
+    margin-left: auto;
+  }
+  html .chapter-bar .chapter-bar-toggle .chapter-bar-current {
+    flex: 1 1 auto !important;
+  }
+}
+/* The bar no longer sits in the page between intro and first chapter: it takes no space in the flow
+   and only appears once it has docked at the top (desktop: inside the title line). */
+html .chapter-bar {
+  height: 0;
+  min-height: 0;
+  border: 0 !important;
+  margin: 0;
+  padding: 0;
+}
+html .chapter-bar::before {
+  display: none;
+}
+html .chapter-bar .chapter-bar-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none !important;
+  visibility: hidden;
+  transition: opacity 320ms ease, transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 320ms;
+}
+html .chapter-bar.is-docked .chapter-bar-inner {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 320ms ease, transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0s;
+}
+html .chapter-bar.is-docked .chapter-bar-toggle,
+html .chapter-bar.is-docked.is-open .chapter-bar-list {
+  pointer-events: auto;
+}
+@media (max-width: 899.98px) {
+  html .chapter-bar .chapter-bar-inner {
+    background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html .chapter-bar .chapter-bar-inner {
+    transition: none !important;
+  }
+}
+html[data-motion="off"] .chapter-bar .chapter-bar-inner {
+  transition: none !important;
+}
+/* No chevron: the whole row is the control; a quiet hover on the title shows it can be opened. */
+html .chapter-bar .chapter-bar-toggle > svg {
+  display: none;
+}
+html .chapter-bar .chapter-bar-toggle .chapter-bar-current {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  transition: text-decoration-color 0.3s ease;
+}
+html .chapter-bar .chapter-bar-toggle:focus-visible .chapter-bar-current,
+html .chapter-bar.is-open .chapter-bar-toggle .chapter-bar-current {
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  html .chapter-bar .chapter-bar-toggle:hover .chapter-bar-current {
+    text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  }
+}
+/* The whole row from the left edge up to and including the date opens the list. */
+html .chapter-bar .chapter-bar-toggle {
+  position: relative;
+}
+html .chapter-bar .chapter-bar-toggle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -200px;
+  right: -8px;
+}
+.chapter-heading {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 45px;
+  max-width: 1000px;
+  padding-bottom: 65px;
+}
+.chapter-number {
+  font-family: var(--serif);
+  font-size: 80px;
+  color: var(--c-muted);
+}
+.chapter-number > span {
+  display: block;
+  font-family: Manrope, sans-serif;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.13em;
+  margin-top: 5px;
+}
+.chapter-heading h2 {
+  font-size: clamp(46px, 5.2vw, 82px);
+  margin: 20px 0 27px;
+}
+.chapter-heading p {
+  font-size: 12px;
+  color: var(--c-muted);
+  max-width: 500px;
+  white-space: pre-line;
+}
+.chapter-heading .eyebrow {
+  font-size: var(--fs-xs);
+}
+.chapter-quote {
+  padding: 65px 24px 105px;
+  text-align: center;
+  max-width: 900px;
+  margin: auto;
+}
+.chapter-quote > span {
+  font-family: var(--serif);
+  font-size: 90px;
+  color: var(--c-sage);
+  display: block;
+  line-height: 1;
+}
+.chapter-quote > p {
+  font-family: var(--serif);
+  font-size: clamp(38px, 4.4vw, 70px);
+  line-height: 1.13;
+  letter-spacing: -0.02em;
+  font-style: italic;
+  color: var(--c-muted);
+}
+.chapter-quote .compass {
+  width: 27px;
+  height: 27px;
+  margin-top: 40px;
+  color: var(--c-muted);
+}
+.preset-cinematic .chapter-1 {
+  background: var(--c-ink);
+  color: var(--c-linen);
+  padding-bottom: 50px;
+}
+.preset-cinematic .chapter-1 .chapter-heading p,
+.preset-cinematic .chapter-1 figcaption {
+  color: var(--c-mist);
+}
+.preset-cinematic .chapter-1 .chapter-number {
+  color: var(--c-sage);
+}
+.preset-cinematic .chapter-1 .eyebrow {
+  color: var(--c-mist);
+}
+.preset-quiet .chapter-heading {
+  max-width: 900px;
+}
+.preset-gallery .chapter-heading {
+  grid-template-columns: 0.6fr 2fr;
+  padding-bottom: 90px;
+}
+.chapter-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 25px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+.chapter-row-number {
+  font-family: var(--serif);
+  font-size: 46px;
+  color: var(--olive);
+}
+.chapter-row h3 {
+  font-family: var(--serif);
+  font-size: 27px;
+}
+.chapter-row p {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.chapter-row .chapter-excerpt {
+  max-width: 600px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@media (max-width: 760px) {
+  .chapter-heading {
+    grid-template-columns: 52px 1fr;
+    gap: 22px;
+    padding-bottom: 35px;
+  }
+  .chapter-number {
+    font-size: 52px;
+  }
+  .chapter-number > span {
+    letter-spacing: 0.03em;
+  }
+  .chapter-heading h2 {
+    font-size: 40px;
+    margin: 15px 0 20px;
+  }
+  .chapter-heading p {
+    line-height: 1.9;
+  }
+  .chapter-quote {
+    padding: 35px 28px 55px;
+  }
+  .chapter-quote > span {
+    font-size: 65px;
+  }
+  .chapter-quote > p {
+    font-size: 38px;
+  }
+  .chapter-quote .compass {
+    width: 24px;
+    height: 24px;
+    margin-top: 25px;
+  }
+  .preset-cinematic .chapter-1 {
+    padding-bottom: 20px;
+  }
+  .preset-gallery .chapter-heading {
+    grid-template-columns: 52px 1fr;
+    padding-bottom: 40px;
+  }
+  .chapter-row {
+    grid-template-columns: 32px 1fr;
+    gap: 16px;
+    padding: 25px 0;
+  }
+  .chapter-row-number {
+    font-size: 36px;
+  }
+  .chapter-row h3 {
+    font-size: 27px;
+  }
+  .chapter-row .chapter-excerpt {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .chapter-row .row-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+    gap: 15px;
+  }
+}
+.chapter-overview {
+  margin: 0 clamp(20px, 6vw, 96px);
+  color: var(--canvas-ink);
+  background: var(--c-chalk);
+  border-bottom: 1px solid var(--c-line);
+}
+.chapter-compass {
+  position: fixed;
+  z-index: 30;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 40px));
+  color: var(--canvas-ink);
+  background: var(--canvas-paper, var(--c-paper));
+  padding: 0 16px;
+  animation: chapter-compass-enter 140ms ease-out;
+}
+[data-motion="off"] .chapter-compass,
+.chapter-compass.is-motion-off {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chapter-compass {
+    animation: none;
+  }
+}
+.chapter-compass[hidden],
+.chapter-compass-list[hidden] {
+  display: none;
+}
+.chapter-compass-toggle {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.chapter-compass-count,
+.chapter-compass-number {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+.chapter-compass-count > span {
+  opacity: 0.5;
+}
+.chapter-compass-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--serif);
+  font-size: 21px;
+  line-height: 1.3;
+}
+.chapter-compass-toggle svg {
+  flex: 0 0 auto;
+}
+.chapter-compass-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.chapter-compass-position {
+  display: flex;
+  gap: 4px;
+  height: 1px;
+}
+.chapter-compass-position > span {
+  flex: 1;
+  min-width: 0;
+  background: currentColor;
+  opacity: 0.18;
+}
+.chapter-compass-position > .is-current {
+  opacity: 0.8;
+}
+.chapter-compass-list {
+  margin: 0;
+  padding: 12px 0;
+  list-style: none;
+  max-height: min(60vh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chapter-compass-list a {
+  display: flex;
+  gap: 22px;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 10px 4px;
+  color: inherit;
+  text-decoration: none;
+  font: 22px/1.35 var(--serif);
+  overflow-wrap: anywhere;
+}
+.chapter-compass-number {
+  opacity: 0.45;
+}
+.chapter-compass-list a[aria-current] .chapter-compass-number {
+  opacity: 1;
+}
+.chapter-compass-list a[aria-current] > span:last-child {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .chapter-compass-list a:hover > span:last-child {
+    text-decoration: underline;
+    text-underline-offset: 5px;
+    text-decoration-thickness: 1px;
+  }
+}
+.chapter-compass :focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 3px;
+}
+@media (max-width: 400px) {
+  .chapter-compass {
+    width: calc(100% - 24px);
+    padding-inline: 12px;
+  }
+  .chapter-compass-toggle {
+    gap: 12px;
+  }
+  .chapter-compass-title {
+    font-size: 19px;
+  }
+}
+.chapter-overview summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  list-style: none;
+}
+.chapter-overview summary::-webkit-details-marker {
+  display: none;
+}
+.chapter-overview summary::after {
+  content: "+";
+  font-size: 18px;
+  line-height: 1;
+}
+.chapter-overview[open] summary::after {
+  content: "−";
+}
+.chapter-overview summary span {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.chapter-overview ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 12px;
+}
+.chapter-overview li + li {
+  border-top: 1px solid var(--c-line);
+}
+.chapter-overview a {
+  min-height: 44px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 2px;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .chapter-overview a:hover span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+.chapter-overview time {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.canvas-theme-after-hours .chapter-overview {
+  color: var(--ed-ink);
+  background: var(--ed-surface-raised);
+  border-color: var(--ed-line);
+}
+.canvas-theme-after-hours .chapter-overview li + li {
+  border-color: var(--ed-line);
+}
+.canvas-theme-after-hours .chapter-overview summary span,
+.canvas-theme-after-hours .chapter-overview time {
+  color: var(--ed-ink-muted);
+}
+/* Compass sits below the current masthead, including during an upward reveal. */
+body:has(.public-header) .chapter-compass {
+  top: 176px;
+  transition: top 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+body:has(.public-header.is-compact) .chapter-compass {
+  top: 76px;
+}
+@media (max-width: 760px) {
+  body:has(.public-header) .chapter-compass {
+    top: 148px;
+  }
+  body:has(.public-header.is-compact) .chapter-compass {
+    top: 76px;
+  }
+}
+.journal-canvas .chapter-compass-number {
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .chapter-number > span {
+    font-size: 12px;
+  }
+  .chapter-heading .eyebrow {
+    font-size: 12px;
+  }
+  .chapter-heading p {
+    font-size: 12px;
+  }
+  .chapter-row p {
+    font-size: 12px;
+  }
+}
+/* ---------- Chapter bar ---------- */
+.chapter-bar {
+  --bar-accent: var(--c-moss);
+  --bar-glass: color-mix(in srgb, var(--canvas-paper) 78%, transparent);
+  background: transparent;
+  border-block: 1px solid color-mix(in srgb, var(--canvas-ink) 14%, transparent);
+  font: 500 12px/1 Manrope, Arial, sans-serif;
+  text-transform: uppercase;
+}
+.canvas-theme-after-hours .chapter-bar {
+  --bar-accent: var(--ed-accent);
+}
+.chapter-bar-inner {
+  padding-inline: clamp(20px, 5vw, 92px);
+}
+.chapter-bar-list {
+  list-style: none;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.chapter-bar-list::-webkit-scrollbar {
+  display: none;
+}
+.chapter-bar-list a {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+.chapter-bar-list a[aria-current] {
+  opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .chapter-bar-list a:hover {
+    opacity: 1;
+  }
+}
+.chapter-bar-number {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+.chapter-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chapter-bar-list a::after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  height: 1px;
+  background: var(--bar-accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+.chapter-bar-list a[aria-current]::after {
+  transform: scaleX(1);
+}
+.chapter-bar :focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -3px;
+}
+@media (min-width: 861px) {
+  /* With the edition bar present, sit directly beneath it. */
+}
+@media (max-width: 860px) {
+  .chapter-bar-list {
+    overflow: visible;
+    padding-bottom: 8px;
+  }
+  .chapter-bar.is-open .chapter-bar-list {
+    display: flex;
+  }
+  .chapter-bar-list a[aria-current] .chapter-bar-name {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 5px;
+    text-decoration-color: var(--bar-accent);
+  }
+}
+[data-motion="off"] .chapter-bar,
+[data-motion="off"] .chapter-bar *,
+[data-motion="off"] .chapter-bar *::after,
+.chapter-bar.is-motion-off,
+.chapter-bar.is-motion-off *,
+.chapter-bar.is-motion-off *::after {
+  transition: none !important;
+}
+/* Bar: sticky beneath the masthead (and the running line) at every width. */
+.chapter-bar,
+body:has(.story-experience .example-banner) .chapter-bar {
+  position: sticky;
+  top: calc(var(--header-visible) + var(--story-line-h, 0px));
+  transition: top var(--header-time) var(--header-ease),
+    background-color 320ms ease,
+    color 320ms ease,
+    border-color 320ms ease;
+}
+.chapter-bar-name,
+.chapter-bar-list a[aria-current] .chapter-bar-name {
+  max-width: 26ch;
+  white-space: nowrap;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-decoration: none;
+}
+.chapter-bar-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 8px;
+  height: 1px;
+  list-style: none;
+  background: var(--bar-accent);
+  pointer-events: none;
+}
+@media (max-width: 860px) {
+  .chapter-bar-inner {
+    padding-inline: 16px;
+  }
+}
+/* Docked: same glass as the masthead, slim Manrope capitals at 11px. */
+.chapter-bar.is-docked {
+  --bar-accent: var(--c-linen);
+  color: var(--c-fog);
+  --bar-glass: color-mix(in srgb, var(--brand-frame) 80%, transparent);
+  background: transparent;
+  border-color: transparent;
+}
+.chapter-bar.is-docked .chapter-bar-list a[aria-current] {
+  opacity: 1;
+  color: var(--c-linen);
+}
+@media (hover: hover) and (pointer: fine) {
+  .chapter-bar.is-docked .chapter-bar-list a:hover {
+    opacity: 1;
+    color: var(--c-linen);
+  }
+}
+.chapter-bar.is-docked .chapter-bar-indicator {
+  bottom: 5px;
+}
+.chapter-bar.is-docked :focus-visible {
+  outline-color: var(--c-linen);
+}
+/* 08.11.: the hairline and the chapter names change softly when the active chapter moves. */
+.chapter-bar-list a {
+  transition: opacity 700ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+.chapter-bar-list a::after {
+  transition: transform 900ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+.chapter-bar::before {
+  content: "";
+  position: absolute;
+  inset: -1px 0;
+  z-index: -1;
+  background: var(--bar-glass);
+  pointer-events: none;
+  transition: opacity 280ms ease-out;
+}
+/* The bar paints above the line's extended glass; same height docked or not (no layout jump). */
+.chapter-bar {
+  z-index: 26;
+}
+@media (min-width: 861px) {
+  .chapter-bar-inner {
+    display: flex;
+    align-items: center;
+  }
+  .chapter-bar-list {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
+@media (max-width: 860px) {
+  .chapter-bar.is-docked.is-open .chapter-bar-list {
+    background: color-mix(in srgb, var(--brand-frame) 92%, transparent);
+  }
+}
+.chapter-bar-inner,
+.chapter-bar-list,
+.chapter-bar-list a {
+  background-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+[data-motion="off"] .chapter-bar::before {
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chapter-bar::before {
+    transition: none !important;
+  }
+}
+@media (min-width: 861px) {
+  .chapter-bar-inner,
+  .chapter-bar .chapter-bar-list a {
+    min-height: 38px;
+  }
+}
+.chapter-bar-list a {
+  transition-timing-function: var(--ease-out-soft);
+}
+.chapter-bar-list a {
+  transition-duration: var(--dur-quick);
+}
+.chapter-bar-list a::after {
+  transition-duration: var(--dur-base);
+}
+/* The hairline is positioned per frame from the scroll position (JS writes translate + scaleX);
+   a CSS transition here would lag behind and fight those values. JS sets an inline transition
+   only for the click-to-chapter glide. */
+html .chapter-bar-indicator {
+  width: 1px;
+  transform-origin: 0 50%;
+  transition: none;
+  will-change: transform;
+}
+/* Per-frame inline opacity during the hand-over between two chapters: no easing on top of it. */
+html .chapter-bar.is-docked .chapter-bar-list a {
+  transition: none;
+}
+/* Same type metrics docked or not, so docking never reflows the chapter names or shifts the hairline. */
+html .chapter-bar,
+html .chapter-bar.is-docked {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.16em;
+}
+@media (min-width: 861px) {
+  html .chapter-bar .chapter-bar-list a,
+  html .chapter-bar.is-docked .chapter-bar-list a {
+    min-height: 38px;
+  }
+}
+
+/* ======================================================================
+   J3: one two-row arrangement at every width (as at ~735px).
+   Row 1 is the running title line (story-chrome.css, centred), row 2 this bar:
+   a three-column grid, so the date always sits on the exact centre of the bar:
+   left counter + chapter title (shrinks with an ellipsis), middle date, right free.
+   ====================================================================== */
+html body:has(.story-experience) .chapter-bar,
+html body:has(.story-experience) .chapter-bar.is-docked,
+html body:has(.story-experience .example-banner) .chapter-bar,
+html body:has(.story-experience .example-banner) .chapter-bar.is-docked {
+  top: calc(var(--header-visible) + 26px) !important;
+}
+html body .chapter-bar .chapter-bar-inner {
+  display: block;
+  min-height: 48px;
+  padding-inline: clamp(16px, 5vw, 92px);
+  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+@media (max-width: 860px) {
+  html body .chapter-bar .chapter-bar-inner {
+    padding-inline: 16px;
+  }
+}
+html body .chapter-bar .chapter-bar-toggle {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  width: 100%;
+  min-height: 48px;
+}
+html body .chapter-bar.is-docked .chapter-bar-toggle {
+  width: 100%;
+  min-height: 48px;
+}
+html body .chapter-bar .chapter-bar-lead {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+html body .chapter-bar .chapter-bar-lead .chapter-bar-count {
+  flex: 0 0 auto;
+}
+html body .chapter-bar .chapter-bar-lead .chapter-bar-current,
+html body .chapter-bar[style*="--chapter-title-col"] .chapter-bar-toggle .chapter-bar-lead .chapter-bar-current {
+  flex: 0 1 auto !important;
+  min-width: 0;
+}
+html body .chapter-bar .chapter-bar-toggle .chapter-bar-current-date {
+  grid-column: 2;
+  justify-self: center;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  html body .chapter-bar .chapter-bar-toggle {
+    column-gap: 10px;
+  }
+  html body .chapter-bar .chapter-bar-lead {
+    gap: 10px;
+  }
+  html body .chapter-bar .chapter-bar-toggle .chapter-bar-current-date {
+    display: block;
+    letter-spacing: 0.08em;
+  }
+}
+
+/* 15.11. abends: the open chapter list grows to its content, so the date is never cut off
+   (the title column is fixed by the component; on narrow windows the list may use the full width). */
+html body .chapter-bar .chapter-bar-list {
+  width: max-content;
+  max-width: calc(100vw - 32px);
+}
+html body .chapter-bar .chapter-bar-list .chapter-bar-name {
+  overflow: visible;
+}
+html body .chapter-bar .chapter-bar-list .chapter-bar-date {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding-right: 4px;
+}

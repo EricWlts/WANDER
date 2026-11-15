@@ -1,0 +1,259 @@
+/* Interaction polish: one calm, restrained vocabulary for hover, focus and
+   pressed states on the public site. Loaded last. Timing and easing come from
+   motion-polish.css (--dur-*, --ease-out-soft) and refinement.css (--ease-image).
+   The masthead expand/collapse animation is deliberately not touched here. */
+
+:root {
+  --focus-ring: var(--c-olive);
+  --focus-ring-offset: 3px;
+  --press-opacity: 0.85;
+}
+/* Dark surfaces use light linen for the ring. */
+:is(.site-header, .site-footer, .lightbox, .home-band.is-dark) {
+  --focus-ring: var(--c-linen);
+}
+
+/* Selection and tap highlight */
+::selection {
+  background: color-mix(in srgb, var(--c-olive) 26%, var(--c-chalk));
+  color: var(--c-ink);
+}
+:is(.site-header, .site-footer, .lightbox, .home-band.is-dark, .home-hero) ::selection {
+  background: color-mix(in srgb, var(--c-linen) 28%, transparent);
+  color: var(--c-linen);
+}
+:where(a, button, summary, [role="button"], label, select) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus: one ring for everything, keyboard users only. Equal specificity to
+   the older element rules, so source order (this file is last) decides. */
+:is(a, button, summary, select, input, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+:is(.site-header, .site-footer, .lightbox) :is(a, button, summary, select):focus-visible {
+  outline-color: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+.home-page .home-band:is(.is-dark) :is(a, button):focus-visible {
+  outline-color: var(--c-linen);
+  outline-offset: var(--focus-ring-offset);
+}
+.home-page .home-band:not(.is-dark) :is(a, button):focus-visible {
+  outline-color: var(--c-olive);
+  outline-offset: var(--focus-ring-offset);
+}
+.home-page .home-hero :is(a, button):focus-visible {
+  outline-color: var(--hero-ink, var(--c-linen));
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Text links: a 1px line that draws from the left.
+   The resting line stays (a soft tint of the text colour); on hover or focus the
+   full-strength line draws across in --dur-base. Studio-only variants without a
+   border are excluded. */
+.text-link:not(:is(.builder-savebar, .module-inspector, .journey-utility) *) {
+  border-bottom-color: color-mix(in srgb, currentColor 38%, transparent);
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  background-origin: border-box;
+  transition:
+    background-size var(--dur-base) var(--ease-out-soft),
+    color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+.text-link svg {
+  transition: translate var(--dur-base) var(--ease-out-soft);
+}
+.text-link:active {
+  opacity: var(--press-opacity);
+}
+.text-link:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* The old hover widened the gap by 9px; the arrow nudge replaces it. The
+   contextual gaps below restore each variant's own resting value. */
+@media (hover: hover) and (pointer: fine) {
+  .text-link:hover { gap: 20px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .builder-savebar .text-link:hover { gap: 9px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .photo-delete-actions .text-link:hover { gap: 8px; }
+}
+@media (max-width: 760px) {
+  @media (hover: hover) and (pointer: fine) {
+    .footer-top .text-link:hover { gap: 10px; }
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .journey-utility .text-link:hover { gap: 8px; }
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .filmstrip-heading .text-link:hover { gap: 9px; }
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .builder-savebar .text-link:hover { gap: 8px; }
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .text-link:not(:is(.builder-savebar, .module-inspector, .journey-utility) *):hover {
+    background-size: 100% 1px;
+  }
+  .text-link:hover svg,
+  .text-link:focus-visible svg {
+    translate: 2px -2px;
+  }
+}
+
+/* Nav, footer and utility links: colour fade plus thin line. */
+.site-footer a,
+.footer-bottom a {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition:
+    background-size var(--dur-base) var(--ease-out-soft),
+    color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+.site-footer a:focus-visible,
+.footer-bottom a:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* Buttons, toggles, chips: soft background/border fade, tiny press. */
+
+.button {
+  transition:
+    background-color var(--dur-quick) var(--ease-out-soft),
+    border-color var(--dur-quick) var(--ease-out-soft),
+    color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+.icon-button {
+  transition:
+    border-color var(--dur-quick) var(--ease-out-soft),
+    background-color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+.view-switch button {
+  transition: color var(--dur-quick) var(--ease-out-soft), text-decoration-color var(--dur-quick) var(--ease-out-soft);
+  text-decoration: underline transparent;
+  text-underline-offset: 6px;
+}
+.view-switch button.selected {
+  text-decoration-color: currentColor;
+}
+.lightbox-controls > button {
+  transition:
+    background-color var(--dur-quick) var(--ease-out-soft),
+    color var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lightbox-controls > button:hover {
+    transition-duration: var(--dur-quick);
+    transition-timing-function: var(--ease-out-soft);
+  }
+}
+.round-arrow {
+  transition-duration: var(--dur-base);
+  transition-timing-function: var(--ease-out-soft);
+}
+.sort-control select {
+  transition: color var(--dur-quick) var(--ease-out-soft), background-color var(--dur-quick) var(--ease-out-soft);
+}
+
+:is(.button, .icon-button, .view-switch button, .text-button, .rail-arrow, .lightbox-controls > button, .header-action, .menu-toggle, .chapter-bar-toggle):active:not(:disabled) {
+  opacity: var(--press-opacity);
+  translate: 0 1px;
+}
+/* Rail arrows and the lightbox are positioned with translate/transform; keep
+   them in place and press with opacity only. */
+:is(.rail-arrow, .lightbox-controls > button, .header-action, .menu-toggle):active:not(:disabled) {
+  translate: none;
+}
+
+/* Photographs: one slow, restrained zoom on pointer devices (max 1.03). */
+.home-cover-image img,
+.selected-image-link img,
+.home-day-card img,
+.home-feature-image img,
+.home-page .home-band.is-more .home-more-entry img {
+  transition: transform var(--dur-slow) var(--ease-image);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cover-link:hover img { transform: none; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  @media (hover: hover) and (pointer: fine) {
+    .cover-link:hover img,
+    .selected-image-link:hover img,
+    .home-day-card:hover img,
+    .home-feature-image-link:hover img,
+    .home-more-entry:hover img {
+      transform: none;
+    }
+  }
+}
+
+/* Reduced motion: no transforms or timed transitions from this file; colour
+   changes stay (instant). Focus rings are unaffected. */
+@media (prefers-reduced-motion: reduce) {
+  .text-link,
+  .text-link svg,
+  .site-footer a,
+  .footer-bottom a,
+  .button,
+  .icon-button,
+  .view-switch button,
+  .lightbox-controls > button,
+  .round-arrow,
+  .sort-control select,
+  .home-cover-image img,
+  .selected-image-link img,
+  .home-day-card img,
+  .home-feature-image img {
+    transition: none;
+  }
+  .text-link:focus-visible svg { translate: none; }
+  @media (hover: hover) and (pointer: fine) {
+    .text-link:hover svg { translate: none; }
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cover-link:hover img { transform: none; }
+  }
+  :is(.button, .icon-button, .view-switch button, .text-button, .rail-arrow, .header-action, .menu-toggle, .chapter-bar-toggle):active:not(:disabled) {
+    translate: none;
+  }
+}
+
+html[data-motion="off"] :is(.text-link:hover svg, .text-link:focus-visible svg) { translate: none; }
+@media (hover: hover) and (pointer: fine) {
+  html[data-motion="off"] .cover-link:hover img { transform: none; }
+}
+html[data-motion="off"] :is(.button, .icon-button, .view-switch button, .text-button, .rail-arrow, .header-action, .menu-toggle, .chapter-bar-toggle):active:not(:disabled) {
+  translate: none;
+}
+
+/* Journey title images: no hover zoom; only the parallax wrapper moves them. */
+html body .inspiration-page .ed-card:focus-visible .ed-image {
+  transform: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  html body .cover-link:hover img,
+  html body .selected-image-link:hover img,
+  html body .inspiration-page .ed-card:hover .ed-image {
+    transform: none !important;
+  }
+}
+html body .cover-link .picture {
+  --active-hover: 1 !important;
+}

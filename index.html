@@ -1,44 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#26312c" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        var off = false;
+        try {
+          off = localStorage.getItem("wander-motion") === "off";
+          d.lang = localStorage.getItem("wander-language") === "en" ? "en" : "de";
+        } catch (e) {}
+        if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) off = true;
+        d.dataset.motion = off ? "off" : "on";
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#141712" />
     <meta
       name="description"
-      content="WANDER — a personal collection of places, photographs and moments worth remembering."
+      content="WANDER — eine persönliche Sammlung von Orten, Fotografien und Momenten, die es wert sind, erinnert zu werden."
     />
-    <meta property="og:title" content="WANDER — Every journey deserves to be remembered." />
+    <meta property="og:title" content="WANDER — Manche Momente bleiben." />
     <meta
       property="og:description"
-      content="A personal collection of places, photographs and moments worth remembering."
+      content="Eine persönliche Sammlung von Orten, Fotografien und Momenten, die es wert sind, erinnert zu werden."
     />
     <meta property="og:site_name" content="WANDER" />
     <meta property="og:type" content="website" />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/assets/brand/favicon/favicon.svg"
-      media="(prefers-color-scheme: dark)"
-    />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/assets/brand/favicon/favicon-light.svg"
-      media="(prefers-color-scheme: light)"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="/assets/brand/favicon/favicon-32.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="16x16"
-      href="/assets/brand/favicon/favicon-16.png"
-    />
+    <!-- White W on a transparent ground, filling the full icon width. -->
+    <link rel="icon" type="image/svg+xml" href="/assets/brand/favicon/favicon.svg" />
     <link rel="shortcut icon" href="/assets/brand/favicon/favicon.ico" />
     <link
       rel="apple-touch-icon"
@@ -48,19 +38,26 @@
     <link rel="manifest" href="/site.webmanifest" />
     <link
       rel="preload"
-      href="/fonts/instrument-serif.ttf"
+      href="/fonts/instrument-serif.woff2"
       as="font"
-      type="font/ttf"
+      type="font/woff2"
       crossorigin
     />
     <link
       rel="preload"
-      href="/fonts/manrope.ttf"
+      href="/fonts/instrument-serif-italic.woff2"
       as="font"
-      type="font/ttf"
+      type="font/woff2"
       crossorigin
     />
-    <title>WANDER — Every journey deserves to be remembered.</title>
+    <link
+      rel="preload"
+      href="/fonts/manrope.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>WANDER — Manche Momente bleiben.</title>
   </head>
   <body>
     <div id="root"></div>

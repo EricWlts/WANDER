@@ -4,6 +4,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
+  type ReactNode,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
   Link,
@@ -13,28 +16,34 @@ import {
 } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
   Pause,
+  PenLine,
   Play,
   Share2,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { sequenceIndex } from "./journalModel";
 import { PhotoRail } from "./PhotoRail";
-import {
-  PhotoViewerModel,
-  decodedImageRequest,
-  viewerIndex,
-  type ViewerState,
-} from "./photoViewerModel";
+import { FocusView } from "./FocusView";
+import "./edition-tilt.css";
 import { JournalCanvas } from "./JournalCanvas";
-import { MotionToggle, useMotionOff } from "./Motion";
+import { useMotionOff } from "./Motion";
 import { t, useLocale } from "./I18n";
 import { api } from "./api";
 import { PageState, useApp } from "./App";
-import { dateLabel, Modal, Picture } from "./components";
+import { dateLabel, dateRange, Modal, Picture } from "./components";
+import { formDateText, formOf, type JourneyForm } from "./journeyForm";
 import { Reveal } from "./Reveal";
+import { fixedReveal } from "./fixedMotion";
+import { clamp01, cloneOpacity, dockProgress, dockRange, flightPose, smoothDamp } from "./titleDock";
+import { coverFocusVars } from "./editionOverrides";
+import { editionSampleTitle, editionTraits } from "./editionCopy";
+import { coverLinkProps } from "./viewTransitions";
+import { isMotionOff } from "./motionState";
+import { coverTransitionAttr, coverTransitionStyle } from "./viewTransitions";
 import type {
   Chapter,
   Journey,
@@ -43,109 +52,166 @@ import type {
   StoryTemplate,
 } from "./types";
 
-export function Inspiration() {
-  useLocale();
-  const [edition, setEdition] = useState("quiet-atlas");
+export function Inspiration({ embedded = false, intro }: { embedded?: boolean; intro?: ReactNode }) {
+  const Container = embedded ? "section" : "main";
+  const Heading = embedded ? "h2" : "h1";
+  const CardHeading = embedded ? "h3" : "h2";
+  const { locale } = useLocale();
   const [templates, setTemplates] = useState<StoryTemplate[]>([]),
     [error, setError] = useState("");
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [edIndex, setEdIndex] = useState(0);
+  const edMotionOff = useMotionOff();
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const cards = Array.from(grid.children) as HTMLElement[];
+      let best = 0, dist = Infinity;
+      cards.forEach((c, k) => {
+        const d = Math.abs(c.offsetLeft - grid.offsetLeft - grid.scrollLeft);
+        if (d < dist) { dist = d; best = k; }
+      });
+      if (grid.scrollLeft + grid.clientWidth >= grid.scrollWidth - 2) best = cards.length - 1;
+      setEdIndex(best);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    grid.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => { grid.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [templates.length]);
+  const goToEdition = (k: number) => {
+    const card = gridRef.current?.children[k] as HTMLElement | undefined;
+    const reduce = edMotionOff || isMotionOff();
+    card?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest", inline: "start" });
+  };
   useEffect(() => {
     api<StoryTemplate[]>("/templates")
       .then(setTemplates)
       .catch((e) => setError(e.message));
   }, []);
   return (
-    <main id="main" className="inspiration-page page-width">
-      <div className="editorial-heading">
-        <span className="eyebrow">
-          {tr("THE WANDER EDITIONS / TWO WAYS TO SEE")}
-        </span>
-        <h1>
-          {t("Your rhythm.", "Dein Rhythmus.")}
-          <br />
-          <em>{t("Your journey.", "Deine Reise.")}</em>
-        </h1>
-        <p>
+    <Container
+      id={embedded ? "editionen" : "main"}
+      className="inspiration-page page-width"
+      aria-labelledby={embedded ? "editions-heading" : undefined}
+      tabIndex={embedded ? -1 : undefined}
+    >
+      <header className="inspiration-head">
+        <span className="eyebrow">{t("Two editions", "Zwei Editionen")}</span>
+        <Heading id="editions-heading">
+          {t("Light or dark.", "Hell oder dunkel.")}{" "}
+          <em>{t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}</em>
+        </Heading>
+        <p className="page-lead">
           {t(
-            "Two editions to start with. Combine them in any day or module.",
-            "Zwei Editionen als Anfang. Kombiniere sie in jedem Tag und Modul.",
+            "Choose the light that suits your journey – or combine both, module by module.",
+            "Wähle das Licht, das zu deiner Reise passt – oder kombiniere beide Modul für Modul.",
           )}
         </p>
-      </div>
+      </header>
+      {!embedded && (
+        /* Desktop: the headline reads across the seam between both halves (decorative copy; the real
+           heading above stays for assistive tech). Hidden on small screens. */
+        <div className="ed-seam-title" aria-hidden="true">
+          {(["is-ink", "is-linen"] as const).map((tone) => (
+            <span key={tone} className={`ed-seam-copy ${tone}`} aria-hidden="true">
+              <span className="ed-seam-line">{t("Light or dark.", "Hell oder dunkel.")}</span>
+              <span className="ed-seam-line is-italic">{t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {intro}
       {error && <p role="alert">{error}</p>}
-      <div
-        className="edition-mobile-switch"
-        aria-label={t("Compare editions", "Editionen vergleichen")}
-      >
-        {templates.map((template) => (
-          <button
-            key={template.id}
-            className={edition === template.id ? "active" : ""}
-            aria-pressed={edition === template.id}
-            onClick={() => setEdition(template.id)}
-          >
-            {template.name}
-          </button>
-        ))}
-      </div>
-      <div className="edition-grid" data-active={edition}>
-        {templates.map((template) => (
-          <Link
-            key={template.id}
-            to={`/inspiration/${template.id}`}
-            className={`edition-card edition-${template.id}`}
-            aria-labelledby={`edition-title-${template.id}`}
-            onClick={(event) => {
-              const selection = window.getSelection();
-              if (event.detail > 0 && selection && !selection.isCollapsed &&
-                  (event.currentTarget.contains(selection.anchorNode) || event.currentTarget.contains(selection.focusNode)))
-                event.preventDefault();
-            }}
-          >
-            <div className="edition-cover">
+      <div className="ed-grid" ref={gridRef}>
+        {templates.map((template, i) => {
+          const light = template.id === "quiet-atlas";
+          const traits = editionTraits(template.id, locale);
+          return (
+            <Link
+              key={template.id}
+              to={`/inspiration/${template.id}`}
+              className={`ed-card ed-${light ? "light" : "dark"}`}
+              aria-labelledby={`edition-title-${template.id}`}
+              onClick={(event) => {
+                const selection = window.getSelection();
+                if (event.detail > 0 && selection && !selection.isCollapsed &&
+                    (event.currentTarget.contains(selection.anchorNode) || event.currentTarget.contains(selection.focusNode)))
+                  event.preventDefault();
+              }}
+            >
               <img
-                src={template.cover}
+                className={`ed-image${template.cover_focus ? " has-cover-focus" : ""}`}
+                src={template.cover_photo?.url ?? template.cover}
+                srcSet={template.cover_photo?.srcset}
+                sizes={template.cover_photo ? "(max-width: 760px) 100vw, 50vw" : undefined}
+                style={coverFocusVars(template.cover_focus) as CSSProperties | undefined}
                 width={1280}
-                height={template.id === "quiet-atlas" ? 960 : 854}
+                height={853}
                 alt={
-                  template.id === "quiet-atlas"
-                    ? t("A sunlit woodland path", "Ein heller Waldweg")
+                  template.cover_photo
+                    ? template.cover_photo.alt || ""
+                    : light
+                    ? t(
+                        "Alpine panorama over snow-covered peaks",
+                        "Alpenpanorama über schneebedeckten Gipfeln",
+                      )
                     : t(
-                        "A figure walking among trees in warm light",
-                        "Eine Person zwischen Bäumen im warmen Licht",
+                        "The sun in Calima haze above dark mountains",
+                        "Die Sonne im Calima-Dunst über dunklen Bergen",
                       )
                 }
               />
-              <span className="edition-sample-title">
-                {template.id === "quiet-atlas"
-                  ? "The art of going nowhere"
-                  : template.id === "after-hours"
-                    ? "When the light stays"
-                    : template.name}
-              </span>
-            </div>
-            <div className="edition-copy">
-              <span className="eyebrow">{t(template.kicker)}</span>
-              <h2 id={`edition-title-${template.id}`}>{template.name}</h2>
-              <p>{t(template.description)}</p>
-              <span className="text-link" aria-hidden="true">
-                {tr("Read the photo essay")}
-                <ArrowUpRight size={17} />
-              </span>
-            </div>
-          </Link>
-        ))}
+              <div className="ed-type">
+                <span className="ed-kicker">
+                  {t(`Edition ${i === 0 ? "I" : "II"}`, `Edition ${i === 0 ? "I" : "II"}`)}
+                </span>
+                <CardHeading id={`edition-title-${template.id}`}>{tr(template.name)}</CardHeading>
+                <span className="ed-sample">
+                  {editionSampleTitle(template.id, locale, template.title_override) || tr(template.name)}
+                </span>
+                <span className="ed-foot">
+                  {traits.length > 0 && (
+                    <span className="ed-traits">
+                      {traits.map((trait) => (
+                        <span key={trait}>{trait}</span>
+                      ))}
+                    </span>
+                  )}
+                  <span className="ed-link" aria-hidden="true">
+                    {t("View photo essay", "Fotoessay ansehen")}
+                    <ArrowUpRight size={16} />
+                  </span>
+                </span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
-      <p className="reference-note">
-        {tr(
-          "Original fictional essays, illustrated with credited stock photography. Your photographs and writing remain entirely your own.",
-        )}
-      </p>
-    </main>
+      {templates.length > 1 && (
+        <div className="ed-pager" role="group" aria-label={t("Choose edition", "Edition wählen")}>
+          {templates.map((template, k) => (
+            <button
+              key={template.id}
+              type="button"
+              className="ed-dot"
+              aria-label={t(`Show edition ${k + 1} of ${templates.length}`, `Edition ${k + 1} von ${templates.length} zeigen`)}
+              aria-current={edIndex === k ? "true" : undefined}
+              onClick={() => goToEdition(k)}
+            />
+          ))}
+        </div>
+      )}
+    </Container>
   );
 }
 export function ExampleStory() {
   const { templateId } = useParams();
-  return <StoryLoader path={`/templates/${templateId}/example`} />;
+  const { locale } = useLocale();
+  return <StoryLoader path={`/templates/${templateId}/example?lang=${locale}`} />;
 }
 export function JourneyStory() {
   const { slug } = useParams();
@@ -260,7 +326,7 @@ function StoryLoader({
     return () => {
       alive = false;
       controller.abort();
-      document.title = "WANDER — Every journey deserves to be remembered.";
+      document.title = "WANDER — A photo journal for journeys, moments and collections.";
     };
   }, [path, slug]);
   useLayoutEffect(() => {
@@ -284,7 +350,7 @@ function StoryLoader({
           <h1>{tr("Opening a little world…")}</h1>
           <p>{tr("Loading photographs")}</p>
         </div>
-        <div className="story-cover-loading-frame">
+        <div className="story-cover-loading-frame" style={coverTransitionStyle()} {...coverTransitionAttr()}>
           <img
             src={cover.url}
             srcSet={cover.srcset}
@@ -318,7 +384,9 @@ export function DayTeaser({
   onPhoto,
   motion,
   textMotion,
+  form = "journey",
 }: {
+  form?: JourneyForm;
   day: Chapter;
   photos: Photo[];
   index: number;
@@ -336,9 +404,9 @@ export function DayTeaser({
       id={`day-${day.id}`}
     >
       <div className="day-heading">
-        <Reveal config={textMotion || day.reveal}>
+        <Reveal config={textMotion || fixedReveal("chapter")}>
           <span className="eyebrow">
-            {tr("DAY")}
+            {form === "journey" ? tr("DAY") : t("CHAPTER", "KAPITEL")}
             {String(index + 1).padStart(2, "0")}
             {day.date
               ? ` / ${dateLabel(day.date, { day: "2-digit", month: "long" })}`
@@ -379,11 +447,11 @@ export function DayTeaser({
               motion={motion}
               actionLabel={
                 more
-                  ? `Explore ${day.title}: ${photos.length} photographs`
+                  ? t(`Explore ${day.title}: ${photos.length} photographs`, `Entdecken: ${day.title}, ${photos.length} Fotografien`)
                   : undefined
               }
               onClick={more ? onOpen : () => onPhoto(photo)}
-              sizes="(max-width: 760px) 100vw, 70vw"
+              sizes="(max-width: 760px) 100vw, 75vw"
             />
             <figcaption>
               {photo.edits?.show_title && <span>{photo.title}</span>}
@@ -515,221 +583,13 @@ export function Filmstrip({
     </section>
   );
 }
-export function PhotoViewer({
-  photos,
-  initial,
-  onClose,
-}: {
+/** The photograph viewer is the focus view: it grows out of the story instead of replacing it. */
+export function PhotoViewer(props: {
   photos: Photo[];
   initial: number;
   onClose: () => void;
 }) {
-  useLocale();
-  const motionOff = useMotionOff();
-  const [view, setView] = useState<ViewerState>({
-    target: viewerIndex(initial, photos.length),
-    visible: null,
-    status: "loading",
-  });
-  const imageSlot = useRef<HTMLDivElement>(null);
-  const displayedImage = useRef<HTMLImageElement | null>(null);
-  const model = useRef<PhotoViewerModel | null>(null);
-  const root = useRef<HTMLDivElement>(null),
-    closeRef = useRef(onClose),
-    id = useRef(crypto.randomUUID()),
-    gesture = useRef({ total: 0, last: 0, locked: false }),
-    touch = useRef<{ x: number; y: number } | null>(null);
-  closeRef.current = onClose;
-  useEffect(() => {
-    displayedImage.current = null;
-    imageSlot.current?.replaceChildren();
-    const session = new PhotoViewerModel(
-      photos.map((photo) => photo.large_url),
-      initial,
-      decodedImageRequest,
-      (state) => {
-        setView(state);
-      },
-    );
-    model.current = session;
-    session.select(initial);
-    return () => {
-      session.dispose();
-      model.current = null;
-    };
-  }, [photos, initial]);
-  useLayoutEffect(() => {
-    const slot = imageSlot.current;
-    const image = view.image;
-    if (!slot || !image || view.visible === null) return;
-    const prior = displayedImage.current;
-    image.alt = photos[view.visible]?.alt || "";
-    image.removeAttribute("aria-hidden");
-    image.className = "lightbox-current";
-    displayedImage.current = image;
-    if (!motionOff && prior && prior !== image) {
-      prior.className = "lightbox-prior";
-      prior.alt = "";
-      prior.setAttribute("aria-hidden", "true");
-      image.classList.add("is-entering");
-      slot.replaceChildren(prior, image);
-      const timer = window.setTimeout(() => prior.remove(), 240);
-      return () => window.clearTimeout(timer);
-    }
-    slot.replaceChildren(image);
-  }, [view.visible, view.image, photos, motionOff]);
-  const next = (direction: number) => model.current?.move(direction);
-  useEffect(() => {
-    if (history.state?.wanderLightbox !== id.current)
-      history.pushState(
-        {
-          ...history.state,
-          idx: (history.state?.idx || 0) + 1,
-          wanderLightbox: id.current,
-        },
-        "",
-      );
-    const pop = () => {
-      if (history.state?.wanderLightbox !== id.current) closeRef.current();
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        e.preventDefault();
-        model.current?.move(e.key === "ArrowRight" ? 1 : -1);
-      }
-    };
-    window.addEventListener("popstate", pop);
-    window.addEventListener("keydown", key);
-    const wheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-      e.preventDefault();
-      const now = performance.now(),
-        g = gesture.current;
-      if (now - g.last > 280) {
-        g.total = 0;
-        g.locked = false;
-      }
-      g.last = now;
-      if (g.locked) return;
-      g.total += e.deltaX;
-      if (Math.abs(g.total) > 45) {
-        g.locked = true;
-        model.current?.move(g.total > 0 ? 1 : -1);
-      }
-    };
-    const el = root.current;
-    el?.addEventListener("wheel", wheel, { passive: false });
-    return () => {
-      window.removeEventListener("popstate", pop);
-      window.removeEventListener("keydown", key);
-      el?.removeEventListener("wheel", wheel);
-    };
-  }, [photos.length]);
-  function close() {
-    model.current?.dispose();
-    if (history.state?.wanderLightbox === id.current) history.back();
-    else onClose();
-  }
-  const photo = view.visible === null ? null : photos[view.visible];
-  if (!photos.length) return null;
-  return (
-    <Modal
-      title={t("Photograph viewer", "Fotoansicht")}
-      className="lightbox"
-      onClose={close}
-    >
-      <div
-        ref={root}
-        className="lightbox-gesture"
-        onTouchStart={(e) => {
-          if (e.touches.length === 1)
-            touch.current = {
-              x: e.touches[0].clientX,
-              y: e.touches[0].clientY,
-            };
-          else touch.current = null;
-        }}
-        onTouchCancel={() => {
-          touch.current = null;
-        }}
-        onTouchEnd={(e) => {
-          const start = touch.current;
-          touch.current = null;
-          if (!start || !e.changedTouches[0]) return;
-          const dx = e.changedTouches[0].clientX - start.x,
-            dy = e.changedTouches[0].clientY - start.y;
-          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3)
-            next(dx < 0 ? 1 : -1);
-        }}
-      >
-        <div className="lightbox-image" aria-busy={view.status === "loading"}>
-          <div ref={imageSlot} className="lightbox-image-layers" />
-          {view.status !== "ready" && (
-            <div
-              className={`lightbox-status${photo ? " has-photo" : ""}`}
-              role="status"
-              aria-live="polite"
-            >
-              <p>
-                {view.status === "error"
-                  ? t(
-                      "Could not load photograph",
-                      "Foto konnte nicht geladen werden",
-                    )
-                  : t("Loading photograph", "Foto wird geladen")}{" "}
-                {view.target + 1} / {photos.length}
-              </p>
-              {view.status === "error" && (
-                <button
-                  className="text-button"
-                  onClick={() => model.current?.retry()}
-                >
-                  {t("Try again", "Erneut versuchen")}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="lightbox-caption">
-          <div>
-            {photo?.edits?.show_title && <p>{photo.title}</p>}
-            {photo?.description && <span>{photo.description}</span>}
-            {photo?.source_url && (
-              <a href={photo.source_url} target="_blank" rel="noreferrer">
-                {t("Photo", "Foto")}: {photo.credit} ↗
-              </a>
-            )}
-          </div>
-          <span aria-live="polite">
-            {view.visible === null ? "—" : view.visible + 1} / {photos.length}
-          </span>
-        </div>
-        <div className="original-link lightbox-original">
-          {photo?.original_url && (
-            <a href={photo.original_url} target="_blank" rel="noreferrer">
-              {t("Open full-resolution copy", "Vollauflösung öffnen")} ↗
-            </a>
-          )}
-        </div>
-        {photos.length > 1 && (
-          <div className="lightbox-controls">
-            <button
-              aria-label={t("Previous photograph", "Vorheriges Foto")}
-              onClick={() => next(-1)}
-            >
-              <ChevronLeft />
-            </button>
-            <button
-              aria-label={t("Next photograph", "Nächstes Foto")}
-              onClick={() => next(1)}
-            >
-              <ChevronRight />
-            </button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
+  return <FocusView {...props} />;
 }
 export function DayGallery({
   title,
@@ -778,7 +638,7 @@ export function DayGallery({
               <Picture
                 photo={photo}
                 onClick={() => open(photo)}
-                sizes="(max-width: 760px) 100vw, 50vw"
+                sizes="(max-width: 760px) 100vw, 55vw"
               />
               {photo.edits?.show_title && (
                 <figcaption>{photo.title}</figcaption>
@@ -798,13 +658,252 @@ export function DayGallery({
     </Modal>
   );
 }
-function StoryExperience({ journey, showcase }: { journey: Journey; showcase?: boolean }) {
-  const { authenticated, notify } = useApp();
-  const [params, setParams] = useSearchParams();
+/** Hairline reading progress under the masthead; transform-only, rAF-throttled. */
+function StoryProgress() {
+  const bar = useRef<HTMLDivElement>(null);
+  // Layout effect: --banner-h (the cover height derives from it) is set before the first paint.
+  useLayoutEffect(() => {
+    const el = bar.current;
+    const main = el?.parentElement;
+    if (!el || !main) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const total = main.offsetHeight - window.innerHeight;
+      const done = total > 0 ? -main.getBoundingClientRect().top / total : 0;
+      el.style.transform = `scaleX(${Math.min(1, Math.max(0, done))})`;
+      el.dataset.idle = total > 0 && done > 0.002 ? "false" : "true";
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    const resize =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    resize?.observe(main);
+    // The sticky chapter bar sits beneath the edition bar, whatever its height.
+    // The bar sits in a wrapper div; the story root (<main>) carries the layout variables.
+    const story = el.closest<HTMLElement>("main") ?? main;
+    const measure = () => {
+      // Everything above the cover (slot, edition/draft bar, motion row): the real canvas offset.
+      const canvas = story.querySelector<HTMLElement>(".journal-canvas");
+      if (canvas)
+        story.style.setProperty("--story-top", `${(canvas.getBoundingClientRect().top + window.scrollY).toFixed(2)}px`);
+      story.style.setProperty(
+        "--banner-h",
+        `${[...story.querySelectorAll<HTMLElement>(":scope > .example-banner, :scope > .draft-banner")]
+          .reduce((sum, el) => sum + el.offsetHeight, 0)}px`,
+      );
+    };
+    // Lone photographs in a wall: tag their ratio so CSS can cap the height to the reading area.
+    let tagFrame = 0;
+    const tagRatios = () => {
+      tagFrame = 0;
+      story.querySelectorAll<HTMLElement>(".photo-wall:not(.wall-miniature) .wall-group > figure:only-child > .picture").forEach((pic) => {
+        const m = /([\d.]+)\s*(?:\/\s*([\d.]+))?/.exec(pic.style.aspectRatio);
+        const r = m ? Number(m[1]) / Number(m[2] ?? 1) : 0;
+        if (r > 0 && pic.style.getPropertyValue("--pic-ratio") !== r.toFixed(4)) pic.style.setProperty("--pic-ratio", r.toFixed(4));
+      });
+    };
+    // Nur hinzugefügte Bilder oder Wände sind relevant; Titel-Klon, Texte und Toasts lösen nichts aus.
+    const relevant = (node: Node) =>
+      node instanceof HTMLElement &&
+      (node.matches(".photo-wall, .wall-group, figure, .picture") ||
+        node.querySelector(".photo-wall, .picture") !== null);
+    const tagObserver = typeof MutationObserver === "undefined" ? null : new MutationObserver((records) => {
+      if (tagFrame) return;
+      if (records.some((record) => [...record.addedNodes].some(relevant)))
+        tagFrame = requestAnimationFrame(tagRatios);
+    });
+    tagObserver?.observe(story, { childList: true, subtree: true });
+    tagRatios();
+    measure();
+    window.addEventListener("resize", measure);
+    const banners = [...story.querySelectorAll<HTMLElement>(":scope > .example-banner, :scope > .draft-banner")];
+    const bannerResize =
+      banners.length && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+    banners.forEach((el) => bannerResize?.observe(el));
+    return () => {
+      window.removeEventListener("resize", measure);
+      tagObserver?.disconnect();
+      cancelAnimationFrame(tagFrame);
+      bannerResize?.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      resize?.disconnect();
+    };
+  }, []);
+  return (
+    <div className="story-progress" aria-hidden="true">
+      <div ref={bar} className="story-progress-bar" data-idle="true" />
+    </div>
+  );
+}
+
+/** Closing section: the other public journeys as tall image cards, title in the image
+ *  (same format as "What you can shape" on the about page). Starts with the next older journey. */
+function NextJourney({ journey }: { journey: Journey }) {
+  const [others, setOthers] = useState<Journey[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api<Journey[]>("/journeys?public=1")
+      .then((list) => {
+        if (!alive) return;
+        const sorted = list
+          .filter((item) => !item.is_example)
+          .sort((a, b) => b.start_date.localeCompare(a.start_date));
+        const at = sorted.findIndex((item) => item.slug === journey.slug);
+        const rest = at < 0 ? sorted : [...sorted.slice(at + 1), ...sorted.slice(0, at)];
+        setOthers(rest.slice(0, 3));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [journey.slug]);
+  if (!others.length) return null;
+  return (
+    <section className="next-journey more-journeys" aria-labelledby="next-journey-title">
+      <div className="more-journeys-inner">
+        <h2 id="next-journey-title" className="more-journeys-title">
+          {t("More journeys", "Weitere Reisen")}
+        </h2>
+        <ul className="more-journeys-grid" data-count={others.length}>
+          {others.map((item) => (
+            <li key={item.id} className="more-journeys-item">
+              <Link
+                className="more-journeys-card"
+                to={`/journeys/${item.slug}`}
+                {...coverLinkProps(item.slug, item.cover)}
+              >
+                <span className="more-journeys-image">
+                  <Picture photo={item.cover} sizes="(max-width: 760px) 100vw, 34vw" />
+                </span>
+                <span className="more-journeys-copy">
+                  <span className="more-journeys-name">{item.title}</span>
+                  <span className="more-journeys-meta">
+                    {[item.location, formDateText(formOf(item), item.start_date, item.end_date, { range: dateRange, day: (day) => dateLabel(day) })]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+/** Closing page of the two edition examples: an invitation to the other edition, in its own mood. */
+function OtherEdition({ journey, showcase }: { journey: Journey; showcase?: boolean }) {
+  const { locale } = useLocale();
+  const otherId = journey.story_template === "after-hours" ? "quiet-atlas" : "after-hours";
+  const name = tr(otherId === "after-hours" ? "Last Light" : "First Light");
+  const path = showcase
+    ? `/showcase/${otherId}?lang=${locale}`
+    : `/templates/${otherId}/example?lang=${locale}`;
+  const [other, setOther] = useState<{ path: string; journey: Journey } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    api<Journey>(path, { signal: controller.signal })
+      .then((value) => {
+        if (alive) setOther({ path, journey: value });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [path]);
+  const loaded = other?.path === path ? other.journey : null;
+  const title = loaded?.title || editionSampleTitle(otherId, locale);
+  return (
+    <section
+      className={`other-edition template-${otherId}`}
+      aria-labelledby="other-edition-title"
+    >
+      <Link className="other-edition-link" to={`/${showcase ? "showcase" : "inspiration"}/${otherId}`}>
+        <span className="eyebrow other-edition-kicker">
+          {t("THE OTHER EDITION", "DIE ANDERE EDITION")}
+        </span>
+        <span className="other-edition-name">{name}</span>
+        <h2 id="other-edition-title" className="other-edition-title">
+          {title}
+        </h2>
+        <span className="other-edition-image" aria-hidden="true">
+          {loaded?.cover ? <Picture photo={loaded.cover} sizes="(max-width: 760px) 100vw, 1100px" /> : null}
+        </span>
+        <span className="other-edition-cta">
+          {t(`View in ${name}`, `In ${name} ansehen`)}
+          <ArrowRight size={16} strokeWidth={1.25} aria-hidden="true" />
+        </span>
+      </Link>
+    </section>
+  );
+}
+/**
+ * The public story page. `preview` renders the same page inside the editor: no header
+ * actions, no draft banner, the URL and browser history stay untouched and links that
+ * would leave the page do nothing (day galleries still open in place).
+ */
+export function StoryExperience({ journey, showcase, preview = false }: { journey: Journey; showcase?: boolean; preview?: boolean }) {
+  const { authenticated: signedIn, notify } = useApp();
+  const authenticated = signedIn && !preview;
+  const [urlParams, setUrlParams] = useSearchParams();
+  const [previewDay, setPreviewDay] = useState<number | null>(null);
+  const params = preview ? new URLSearchParams(previewDay ? `day=${previewDay}` : "") : urlParams;
+  const setParams = (next: URLSearchParams, options?: { replace?: boolean; preventScrollReset?: boolean }) => {
+    if (preview) setPreviewDay(Number(next.get("day")) || null);
+    else setUrlParams(next, options);
+  };
+  /** Preview: keep every click on the page; a day link opens its gallery in place. */
+  const inertLinks = (e: ReactMouseEvent<HTMLElement>) => {
+    const link = (e.target as Element).closest?.("a[href]");
+    if (!link) return;
+    e.preventDefault();
+    const url = new URL(link.getAttribute("href") || "", window.location.href);
+    const day = Number(url.searchParams.get("day"));
+    if (day && url.pathname === window.location.pathname) setPreviewDay(day);
+  };
   const [viewerPhotos, setViewerPhotos] = useState<Photo[]>(journey.photos);
   const [lightbox, setLightbox] = useState<number | null>(null),
     [collection, setCollection] = useState<"all" | "film" | null>(null),
     [shareLink, setShareLink] = useState("");
+  // Share/edit live in the masthead instead of a separate bar above the story.
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
+  const [navSlot, setNavSlot] = useState<HTMLElement | null>(null);
+  const [runningSlot, setRunningSlot] = useState<HTMLElement | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    if (preview) return;
+    setActionsSlot(document.getElementById("header-actions"));
+    setNavSlot(document.getElementById("nav-actions"));
+    setRunningSlot(document.getElementById("header-running"));
+  }, [preview]);
+  useEffect(() => {
+    // Ein Scroll-Burst = höchstens ein Lesevorgang pro Frame; setScrolled löst nur bei einem Wechsel ein Rendern aus.
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setScrolled(window.scrollY > 120);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
   const dayId = Number(params.get("day"));
   const day = journey.chapters.find(
     (chapter) => chapter.kind === "chapter" && chapter.id === dayId,
@@ -822,6 +921,7 @@ function StoryExperience({ journey, showcase }: { journey: Journey; showcase?: b
     setLightbox(sequenceIndex(sequence, photo));
   }
   async function share() {
+    if (preview) return;
     const url = window.location.href;
     try {
       await navigator.clipboard.writeText(url);
@@ -830,77 +930,245 @@ function StoryExperience({ journey, showcase }: { journey: Journey; showcase?: b
       setShareLink(url);
     }
   }
+  const motionOff = useMotionOff();
+  // Title docking: the cover title flies into the running line, scroll-coupled (no time tween).
+  useEffect(() => {
+    const main = document.getElementById("main");
+    const line = main?.querySelector<HTMLElement>(".story-running-line");
+    if (!main || !line) return;
+    const reduce = () => motionOff || isMotionOff();
+    let clone: HTMLElement | null = null;
+    let cloneSource: HTMLElement | null = null;
+    let natural = { w: 0, h: 0, font: 16 };
+    let frame = 0;
+    let flying = false;
+    let lastP = -1;
+    // Smoothed progress: eases toward the scroll-derived target so the flight never steps.
+    let sp = 0;
+    let spv = 0;
+    let lastT = 0;
+    let lastEdge = NaN;
+    let lineOn = false;
+    let primed = false;
+    const setFlight = (on: boolean) => {
+      if (on === flying) return;
+      flying = on;
+      main.toggleAttribute("data-title-flight", on);
+    };
+    const dropClone = () => {
+      clone?.remove();
+      clone = null;
+      cloneSource = null;
+    };
+    const buildClone = (h1: HTMLElement) => {
+      dropClone();
+      const css = getComputedStyle(h1);
+      clone = document.createElement("div");
+      clone.className = "title-dock-clone";
+      clone.setAttribute("aria-hidden", "true");
+      clone.textContent = h1.textContent;
+      Object.assign(clone.style, {
+        font: css.font,
+        letterSpacing: css.letterSpacing,
+        lineHeight: css.lineHeight,
+        textAlign: css.textAlign,
+        textTransform: css.textTransform,
+        color: css.color,
+        textShadow: css.textShadow,
+        width: `${h1.offsetWidth}px`,
+      });
+      main.appendChild(clone);
+      cloneSource = h1;
+      natural = { w: h1.offsetWidth, h: h1.offsetHeight, font: parseFloat(css.fontSize) || 16 };
+    };
+    const update = (ts?: number) => {
+      frame = 0;
+      const now = typeof ts === "number" ? ts : performance.now();
+      const dt = lastT ? Math.min(64, Math.max(0, now - lastT)) : 16;
+      lastT = now;
+      const h1 = main.querySelector<HTMLElement>(".journal-cover h1");
+      const lineRect = line.getBoundingClientRect();
+      const edge = lineRect.bottom;
+      const box = h1?.getBoundingClientRect();
+      let p: number;
+      let target: number;
+      if (!h1 || !box || box.width === 0 || box.height === 0) {
+        // No cover title: the line fades in with the first scroll.
+        target = clamp01((window.scrollY - 60) / 60);
+        p = target;
+        sp = target;
+        setFlight(false);
+        dropClone();
+      } else if (reduce()) {
+        target = box.top < edge ? 1 : 0;
+        p = target;
+        sp = target;
+        setFlight(false);
+        dropClone();
+      } else {
+        target = dockProgress(box.top, edge, dockRange);
+        // Critically damped spring (smoothTime 240 ms, capped speed); first frame snaps.
+        if (primed) {
+          const next = smoothDamp(sp, target, spv, 0.24, dt / 1000, 3);
+          sp = next.value;
+          spv = next.velocity;
+        } else {
+          sp = target;
+          spv = 0;
+        }
+        if (Math.abs(target - sp) < 0.0015 && Math.abs(spv) < 0.02) {
+          sp = target;
+          spv = 0;
+        }
+        p = sp;
+        if (p > 0 && (!clone || cloneSource !== h1 || natural.w !== h1.offsetWidth)) buildClone(h1);
+        if (p > 0 && clone) {
+          const span = line.firstElementChild?.getBoundingClientRect();
+          const toX = span ? span.left + span.width / 2 : window.innerWidth / 2;
+          const toY = span ? span.top + span.height / 2 : lineRect.top + lineRect.height / 2;
+          const from = {
+            x: box.left + box.width / 2,
+            y: box.top + box.height / 2,
+            s: natural.w ? box.width / natural.w : 1,
+          };
+          const pose = flightPose(from, { x: toX, y: toY, s: Math.max(0.12, 15 / natural.font) }, p);
+          clone.style.transform = `translate3d(${pose.x - natural.w / 2}px, ${pose.y - natural.h / 2}px, 0) scale(${pose.s})`;
+          clone.style.opacity = String(cloneOpacity(p));
+          setFlight(true);
+        } else {
+          setFlight(false);
+          dropClone();
+        }
+      }
+      primed = true;
+      if (p !== lastP) {
+        lastP = p;
+        line.style.setProperty("--title-p", String(p));
+        // Hysteresis: the glass only appears once the title is really on its way and leaves
+        // as soon as it is back on the cover, so no empty bar is left over the picture.
+        lineOn = lineOn ? p > 0.12 : p > 0.25;
+        line.toggleAttribute("data-on", lineOn);
+        // Kicker and subtitle on the cover step back while the title takes off.
+        h1?.parentElement?.style.setProperty("--title-p", String(p));
+      }
+      // Keep animating while easing or while the running line is still moving (header collapse).
+      if (!reduce() && (sp !== target || edge !== lastEdge)) schedule();
+      lastEdge = edge;
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      main.removeAttribute("data-title-flight");
+      dropClone();
+    };
+  }, [motionOff, journey.id]);
+  function backToStart(event: React.MouseEvent<HTMLButtonElement>) {
+    const main = event.currentTarget.closest("main");
+    const reduce = motionOff || isMotionOff();
+    window.scrollTo({ top: 0, behavior: reduce ? "instant" : "smooth" });
+    main?.querySelector<HTMLElement>(".journal-cover h1")?.focus({ preventScroll: true });
+  }
   const afterHours = journey.story_template === "after-hours";
-  const editionLink = afterHours ? "/showcase/quiet-atlas" : "/showcase/after-hours";
-  const editionName = afterHours ? "Quiet Atlas" : "After Hours";
-  const endLink = journey.is_example ? "/inspiration" : "/archive";
+  const otherEdition = afterHours ? "quiet-atlas" : "after-hours";
+  const editionLink = `/${showcase ? "showcase" : "inspiration"}/${otherEdition}`;
+  const editionName = tr(afterHours ? "First Light" : "Last Light");
+  const editionLabel = afterHours
+    ? t("Last Light · Tenerife", "Letztes Licht · Teneriffa")
+    : t("First Light · Switzerland", "Erstes Licht · Schweiz");
   return (
     <main
       id="main"
-      className={`story-experience template-${journey.story_template || "quiet-atlas"}${showcase ? " showcase-story" : ""}`}
+      className={`story-experience template-${journey.story_template || "quiet-atlas"}${showcase ? " showcase-story" : ""}${journey.cover_focus ? " has-cover-focus" : ""}${preview ? " is-story-preview" : ""}`}
+      style={coverFocusVars(journey.cover_focus) as CSSProperties | undefined}
+      data-scrolled={scrolled ? "true" : "false"}
+      onClickCapture={preview ? inertLinks : undefined}
     >
+      <StoryProgress />
+      <div className="story-running-line" aria-hidden="true">
+        <span>
+          {journey.title}
+          {journey.location ? <span className="story-running-place"> · {journey.location}</span> : null}
+        </span>
+      </div>
       {journey.is_example && (
         <div className="example-banner">
           <Link to={showcase ? "/" : "/inspiration"}>
             <ArrowLeft size={14} />
-            {showcase ? tr("Journal") : tr("All editions")}
+            {showcase ? t("Home", "Startseite") : tr("All editions")}
           </Link>
-          <span>
-            {tr("ORIGINAL FICTIONAL ESSAY /")}{" "}
-            {journey.story_template === "after-hours"
-              ? "AFTER HOURS"
-              : "QUIET ATLAS"}
-          </span>
-          <Link to={showcase ? editionLink : `/studio/new?template=${journey.story_template}`}>
-            {showcase ? editionName : tr("Make it yours")}
+          <span>{editionLabel}</span>
+          <Link to={editionLink}>
+            {editionName}
             <ArrowUpRight size={14} />
           </Link>
         </div>
       )}
-      {showcase && (
-        <div className="story-motion-row page-width">
-          <MotionToggle className="story-motion" />
-        </div>
-      )}
-      {!journey.published && (
+      {!journey.published && !preview && (
         <div className="draft-banner">
           {tr("PRIVATE PREVIEW — Only visible to you.")}
           <Link to={`/studio/${journey.slug}`}>{tr("Return to studio ↗")}</Link>
         </div>
       )}
-      {!showcase && (
-        <div className="story-facts page-width">
-          <span>
-            {journey.location} · {journey.photos.length}{" "}
-            {t("photographs", "Fotos")}
-          </span>
-          <div>
-            <MotionToggle className="story-motion" />
-            {authenticated && !journey.is_example && (
-              <Link to={`/studio/${journey.slug}`}>
-                {t("Edit story", "Reise bearbeiten")} ↗
-              </Link>
-            )}
-            <button onClick={share}>
-              <Share2 size={14} />
-              {t("Share", "Teilen")}
-            </button>
-          </div>
-        </div>
+      {runningSlot && createPortal(
+        <span>
+          {journey.title}
+          {journey.location ? <span className="header-running-place"> · {journey.location}</span> : null}
+        </span>,
+        runningSlot,
+      )}
+      {!showcase && actionsSlot && createPortal(
+        <>
+          {authenticated && !journey.is_example && (
+            <Link
+              to={`/studio/${journey.slug}`}
+              className="header-action"
+              aria-label={t("Edit story", "Geschichte bearbeiten")}
+              title={t("Edit story", "Geschichte bearbeiten")}
+            >
+              <PenLine size={17} strokeWidth={1.25} />
+            </Link>
+          )}
+          <button
+            type="button"
+            className="header-action"
+            onClick={share}
+            aria-label={t("Share", "Teilen")}
+            title={t("Share", "Teilen")}
+          >
+            <Share2 size={17} strokeWidth={1.25} />
+          </button>
+        </>,
+        actionsSlot,
+      )}
+      {!showcase && navSlot && createPortal(
+        <>
+          {authenticated && !journey.is_example && (
+            <Link to={`/studio/${journey.slug}`} className="nav-action">
+              <PenLine size={17} strokeWidth={1.25} />
+              {t("Edit story", "Geschichte bearbeiten")}
+            </Link>
+          )}
+          <button type="button" className="nav-action" onClick={share}>
+            <Share2 size={17} strokeWidth={1.25} />
+            {t("Share", "Teilen")}
+          </button>
+        </>,
+        navSlot,
       )}
       <JournalCanvas journey={journey} onPhoto={openPhoto} />
-      <div className="story-end page-width">
-        <Link
-          className="text-link"
-          to={showcase ? editionLink : endLink}
-        >
-          <ArrowLeft size={17} />{" "}
-          {showcase
-            ? t(`Read in ${editionName}`, `In ${editionName} lesen`)
-            : journey.is_example
-              ? tr("Explore the other edition")
-              : tr("Back to the archive")}
-        </Link>
+      <div className={`story-end page-width${journey.is_example || showcase ? " story-end-editions" : ""}`}>
+        {!journey.is_example && !showcase && (
+          <Link className="text-link" to="/archive">
+            <ArrowLeft size={17} /> {tr("Back to the archive")}
+          </Link>
+        )}
         {showcase && (
           <button className="text-link" onClick={share}>
             <Share2 size={14} /> {t("Share", "Teilen")}
@@ -910,12 +1178,22 @@ function StoryExperience({ journey, showcase }: { journey: Journey; showcase?: b
           {tr("All")} {journey.photos.length} {tr("photographs")}{" "}
           <ArrowUpRight size={17} />
         </button>
+        <div className="story-to-top">
+          <button type="button" className="text-link" onClick={backToStart}>
+            <ArrowUp size={15} strokeWidth={1} aria-hidden="true" />
+            {t("Back to top", "Zum Anfang")}
+          </button>
+        </div>
       </div>
-      {journey.demo && (
+      {(journey.is_example || showcase) && <OtherEdition journey={journey} showcase={showcase} />}
+      {!showcase && !journey.is_example && journey.published && (
+        <NextJourney journey={journey} />
+      )}
+      {journey.demo && !journey.is_example && (
         <p className="reference-note page-width">
-          {tr(
-            "An imagined essay, illustrated with stock photography. Photographer credits accompany each full-size image.",
-          )}
+          {journey.story_template === "after-hours"
+            ? t("Example journey · Tenerife", "Beispielreise · Teneriffa")
+            : t("Example journey · Switzerland", "Beispielreise · Schweiz")}
         </p>
       )}
       {day && (
@@ -1001,10 +1279,10 @@ export function HomeDays({ slug }: { slug: string }) {
               <Picture
                 photo={favorite}
                 animate
-                sizes="(max-width: 760px) 100vw, 33vw"
+                sizes="(max-width: 760px) 100vw, 38vw"
               />
               <span className="eyebrow">
-                {tr("DAY")}
+                {formOf(journey) === "journey" ? tr("DAY") : t("CHAPTER", "KAPITEL")}
                 {String(index + 1).padStart(2, "0")} / {photos.length}{" "}
                 {tr("PHOTOGRAPHS")}
               </span>

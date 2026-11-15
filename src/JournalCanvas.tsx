@@ -1,8 +1,13 @@
-import { type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { ArrowDown, Camera, Pencil } from "lucide-react";
+import { readLayout } from "./editorPresets";
+import { type CSSProperties, type ReactNode } from "react";
+import { effectivePhotoRatio } from "./storyLayout";
+import { pairOffsets, readTitlePosition, titleAlign } from "./imageFrame";
+import { Camera, Pencil } from "lucide-react";
 import { Picture, dateRange, dateLabel } from "./components";
-import { Reveal, resolveReveal, journeyReveal } from "./Reveal";
-import { imageParallax, canPanImage } from "./imageParallax";
+import { formDateText, formOf } from "./journeyForm";
+import { Reveal } from "./Reveal";
+import { canPanImage } from "./imageParallax";
+import { fixedMotion, fixedReveal, hoverScale } from "./fixedMotion";
 import { Parallax } from "./Motion";
 import { QuietAtlasChapterCompass } from "./QuietAtlasChapterCompass";
 import { Filmstrip } from "./StoryExperience";
@@ -23,6 +28,8 @@ import {
 } from "./storyLayout";
 export { modulePhotos } from "./journalModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
+import { coverFocusVars } from "./editionOverrides";
+import { coverTransitionAttr, coverTransitionStyle } from "./viewTransitions";
 export type Selection =
   | { type: "hero" }
   | { type: "module"; id: number }
@@ -53,13 +60,10 @@ function layoutStyle(
 ): CSSProperties {
   const chapter = kind === "chapter";
   const defaultGap = chapter && edition !== "after-hours" ? 24 : 18;
-  const defaultPadding = chapter && edition !== "after-hours" ? 48 : 32;
   const columns =
     l.columns ||
     (kind === "pair" ? 2 : kind === "image" || kind === "hero" ? 1 : 4);
   return {
-    "--module-hover-scale":
-      l.hover_zoom === undefined ? undefined : 1 + l.hover_zoom / 100,
     "--module-font":
       l.font === "sans" ? "Manrope, Arial, sans-serif" : "var(--serif)",
     "--module-text-size": `${l.text_size || (kind === "text" && !l.text_preset ? 16 : typePresets[l.text_preset || "medium"])}px`,
@@ -69,32 +73,19 @@ function layoutStyle(
     "--module-inset": `${l.inset ?? 0}px`,
     "--module-cols": columns,
     "--module-gap": `${l.gap ?? defaultGap}px`,
-    "--module-padding": `${l.padding ?? defaultPadding}px`,
+    // Unset padding stays unset so story-polish.css can supply the rhythm scale.
+    "--module-padding": l.padding === undefined ? undefined : `${l.padding}px`,
     "--module-offset": `${l.offset ?? 50}px`,
     "--module-mobile-cols": l.mobile_columns ?? Math.min(columns, 2),
     "--module-mobile-gap": `${l.mobile_gap ?? l.gap ?? defaultGap}px`,
-    "--module-mobile-padding": `${l.mobile_padding ?? l.padding ?? (chapter ? (edition === "after-hours" ? 12 : 32) : 36)}px`,
-    "--module-title-size": `${l.title_size || 72}px`,
+    "--module-mobile-padding":
+      (l.mobile_padding ?? l.padding) === undefined
+        ? undefined
+        : `${l.mobile_padding ?? l.padding}px`,
+    "--module-title-size": l.title_size ? `${l.title_size}px` : undefined,
     "--module-ratio":
       l.ratio && l.ratio !== "original" ? l.ratio.replace(":", "/") : "auto",
   } as CSSProperties;
-}
-function followChapterLink(event: MouseEvent<HTMLAnchorElement>) {
-  const ownerDocument = event.currentTarget.ownerDocument;
-  const view = ownerDocument.defaultView;
-  event.preventDefault();
-  const target = ownerDocument.getElementById(
-    event.currentTarget.hash.slice(1),
-  );
-  if (!target) return;
-
-  target.focus({ preventScroll: true });
-  target.scrollIntoView({
-    block: "start",
-    behavior: view?.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? "instant"
-      : "smooth",
-  });
 }
 function Selectable({
   children,
@@ -161,8 +152,11 @@ export function JournalCanvas({
   onSelect = () => {},
   onPhoto = () => {},
   onEmptyModule,
+  onWriteText,
   replay = 0,
   dayId,
+  emptyState,
+  thumbnail = false,
 }: {
   journey: Journey;
   editing?: boolean;
@@ -170,11 +164,40 @@ export function JournalCanvas({
   onSelect?: (s: Selection) => void;
   onPhoto?: (p: Photo, sequence?: Photo[]) => void;
   onEmptyModule?: (id: number) => void;
+  /** Editor only: the placeholder of an empty text asks to write in the settings panel. */
+  onWriteText?: (moduleId: number) => void;
   replay?: number;
   dayId?: number;
+  /** Editor only: shown instead of the loose-photo fallback while the story has no modules. */
+  emptyState?: ReactNode;
+  /** Editor only: a small variant preview of the module given in dayId (no element ids, small images). */
+  thumbnail?: boolean;
 }) {
   const l = journey.layout || {},
-    edition = journey.story_template || "quiet-atlas";
+    edition = journey.story_template || "quiet-atlas",
+    coverDate = formDateText(formOf(journey), journey.start_date, journey.end_date, {
+      range: dateRange,
+      day: (day) => dateLabel(day),
+    });
+  const titlePos = readTitlePosition(l);
+  // Empty texts show a quiet invitation in the editor only; the public page renders nothing for them.
+  const writeHint =
+    formOf(journey) === "journey"
+      ? t("What happened on this day?", "Was ist an diesem Tag passiert?")
+      : t("One sentence about these pictures.", "Ein Satz zu diesen Bildern.");
+  const placeholder = (moduleId: number) =>
+    editing && onWriteText ? (
+      <button
+        type="button"
+        className="module-placeholder"
+        onClick={(e) => {
+          e.stopPropagation();
+          onWriteText(moduleId);
+        }}
+      >
+        {writeHint}
+      </button>
+    ) : null;
   const cover =
     journey.photos.find((p) => p.id === journey.cover_id) || journey.cover;
   const roots = journey.chapters.filter(
@@ -183,8 +206,9 @@ export function JournalCanvas({
       !journey.chapters.some((d) => d.id === c.layout?.parent_id),
   );
   const rootChapters = roots.filter((chapter) => chapter.kind === "chapter");
-  const loose = rootPhotos(journey, "loose"),
-    film = rootPhotos(journey, "filmstrip");
+  // Photographs that sit in no module are library material, never story content: they are not
+  // rendered automatically – not on the public page, not in the editor. Only modules show photos.
+  const film = rootPhotos(journey, "filmstrip");
   function photoClick(
     p: Photo,
     moduleId?: number,
@@ -212,7 +236,7 @@ export function JournalCanvas({
       );
   }
   function render(module: Chapter) {
-    const layout = module.layout || {},
+    const layout = readLayout(module.kind, module.layout),
       photos = modulePhotos(module, journey),
       theme =
         layout.edition && layout.edition !== "inherit"
@@ -220,23 +244,16 @@ export function JournalCanvas({
           : edition;
     const kind = module.kind,
       isHero = kind === "hero",
+      // Text and quote sit centred in a block of their own width: the text width (not a side margin) decides there.
+      hasSideMargin = layout.margin_x !== undefined && !isHero && kind !== "text" && kind !== "quote",
       single = kind === "image" || isHero;
     const isText = kind === "text" || kind === "quote";
-    const motion =
-      isText && journey.layout?.text_animations === false
-        ? resolveReveal({ effect: "none" })
-        : resolveReveal(
-            module.reveal,
-            isText
-              ? { effect: "none", duration: 1000 }
-              : journeyReveal(journey.reveal_settings, "images"),
-          );
-    const surface = surfaceColors(
-      layout.background ||
-        (layout.edition && layout.edition !== "inherit"
-          ? editionColors[theme]
-          : journey.layout?.background || editionColors[theme]),
-    );
+    // Bewegung ist fest (fixedMotion.ts): gespeicherte reveal-Werte werden ignoriert.
+    const motion = fixedReveal(kind);
+    // Surface colours always follow the edition; legacy custom colours are ignored.
+    const surface = surfaceColors(editionColors[theme]);
+    const filled =
+      !!layout.edition_fill && !!layout.edition && layout.edition !== "inherit";
     const pick = (p: Photo) => photoClick(p, module.id);
     const image = (p: Photo, index = 0) => (
       <figure
@@ -259,41 +276,39 @@ export function JournalCanvas({
             : ""
         }
       >
-        {motion.effect === "parallax" && !isHero ? (
-          <Parallax intensity={motion.intensity}>
-            <Picture photo={p} onClick={() => pick(p)} sizes="75vw" />
-          </Parallax>
-        ) : (
-          <Picture
-            photo={
-              layout.ratio && layout.ratio !== "original"
-                ? {
-                    ...p,
-                    edits: {
-                      ...p.edits,
-                      ratio: layout.ratio,
-                      fit: layout.fit || p.edits?.fit,
-                    },
-                  }
-                : p
-            }
-            onClick={() => pick(p)}
-            sizes="(max-width:760px) 100vw, 75vw"
-          />
-        )}
+        <Picture
+          photo={
+            layout.ratio && layout.ratio !== "original"
+              ? {
+                  ...p,
+                  edits: {
+                    ...p.edits,
+                    ratio: layout.ratio,
+                    fit: layout.fit || p.edits?.fit,
+                  },
+                }
+              : p
+          }
+          onClick={() => pick(p)}
+          sizes={thumbnail ? "240px" : "(max-width:760px) 100vw, 75vw"}
+        />
         {p.edits?.show_title && p.title && <figcaption>{p.title}</figcaption>}
       </figure>
     );
     const showTitle = layout.show_title !== false;
     return (
       <Selectable
-        elementId={`canvas-module-${module.id}`}
+        elementId={thumbnail ? undefined : `canvas-module-${module.id}`}
         key={module.id}
         style={
           {
             ...layoutStyle(layout, kind, theme),
             "--module-bg": surface.background,
-            "--canvas-ink": layout.text_color || surface.ink,
+            "--canvas-ink": surface.ink,
+            "--module-fill": filled ? editionColors[theme] : undefined,
+            "--image-hover-scale": hoverScale(kind),
+            "--module-margin-x":
+              hasSideMargin ? `${layout.margin_x}px` : undefined,
           } as CSSProperties
         }
         editing={editing}
@@ -308,7 +323,7 @@ export function JournalCanvas({
             onEmptyModule(module.id);
           else onSelect({ type: "module", id: module.id });
         }}
-        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-${layout.title_style || "overlay"} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""}`}
+        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-overlay ${layout.frame ? "module-framed" : ""} ${filled ? "module-fill" : ""} ${hasSideMargin ? "has-margin-x" : ""} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""} ${kind === "text" && layout.font === undefined ? "text-prose-default-font" : ""} ${kind === "text" && layout.text_size === undefined && layout.text_preset === undefined ? "text-prose-default-size" : ""} ${kind === "text" && layout.text_width === undefined ? "text-prose-default-width" : ""}`}
       >
         <Reveal
           key={`${replay}-${module.id}-${motion.effect}`}
@@ -328,16 +343,21 @@ export function JournalCanvas({
                 </span>
               )}
               <h2>{module.title}</h2>
-              {module.story && <p className="module-prose">{module.story}</p>}
+              {module.story ? (
+                <p className="module-prose">{module.story}</p>
+              ) : (
+                placeholder(module.id)
+              )}
               {module.quote && <blockquote>{module.quote}</blockquote>}
             </div>
           )}
-          {kind === "text" && (
-            <div className="module-prose">
-              {showTitle && <h2>{module.title}</h2>}
-              <p>{module.story}</p>
-            </div>
-          )}
+          {kind === "text" &&
+            (showTitle || module.story || (editing && onWriteText)) && (
+              <div className="module-prose">
+                {showTitle && <h2>{module.title}</h2>}
+                {module.story ? <p>{module.story}</p> : placeholder(module.id)}
+              </div>
+            )}
           {kind === "quote" && (
             <blockquote>
               {module.quote || module.story}
@@ -353,15 +373,15 @@ export function JournalCanvas({
             {isHero ? (
               <div className="module-cover">
                 <Parallax
-                  {...imageParallax(layout, true)}
-                  enabled={
-                    imageParallax(layout, true).enabled &&
-                    (layout.image_parallax === undefined ||
-                      canPanImage(photos[0] ? {
-                        ...photos[0],
-                        edits: { ...photos[0].edits, fit: layout.fit || photos[0].edits?.fit },
-                      } : null))
-                  }
+                  intensity={fixedMotion("hero").parallax}
+                  enabled={canPanImage(
+                    photos[0]
+                      ? {
+                          ...photos[0],
+                          edits: { ...photos[0].edits, fit: layout.fit || photos[0].edits?.fit },
+                        }
+                      : null,
+                  )}
                 >
                   {photos[0]
                     ? image(photos[0])
@@ -396,10 +416,27 @@ export function JournalCanvas({
               ) : null
             ) : (
               photos.length > 0 && (
-                <PhotoWall
+kind === "image" ? (
+                <div className="single-image">
+                  <div
+                    className="single-image-frame"
+                    style={
+                      {
+                        "--single-ratio": effectivePhotoRatio(
+                          layout.ratio && layout.ratio !== "original"
+                            ? { ...photos[0], edits: { ...photos[0].edits, ratio: layout.ratio } }
+                            : photos[0],
+                        ),
+                      } as CSSProperties
+                    }
+                  >
+                                    <PhotoWall
                   photos={single ? photos.slice(0, 1) : photos}
                   layout={{
                     ...layout,
+                    // Parallax is no longer an author setting.
+                    image_parallax: undefined,
+                    parallax: undefined,
                     columns: single
                       ? 1
                       : desktopWallColumns(layout, kind, photos.length),
@@ -416,6 +453,34 @@ export function JournalCanvas({
                       : undefined
                   }
                 />
+                  </div>
+                </div>
+              ) : (
+                                <PhotoWall
+                  photos={single ? photos.slice(0, 1) : photos}
+                  layout={{
+                    ...layout,
+                    // Parallax is no longer an author setting.
+                    image_parallax: undefined,
+                    parallax: undefined,
+                    ...(kind === "pair" ? { column_offsets: pairOffsets(layout) } : {}),
+                    columns: single
+                      ? 1
+                      : desktopWallColumns(layout, kind, photos.length),
+                  }}
+                  autoComposition={
+                    !single &&
+                    ["chapter", "pair", "wall", "gallery"].includes(kind) &&
+                    usesAutomaticWallComposition(layout)
+                  }
+                  onPhoto={pick}
+                  selectedId={
+                    selected?.type === "photo"
+                      ? selected.placementId
+                      : undefined
+                  }
+                />
+              )
               )
             )}
           </MediaLayout>
@@ -438,7 +503,7 @@ export function JournalCanvas({
   if (dayId !== undefined) {
     const day = journey.chapters.find((c) => c.id === dayId);
     return (
-      <div className={`journal-canvas canvas-theme-${edition}`}>
+      <div className={`journal-canvas canvas-theme-${edition}${thumbnail ? " is-thumbnail" : ""}`}>
         <div className="journal-content">{day && render(day)}</div>
       </div>
     );
@@ -448,32 +513,30 @@ export function JournalCanvas({
       className={`journal-canvas canvas-theme-${edition} ${editing ? "is-editing" : ""}`}
       style={
         {
-          "--module-hover-scale":
-            l.hover_zoom === undefined ? undefined : 1 + l.hover_zoom / 100,
-          "--canvas-paper": l.background || editionColors[edition],
-          "--canvas-ink": surfaceColors(l.background || editionColors[edition])
-            .ink,
+          "--canvas-paper": editionColors[edition],
+          "--canvas-ink": surfaceColors(editionColors[edition]).ink,
         } as CSSProperties
       }
     >
       <Selectable
         editing={editing}
         active={selected?.type === "hero"}
-        label={t("Journey cover", "Reisetitelbild")}
+        label={t("Story cover", "Titelbild")}
         onSelect={() => onSelect({ type: "hero" })}
-        className={`journal-cover cover-${l.title_style || "overlay"}`}
+        className={`journal-cover cover-overlay ${titlePos ? "has-title-pos" : ""}${journey.cover_focus ? " has-cover-focus" : ""}`}
         style={
-          { "--cover-title-size": `${l.title_size || 100}px` } as CSSProperties
+          {
+            "--cover-title-size": l.title_size ? `${l.title_size}px` : undefined,
+            "--title-x": titlePos ? titlePos.x : undefined,
+            "--title-y": titlePos ? titlePos.y : undefined,
+            ...coverFocusVars(journey.cover_focus),
+          } as CSSProperties
         }
       >
-        <Parallax
-          {...imageParallax(l, true)}
-          enabled={
-            imageParallax(l, true).enabled &&
-            (l.image_parallax === undefined || canPanImage(cover || null))
-          }
-        >
+        <Parallax enabled={Boolean(cover)} intensity={fixedMotion("cover").parallax}>
           <div
+            style={editing ? undefined : coverTransitionStyle()}
+            {...(editing ? {} : coverTransitionAttr())}
             onClick={
               editing
                 ? (e) => {
@@ -486,6 +549,7 @@ export function JournalCanvas({
             <Picture
               photo={cover}
               eager
+              priority="high"
               className="journal-cover-photo"
               onClick={
                 cover
@@ -503,84 +567,38 @@ export function JournalCanvas({
             />
           </div>
         </Parallax>
-        <div className="journal-cover-copy">
-          {(journey.location || journey.start_date) && (
+        <div
+          className="journal-cover-copy"
+          data-title-align={titlePos ? titleAlign(titlePos.x) : undefined}
+        >
+          {(journey.location || coverDate) && (
             <span className="eyebrow">
               {journey.location}
-              {journey.location && journey.start_date ? " · " : ""}
-              {journey.start_date && dateRange(journey.start_date, journey.end_date)}
+              {journey.location && coverDate ? " · " : ""}
+              {coverDate}
             </span>
           )}
-          <h1>{journey.title}</h1>
+          <h1 tabIndex={-1}>{journey.title}</h1>
           {journey.subtitle && <p>{journey.subtitle}</p>}
         </div>
-        <a
-          className="cover-continue"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.currentTarget.ownerDocument
-              .getElementById("journal-content")
-              ?.scrollIntoView({ behavior: "instant" });
-          }}
-          href="#journal-content"
-          aria-label={t("Continue to photographs", "Weiter zu den Fotos")}
-        >
-          <ArrowDown size={20} />
-        </a>
       </Selectable>
-      {!editing &&
-        rootChapters.length > 1 &&
-        (edition === "quiet-atlas" ? (
-          <QuietAtlasChapterCompass chapters={rootChapters} />
-        ) : (
-          <details className="chapter-overview">
-            <summary>
-              {t("Chapters", "Kapitel")}
-              <span>{rootChapters.length}</span>
-            </summary>
-            <ol>
-              {rootChapters.map((chapter) => (
-                <li key={chapter.id}>
-                  <a
-                    href={`#canvas-module-${chapter.id}`}
-                    onClick={followChapterLink}
-                  >
-                    {chapter.date && (
-                      <time dateTime={chapter.date}>
-                        {dateLabel(chapter.date, {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </time>
-                    )}
-                    <span>{chapter.title}</span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </details>
-        ))}
+      {journey.introduction && (
+        <Selectable
+          editing={editing}
+          active={selected?.type === "intro"}
+          label={t("Introduction", "Einleitung")}
+          onSelect={() => onSelect({ type: "intro" })}
+          className="journal-intro"
+        >
+          <p>{journey.introduction}</p>
+        </Selectable>
+      )}
+      {!editing && rootChapters.length > 1 && (
+        <QuietAtlasChapterCompass chapters={rootChapters} />
+      )}
       <div id="journal-content" className="journal-content">
-        {journey.introduction && (
-          <Selectable
-            editing={editing}
-            active={selected?.type === "intro"}
-            label={t("Introduction", "Einleitung")}
-            onSelect={() => onSelect({ type: "intro" })}
-            className="journal-intro"
-          >
-            <p>{journey.introduction}</p>
-          </Selectable>
-        )}
-        {loose.length > 0 && (
-          <div className="journal-loose">
-            <PhotoRail
-              photos={loose}
-              onPhoto={(p) => photoClick(p, undefined, loose, "loose")}
-            />
-          </div>
+        {emptyState && roots.length === 0 && (
+          <div className="journal-empty-state">{emptyState}</div>
         )}
         {roots.map(render)}
       </div>

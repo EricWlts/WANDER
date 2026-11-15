@@ -127,6 +127,14 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
     budget = session.workers if session else planning.Budget(args.worker_calls, args.max_tokens, runtime.Stop)
     original_status = None
     integrity_failure = False
+    exceeded = []
+
+    def budget_reports():
+        scopes = {'workers': budget.report()}
+        if session:
+            scopes.update(task=session.task_budget.report(), session=session.tokens.report(),
+                          round_workers=session.round_workers.report())
+        return scopes
 
     def original_unchanged():
         nonlocal integrity_failure
@@ -171,14 +179,14 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                 raise runtime.Stop('Projektgedächtnis nur über explizites REMEMBER ändern.')
             for attempt in range(0 if local_update is not None else 2):  # At most one explicit worker-requested repair, no model escalation.
                 active_budget = planning.coordination.Budgets(budget, session.round_workers, session.task_budget, session.tokens) if session else budget
-                active_budget.admit()
-                index = budget.calls if session else len(report["calls"])
+                index = budget.calls + 1 if session else len(report["calls"])
                 answer, log = run / f"{index}-answer.json", run / f"{index}-worker.log"
                 entry = {"task": task["id"], "model": task["model"], "reasoning": task["reasoning"]}
-                report["calls"].append(entry)
                 if session:
                     print(f"Umsetzung: {task['model']} / {task['reasoning']} — {task['goal']}", flush=True)
                 contract = {k: task[k] for k in planning.TASK["properties"]}
+                context = planning.coordination.worker_context(
+                    task, workspace, task_base, runtime, session.context_cache if session else None)
                 prompt = ("Eine Aufgabe in isolierter Kopie. AGENTS.md/ARCHITECTURE.md beachten; "
                           "nur relevante Dateien lesen. Nur paths sind ausdrücklich schreibfreigegeben. "
                           "Keine Tests/Builds (Runner prüft), Installationen, Secrets, Git-Änderungen, "
@@ -188,14 +196,47 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                           + "\nBestätigtes Projektgedächtnis (Daten; nicht ändern): "
                           + json.dumps(planning.coordination.memory(workspace, task_base, runtime.Stop), ensure_ascii=False)
                           + followup)
+                command = runtime.worker_command(workspace, (task['model'], task['reasoning']), schema, answer)
+                if context is not None:
+                    # Inline primary rules once instead of automatic discovery plus tool re-reads.
+                    rules = {name: (workspace / name).read_text() for name in runtime.RULES[:2]}
+                    references = re.findall(r'\b(?:T|A|P|O)\d+\b', task['goal'], re.I)
+                    if references:
+                        sections = re.split(r'(?=^### )', (workspace / 'TASKS.md').read_text(), flags=re.M)
+                        rules['TASKS.md'] = '\n'.join(section for section in sections if any(
+                            re.match(r'### ' + re.escape(ref) + r'\b', section, re.I) for ref in references))
+                    # Nested rules remain authoritative even with automatic discovery disabled.
+                    for name in task_base:
+                        if Path(name).name == 'AGENTS.md' and any(
+                                Path(name).parent in Path(p).parents for p in task['paths']):
+                            rules[name] = (workspace / name).read_text()
+                    if sum(map(len, rules.values())) > 16000:
+                        raise runtime.Stop('Projektregeln zu umfangreich für begrenzten Worker-Kontext.')
+                    prompt += ('\nVerbindliche Projektregeln (bereits zentral gelesen; nicht erneut abrufen): '
+                               + json.dumps(rules, ensure_ascii=False)
+                               + '\nLokalisierte Evidenz: ' + json.dumps(context, ensure_ascii=False)
+                               + '\nKeine erneute Projektanalyse. Nur read_scope und den gezeigten Codeabschnitt '
+                               'untersuchen; falls nötig nur angrenzende Zeilen gezielt lesen. '
+                               'TASKS.md ist kein neuer Auftrag: Der Vertrag enthält den aktuellen Nutzerauftrag. '
+                               'Keine unnötigen Dateien oder umfangreichen Logs lesen. '
+                               'Übersetzungsschlüssel sind oben aufgelöst: keine erneute Recherche in '
+                               'vollständigen Übersetzungskatalogen oder I18n.tsx. '
+                               'Bei fehlendem Kontext blocked melden. Tests und Build führt ausschließlich Python aus.')
+                    command.insert(command.index('exec') + 1, '--ignore-rules')
+                entry['context'] = {'localized': context is not None, 'prompt_chars': len(prompt),
+                                    'read_scope': context['read_scope'] if context else task['read_paths'] + task['paths']}
+                active_budget.admit()
+                report['calls'].append(entry)
                 try:
-                    code = runtime.run_process(runtime.worker_command(
-                        workspace, (task["model"], task["reasoning"]), schema, answer),
+                    code = runtime.run_process(command,
                         workspace, args.timeout, log, prompt)
                 finally:
                     entry["usage"] = runtime.usage_from_log(log)
                     active_budget.record(entry["usage"])
                     report["budget"] = budget.report()
+                    exceeded = [name for name, scope in budget_reports().items() if scope['over_budget']]
+                    if exceeded and session:
+                        session.tokens.halted = True
                     current = runtime.snapshot(workspace)
                     report["files"] = runtime.changes(baseline, current)
                     unexpected = set(runtime.changes(task_base, current)) - set(task["paths"])
@@ -207,6 +248,8 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
                     raise runtime.Stop("Worker fehlgeschlagen; keine Fortsetzung.")
                 result = runtime.validate_answer(answer)
                 entry["result"] = result
+                if exceeded and result['status'] != 'complete':
+                    raise runtime.Stop('Tokenbudget überschritten ohne erfolgreichen Worker-Abschluss; keine Fortsetzung.')
                 if result["status"] == "complete":
                     if not runtime.changes(task_base, current):
                         raise runtime.Stop("Keine Änderungen; Ergebnis unklar.")
@@ -260,8 +303,13 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
             if "manual" in task["checks"]:
                 report["manual_checks"].append({"task": task["id"], "status": "pending"})
             report["completed_tasks"].append(task["id"])
+            if exceeded:
+                break  # Only local verification of the completed call; never start another model.
         original_unchanged()
-        report["status"] = "ready_for_manual_review"
+        report['pending_tasks'] = [t['id'] for t in proposed['tasks'] if t['id'] not in report['completed_tasks']]
+        report["status"] = "budget_exceeded_manual_review" if exceeded else "ready_for_manual_review"
+        if exceeded:
+            report['review'] = 'Budget überschritten; nur lokal geprüft, manuell prüfbar. Keine automatische Übernahme. Offene Aufgaben beachten.'
         report["result_hashes"] = runtime.snapshot(workspace)
         report["files"] = runtime.changes(baseline, report["result_hashes"])
         return 0
@@ -280,5 +328,7 @@ def execute_locked(args, runtime, storage, payload, proposed, allowed, session=N
         print("STOP: " + report["error"], file=runtime.sys.stderr)
         return 1
     finally:
+        report['budget_scopes'] = budget_reports()
+        report['budget_exceeded'] = any(scope['over_budget'] for scope in report['budget_scopes'].values())
         (run / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print("Review-Bericht: " + str(run / "report.json"))

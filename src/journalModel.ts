@@ -1,7 +1,7 @@
 import type { Chapter, ImagePlacement, Journey, Layout, Photo } from "./types";
 export const editionColors = {
-  "quiet-atlas": "#ECEDEB",
-  "after-hours": "#20241F",
+  "quiet-atlas": "#EEECE6",
+  "after-hours": "#1A1D18",
 };
 export const typePresets = {
   small: 17,
@@ -57,7 +57,21 @@ export function placementsFor(
     ).map((id, i) => ({ id: `legacy:${module.id}:${i}:${id}`, photo_id: id }))
   );
 }
+function withoutHoverZoom<T extends { hover_zoom?: number }>(edits: T): T {
+  if (edits.hover_zoom === undefined) return edits;
+  const { hover_zoom: _ignored, ...rest } = edits;
+  return rest as T;
+}
 export function modulePhotos(module: Chapter, journey: Journey): Photo[] {
+  /* "Show all photos": the whole collection in its order; own placements stay stored untouched. */
+  if (module.kind === "filmstrip" && module.layout?.all_photos === true)
+    return [...journey.photos]
+      .sort((a, b) => a.position - b.position || a.id - b.id)
+      .map((p) => ({
+        ...p,
+        placement_id: `all:${p.id}`,
+        edits: withoutHoverZoom({ ...p.edits, ...module.layout?.photo_edits?.[p.id] }),
+      }));
   return placementsFor(module, journey).flatMap((frame) => {
     const p = journey.photos.find((p) => p.id === frame.photo_id);
     return p
@@ -65,11 +79,12 @@ export function modulePhotos(module: Chapter, journey: Journey): Photo[] {
           {
             ...p,
             placement_id: frame.id,
-            edits: {
+            // Hover zoom is no longer an author setting: stored values are ignored.
+            edits: withoutHoverZoom({
               ...p.edits,
               ...module.layout?.photo_edits?.[p.id],
               ...frame.edits,
-            },
+            }),
           },
         ]
       : [];

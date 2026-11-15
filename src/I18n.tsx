@@ -22,8 +22,9 @@ export function t(en: string, de?: string): string {
   if (active !== "de") return en;
   const translated = de || (catalog as Record<string, string>)[en];
   if (translated) return translated;
+  // Backend wording: "Please provide a valid <field>[ for the story| for the <kind> module] (maximum N characters)."
   const field = en.match(
-    /^Please provide a valid (.+) \(maximum (\d+) characters\)\.$/,
+    /^Please provide a valid (.+?)(?: for the (story|(\w+) module))? \(maximum (\d+) characters\)\.$/,
   );
   if (field) {
     const names: Record<string, string> = {
@@ -40,7 +41,25 @@ export function t(en: string, de?: string): string {
       alt: "alternative Bildbeschreibung",
       password: "Passwort",
     };
-    return `Bitte einen gültigen Wert für ${names[field[1]] || field[1]} eingeben (maximal ${field[2]} Zeichen).`;
+    // Same German names as moduleNames in JournalCanvas.tsx (not imported here: it imports this file).
+    const modules: Record<string, string> = {
+      chapter: "Tag / Kapitel",
+      hero: "Titelbild",
+      image: "Einzelbild",
+      pair: "Bildpaar / Gruppe",
+      rail: "Horizontale Bildreihe",
+      filmstrip: "Laufender Fotostreifen",
+      wall: "Fotowand",
+      gallery: "Galerie",
+      text: "Text",
+      quote: "Zitat",
+    };
+    const [, key, scope, kind, maximum] = field;
+    const name = names[key] || key;
+    const ask = `Bitte einen gültigen Wert eingeben (maximal ${maximum} Zeichen).`;
+    if (scope === "story") return `Geschichte · ${name}: ${ask}`;
+    if (kind) return `Modul „${modules[kind] || kind}“ · ${name}: ${ask}`;
+    return `Bitte einen gültigen Wert für ${name} eingeben (maximal ${maximum} Zeichen).`;
   }
   if (en.startsWith("Please provide a valid ") && en.endsWith("."))
     return "Bitte ein gültiges Datum eingeben.";

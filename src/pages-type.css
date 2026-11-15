@@ -1,0 +1,16 @@
+/* pages-type – Feinschliff 09.11. */
+
+/* Shared page scale: values mirror the Editions masthead (/inspiration). */
+:root {
+  --page-title-size: clamp(30px, 3.7vw, 56px);
+  --page-lead-size: clamp(14px, 1.2vw, 17px);
+  --page-body-size: clamp(16px, 1.2vw, 17px);
+  --page-ui-size: 15px;
+  --page-quote-size: clamp(22px, 2.1vw, 30px);
+}
+html body :is(.archive-heading, .about-opening) h1 {
+  font: 400 var(--page-title-size) / 1.06 var(--serif);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+html body :is(.archive-heading, .about-opening) h1 em { font-style: italic; color: var(--c-moss, var(--olive)); }

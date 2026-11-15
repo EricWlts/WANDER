@@ -132,10 +132,15 @@ class ExecutionTests(unittest.TestCase):
 
     def test_budget_overrun_stops_next_task(self):
         self.tokens = 21000
-        self.assertEqual(self.run_plan(), 1)
+        self.assertEqual(self.run_plan(), 0)
         self.assertEqual(len(self.calls), 1)
         self.assertTrue(self.report()['budget']['over_budget'])
         self.assertEqual(self.report()['budget']['overrun_tokens'], 1001)
+        self.assertEqual(self.report()['status'], 'budget_exceeded_manual_review')
+        self.assertEqual(self.report()['completed_tasks'], ['A'])
+        self.assertEqual(self.report()['pending_tasks'], ['B'])
+        self.assertEqual(len(self.checks), 2)
+        self.assertEqual((self.root / 'src/App.tsx').read_text(), 'before')
 
     def test_unknown_usage_and_call_limit_stop_next_worker(self):
         with patch.object(o, 'usage_from_log', return_value={

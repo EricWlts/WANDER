@@ -1,0 +1,12 @@
+/* Rules from the former editor-simplify.css that the public journal canvas
+   (JournalCanvas) needs. Loaded last, like editor-simplify.css used to be, so
+   the specificity order is unchanged. The rest now loads with the Studio. */
+
+/* editor-simplify – Editor vereinfacht, Modul-Hintergrund in Editionsfarbe (09.11.) */
+
+/* Leerer Editor: ruhiger Hinweis statt loser Bildleiste */
+.journal-empty-state {
+  display: grid;
+  place-items: center;
+  padding: clamp(48px, 10vw, 120px) 24px;
+}

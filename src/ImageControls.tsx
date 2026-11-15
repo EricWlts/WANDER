@@ -1,9 +1,9 @@
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { Field, Picture } from "./components";
+import { SegmentedControl } from "./EditorControls";
 import { t } from "./I18n";
 import type { Photo, ImageEdits, Ratio } from "./types";
-import { HoverZoomControl } from "./HoverZoomControl";
 export const ratios: Ratio[] = [
   "original",
   "free",
@@ -17,10 +17,13 @@ export function ImageControls({
   photo,
   onChange,
   preview = true,
+  children,
 }: {
   photo: Photo;
   onChange: (patch: Partial<Photo>) => void;
   preview?: boolean;
+  /** Actions shown after the basic settings and before the closed "Feinschliff". */
+  children?: ReactNode;
 }) {
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(
       null,
@@ -45,7 +48,13 @@ export function ImageControls({
           onChange={(e) => onChange({ title: e.target.value })}
         />
       </Field>
-      <Field label={t("Caption / memory", "Bildunterschrift / Erinnerung")}>
+      <Field
+        label={t("Caption (optional)", "Bildunterschrift (optional)")}
+        hint={t(
+          "Appears below the photograph in the full-screen view.",
+          "Erscheint unter dem Foto in der Großansicht.",
+        )}
+      >
         <textarea
           rows={2}
           maxLength={2000}
@@ -54,10 +63,10 @@ export function ImageControls({
         />
       </Field>
       <Field
-        label={t("Alternative description", "Alternative Bildbeschreibung")}
+        label={t("Description for screen readers", "Bildbeschreibung für Screenreader")}
         hint={t(
-          "Describes the photograph for assistive technology. Independent of its visible title.",
-          "Beschreibt das Foto für assistive Technik, unabhängig vom sichtbaren Titel.",
+          "Not shown. Describes the image for people who cannot see it and for search engines. One sentence is enough, e.g. “Gulls above red roofs by the sea”.",
+          "Wird nicht angezeigt. Beschreibt das Bild für Menschen, die nicht sehen können, und für Suchmaschinen. Ein Satz genügt, z. B. „Möwen über roten Dächern am Meer“.",
         )}
       >
         <textarea
@@ -67,8 +76,46 @@ export function ImageControls({
           onChange={(e) => onChange({ alt: e.target.value })}
         />
       </Field>
-      <details className="inspector-section" open>
-        <summary>{t("Crop & layout", "Zuschnitt & Layout")}</summary>
+      <Field label={t("Aspect ratio", "Bildformat")}>
+          <select
+            value={edits.ratio || "original"}
+            onChange={(e) => change({ ratio: e.target.value as Ratio })}
+          >
+            {ratios.map((r) => (
+              <option key={r} value={r}>
+                {r === "original"
+                  ? t("Original", "Originalformat")
+                  : r === "free"
+                    ? t("Free crop", "Freier Zuschnitt")
+                    : r}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {edits.ratio === "free" && (
+          <Field label={t("Free aspect ratio", "Freies Seitenverhältnis")}>
+            <input
+              type="range"
+              min="0.25"
+              max="4"
+              step="0.01"
+              value={edits.free_ratio || 1.5}
+              onChange={(e) => change({ free_ratio: Number(e.target.value) })}
+            />
+          </Field>
+        )}
+      <SegmentedControl
+        label={t("Display", "Darstellung")}
+        value={edits.fit || "cover"}
+        options={[
+          { value: "contain", label: t("Show whole photo", "Ganzes Foto zeigen") },
+          { value: "cover", label: t("Fill the frame", "Flächenfüllend") },
+        ]}
+        onChange={(fit) => change({ fit })}
+      />
+      {children}
+      <details className="inspector-section inspector-fine">
+        <summary>{t("Fine-tuning", "Feinschliff")}</summary>
         {preview && (
           <div
             className="crop-surface"
@@ -133,49 +180,6 @@ export function ImageControls({
             />
           </div>
         )}
-        <Field label={t("Aspect ratio", "Bildformat")}>
-          <select
-            value={edits.ratio || "original"}
-            onChange={(e) => change({ ratio: e.target.value as Ratio })}
-          >
-            {ratios.map((r) => (
-              <option key={r} value={r}>
-                {r === "original"
-                  ? t("Original", "Originalformat")
-                  : r === "free"
-                    ? t("Free crop", "Freier Zuschnitt")
-                    : r}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {edits.ratio === "free" && (
-          <Field label={t("Free aspect ratio", "Freies Seitenverhältnis")}>
-            <input
-              type="range"
-              min="0.25"
-              max="4"
-              step="0.01"
-              value={edits.free_ratio || 1.5}
-              onChange={(e) => change({ free_ratio: Number(e.target.value) })}
-            />
-          </Field>
-        )}
-        <Field label={t("Image fit", "Bilddarstellung")}>
-          <select
-            value={edits.fit || "cover"}
-            onChange={(e) =>
-              change({ fit: e.target.value as ImageEdits["fit"] })
-            }
-          >
-            <option value="cover">
-              {t("Fill the frame", "Flächenfüllend zuschneiden")}
-            </option>
-            <option value="contain">
-              {t("Show entire image", "Vollständig anzeigen")}
-            </option>
-          </select>
-        </Field>
         {(
           [
             ["x", t("Horizontal focus", "Horizontaler Fokus")],
@@ -219,20 +223,13 @@ export function ImageControls({
           <RotateCcw size={15} />
           {t("Reset crop", "Zuschnitt zurücksetzen")}
         </button>
+        <p className="inspector-note">
+          {t(
+            "The original stays unchanged. Reset crop restores this placement to its original framing; titles and descriptions belong to the source photograph.",
+            "Das Original bleibt unverändert. Zuschnitt zurücksetzen stellt diese Bildverwendung auf den ursprünglichen Ausschnitt zurück; Titel und Beschreibungen gehören zum Ausgangsfoto.",
+          )}
+        </p>
       </details>
-      <details className="inspector-section">
-        <summary>{t("Movement & details", "Bewegung & Details")}</summary>
-        <HoverZoomControl
-          value={edits.hover_zoom}
-          onChange={(hover_zoom) => change({ hover_zoom })}
-        />
-      </details>
-      <p className="inspector-note">
-        {t(
-          "The original stays unchanged. Reset crop restores this placement to its original framing; titles and descriptions belong to the source photograph.",
-          "Das Original bleibt unverändert. Zuschnitt zurücksetzen stellt diese Bildverwendung auf den ursprünglichen Ausschnitt zurück; Titel und Beschreibungen gehören zum Ausgangsfoto.",
-        )}
-      </p>
     </div>
   );
 }

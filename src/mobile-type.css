@@ -1,0 +1,168 @@
+/* Mobile typography corrections for public pages (measured at 390 px). */
+@media (max-width: 760px) {
+  /* 1. /about: eyebrow, body copy, photo credits */
+  .about-page > .eyebrow {
+    font-size: 12px;
+  }
+  .about-content p {
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  .credits p,
+  .credits ul {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* 2. 404 page text */
+  .page-state p {
+    font-size: 15px;
+  }
+
+  /* 4. Remaining public-page text below 12 px raised to 12 px */
+  .eyebrow {
+    font-size: 12px;
+  }
+  .intro-eyebrow {
+    font-size: 12px;
+  }
+  .intro-aside p {
+    font-size: 12px;
+  }
+  .scroll-link {
+    font-size: 12px;
+  }
+  .cover-top {
+    font-size: 12px;
+  }
+  .cover-title .eyebrow {
+    font-size: 12px;
+  }
+  .cover-side {
+    font-size: 12px;
+  }
+  .cover-caption {
+    font-size: 12px;
+  }
+  .section-index {
+    font-size: 12px;
+  }
+  .selected-tag {
+    font-size: 12px;
+  }
+  .journey-facts {
+    font-size: 12px;
+  }
+  .demo-caption {
+    font-size: 12px;
+  }
+  .interlude-caption {
+    font-size: 12px;
+  }
+  .home-interlude > .eyebrow:last-child {
+    font-size: 12px;
+  }
+  .footer-top > span {
+    font-size: 12px;
+  }
+  .footer-top .text-link {
+    font-size: 12px;
+  }
+  .footer-bottom {
+    font-size: 12px;
+  }
+  .view-switch button {
+    font-size: 12px;
+  }
+  .sort-control select {
+    font-size: 12px;
+  }
+  .entry-number {
+    font-size: 12px;
+  }
+  .entry-foot {
+    font-size: 12px;
+  }
+  .opening-top {
+    font-size: 12px;
+  }
+  .opening-title > .eyebrow {
+    font-size: 12px;
+  }
+  .opening-bottom {
+    font-size: 12px;
+  }
+  .opening-bottom > a {
+    font-size: 12px;
+  }
+  .journey-utility .text-link {
+    font-size: 12px;
+  }
+  .journey-utility > .eyebrow {
+    font-size: 12px;
+  }
+  .demo-note {
+    font-size: 12px;
+  }
+  .journey-introduction > .demo-note {
+    font-size: 12px;
+  }
+  .photo-story figcaption {
+    font-size: 12px;
+  }
+  .lightbox-caption span {
+    font-size: 12px;
+  }
+  .lightbox-caption a {
+    font-size: 12px;
+  }
+  .toast {
+    font-size: 12px;
+  }
+  .caption-star {
+    font-size: 12px;
+  }
+  .manifesto-content p {
+    font-size: 12px;
+  }
+  .manifesto-content .text-link {
+    font-size: 12px;
+  }
+  .selected-copy > p {
+    font-size: 12px;
+  }
+  .large-link {
+    font-size: 12px;
+  }
+  .journey-reflection > .eyebrow {
+    font-size: 12px;
+  }
+  .journey-closing > .eyebrow {
+    font-size: 12px;
+  }
+  .journey-closing > p {
+    font-size: 12px;
+  }
+  .closing-nav .text-link {
+    font-size: 12px;
+  }
+  
+  .example-banner {
+    font-size: 12px;
+  }
+  .day-open span {
+    font-size: 12px;
+  }
+  .favorite-frame figcaption {
+    font-size: 12px;
+  }
+  .day-gallery-grid figcaption {
+    font-size: 12px;
+  }
+  .process-title {
+    font-size: 12px;
+  }
+  .collection-grid > button > span {
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,1015 @@
+/* Einstellungen: Titelposition */
+.title-position {
+  display: grid;
+  gap: 10px;
+}
+.title-position-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--c-stone);
+  touch-action: none;
+  user-select: none;
+}
+.title-position-preview:focus-visible,
+.title-grid button:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
+}
+.title-position-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.title-position-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 30%, rgba(22, 28, 24, 0.4));
+  pointer-events: none;
+}
+.title-position-block {
+  position: absolute;
+  z-index: 3;
+  width: max-content;
+  max-width: 88%;
+  padding: 4px 8px;
+  border: 1px dashed rgba(242, 243, 239, 0.85);
+  border-radius: 4px;
+  color: var(--c-linen);
+  font: 400 15px/1.1 "Instrument Serif", serif;
+  cursor: grab;
+}
+.title-position-block:active {
+  cursor: grabbing;
+}
+.title-position-block small {
+  display: block;
+  font: 500 9px/1.4 Manrope, sans-serif;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+.title-position-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.title-snap {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  translate: -50% -50%;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.title-snap::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--c-linen);
+  box-shadow: 0 0 0 1px rgba(22, 28, 24, 0.5);
+}
+.title-position-preview:hover .title-snap,
+.title-position-preview:focus-within .title-snap {
+  opacity: 0.75;
+}
+.title-snap[aria-pressed="true"],
+.title-snap[data-snap] {
+  opacity: 1;
+}
+.title-snap[data-snap]::before {
+  inset: 3px;
+  background: var(--c-moss);
+  box-shadow: 0 0 0 2px var(--c-linen);
+}
+.title-snap:focus-visible {
+  outline: 2px solid var(--c-linen);
+  outline-offset: 1px;
+  opacity: 1;
+}
+.editor-empty-state {
+  max-width: 460px;
+  text-align: center;
+  color: var(--c-ink-soft);
+  font: 400 clamp(20px, 2.4vw, 26px) / 1.3 "Instrument Serif", serif;
+}
+.editor-empty-state > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+  font: 500 14px Manrope, sans-serif;
+}
+.story-draft-later {
+  display: block;
+  margin: 10px auto 0;
+}
+
+/* Regler mit Mittelmarke (Versatz) */
+.stagger-control input[type="range"] {
+  width: 100%;
+}
+.stagger-control .stagger-scale {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 500 11px Manrope, sans-serif;
+  color: var(--c-muted);
+}
+.stagger-control .stagger-scale button {
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--c-moss);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Rand-Regler: Zurücksetzen-Knopf in der Beschriftungszeile */
+.margin-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.margin-field-head > span {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.margin-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 12px Manrope, sans-serif;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.2s, text-decoration-color 0.2s;
+}
+.margin-reset:hover:not(:disabled),
+.margin-reset:focus-visible:not(:disabled) {
+  color: var(--c-ink);
+  text-decoration-color: currentColor;
+}
+.margin-reset:disabled {
+  cursor: default;
+}
+
+/* Auf dem Smartphone ist der Desktop/Mobil-Umschalter überflüssig (unter 760 px). */
+@media (max-width: 759.98px) {
+  html body .editor-bar .editor-devices {
+    display: none;
+  }
+}
+
+/* Einfacher Inspector: Stil-Kacheln, Basis-Regler, Feinschliff */
+.module-inspector .preset-label {
+  font-size: 12px;
+}
+.module-inspector .preset-tile {
+  min-height: 44px;
+}
+.style-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  margin: -6px 0 12px;
+}
+.style-actions .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 13px;
+}
+.style-actions .preset-custom {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-moss);
+}
+.segmented-field {
+  margin-bottom: 14px;
+}
+.segmented-field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+.segmented button {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--c-line);
+  border-radius: 3px;
+  background: var(--c-chalk);
+  color: var(--c-ink);
+  font: 500 12px / 1.3 Manrope, sans-serif;
+  cursor: pointer;
+}
+.segmented button:hover:not(:disabled) {
+  background: var(--c-stone);
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--c-stone);
+  border-color: var(--c-moss);
+  box-shadow: inset 0 0 0 1px var(--c-moss);
+  color: var(--c-moss);
+}
+.segmented button:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
+}
+.segmented button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.inspector-plain {
+  margin-bottom: 14px;
+}
+.module-inspector .inspector-fine {
+  margin-top: 18px;
+}
+
+/* ── Dunkelkammer (Editor) ───────────────────────────────────────────────
+   Das Werkzeug tritt zurück: Leiste, Liste und rechte Spalte sind dunkel,
+   die Geschichte liegt als beleuchtete Seite in der Mitte.
+   Drei Ebenen: Bühnenumgebung (tiefste Stufe) · Leiste · Seitenspalten.
+   Die Palettenvariablen werden innerhalb der Werkzeugflächen umgemappt,
+   damit Felder, Knöpfe und Linien ohne Einzelregeln folgen. Die Vorschau
+   ist ein eigenes Dokument (iframe) und bleibt davon unberührt. */
+.modular-studio {
+  --dk-stage: #0b0d0b;
+  --dk-bar: #121512;
+  --dk-panel: #171b17;
+  --dk-raised: #1f2520;
+  --dk-hover: #252c26;
+  --dk-active: #2c342e;
+  --dk-hair: color-mix(in srgb, var(--c-linen) 9%, transparent);
+  --dk-hair-strong: color-mix(in srgb, var(--c-linen) 20%, transparent);
+  --dk-text: var(--c-linen);
+  --dk-text-soft: #c9d0ca;
+  --dk-text-muted: #a3ada6;
+  --dk-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  background: var(--dk-stage);
+  color: var(--dk-text);
+}
+.modular-studio :is(.editor-bar, .module-navigator, .module-inspector, .canvas-selection, .canvas-context, .studio-mobile-tabs, .editor-error, .recovery-banner) {
+  color-scheme: dark;
+  --c-white: #f7f8f5;
+  --c-chalk: var(--dk-raised);
+  --c-paper: var(--dk-hover);
+  --c-stone: var(--dk-active);
+  --c-stone-deep: #343d36;
+  --c-line: var(--dk-hair);
+  --c-line-strong: var(--dk-hair-strong);
+  --c-mist: #8e9a91;
+  --c-sage: #a3ada6;
+  --c-muted: var(--dk-text-muted);
+  --c-olive: #c3ccc4;
+  --c-moss: #dfe6df;
+  --c-ink-soft: var(--dk-text-soft);
+  --c-ink: var(--dk-text);
+  --c-clay: #dc9580;
+  --c-clay-soft: #3a2a24;
+  --c-ochre: #d2ae7c;
+  --ink: var(--dk-text);
+  --paper: var(--dk-panel);
+  --panel: var(--dk-panel);
+  --line: var(--dk-hair);
+  --olive: #c3ccc4;
+  --muted: var(--dk-text-muted);
+  --accent: #c3ccc4;
+  --ink-soft: var(--dk-text-soft);
+  color: var(--dk-text);
+}
+
+/* Ebene 1 – Leiste: eine Stufe über der Bühnenumgebung, nie heller als die Seite. */
+.modular-studio .editor-bar {
+  background: color-mix(in srgb, var(--dk-bar) 94%, transparent);
+  border-top: 1px solid var(--dk-hair);
+  border-bottom: 1px solid var(--dk-hair);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.modular-studio .editor-identity strong {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.005em;
+}
+.modular-studio .editor-devices {
+  border-color: var(--dk-hair);
+  background: transparent;
+}
+.modular-studio .editor-devices button.active,
+.modular-studio .editor-mode[aria-pressed="true"] {
+  background: var(--dk-active);
+  color: var(--dk-text);
+}
+
+/* Ebene 2 – Seitenspalten: eigene Stufe, nur 1-px-Haarlinien zur Bühne. */
+.modular-studio .module-navigator,
+.modular-studio .module-inspector {
+  background: var(--dk-panel);
+}
+.modular-studio .module-navigator {
+  border-right: 1px solid var(--dk-hair);
+}
+.modular-studio .module-inspector {
+  border-left: 1px solid var(--dk-hair);
+}
+.modular-studio .panel-heading {
+  color: var(--dk-text-muted);
+}
+.modular-studio .module-inspector .panel-heading {
+  border-bottom-color: var(--dk-hair);
+}
+
+/* Ebene 3 – Bühne: tiefste Stufe, die Seite ist das Licht im Raum. */
+.modular-studio .canvas-area {
+  background: radial-gradient(ellipse 70% 55% at 50% 38%, color-mix(in srgb, var(--c-linen) 5%, transparent), transparent 70%);
+}
+.modular-studio .canvas-selection,
+.modular-studio .canvas-context {
+  background: transparent;
+  color: var(--dk-text-muted);
+}
+.modular-studio .canvas-device {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    0 28px 70px -18px rgba(0, 0, 0, 0.7),
+    0 0 120px -30px color-mix(in srgb, var(--c-linen) 10%, transparent);
+}
+.modular-studio .canvas-device[data-edition="last-light"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--c-linen) 22%, transparent),
+    0 28px 70px -18px rgba(0, 0, 0, 0.8);
+}
+.modular-studio .canvas-add {
+  border-color: var(--dk-hair-strong);
+  color: var(--dk-text-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .modular-studio .canvas-add:hover {
+    background: color-mix(in srgb, var(--c-linen) 4%, transparent);
+  }
+}
+
+/* Etwas mehr Raum für Drehbuch und Spalte (nur Desktop). */
+@media (min-width: 761px) {
+  .modular-studio .studio-workspace {
+    grid-template-columns: 236px minmax(0, 1fr) 316px;
+  }
+}
+
+/* „Story gestalten“ tritt zurück; „Veröffentlichen“ bleibt die einzige helle Fläche. */
+.modular-studio .story-draft-button:not(:disabled) {
+  background: transparent;
+  color: var(--dk-text);
+  border: 1px solid var(--dk-hair-strong);
+}
+@media (hover: hover) and (pointer: fine) {
+  .modular-studio .story-draft-button:not(:disabled):hover {
+    background: color-mix(in srgb, var(--c-linen) 6%, transparent);
+  }
+}
+
+/* ── Modulliste als Drehbuch ─────────────────────────────────────────── */
+.modular-studio .module-navigator .cover-nav,
+.modular-studio .module-nav-item > .module-nav-select {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  transition: border-color 220ms var(--dk-ease), background-color 220ms var(--dk-ease);
+}
+.modular-studio .module-navigator .cover-nav {
+  border-color: var(--dk-hair);
+}
+@media (hover: hover) and (pointer: fine) {
+  .modular-studio .module-navigator .cover-nav:hover,
+  .modular-studio .module-nav-item > .module-nav-select:hover {
+    background: color-mix(in srgb, var(--c-linen) 4%, transparent);
+  }
+}
+/* Gewählt: feiner heller Rahmen statt grauer Fläche. */
+.modular-studio .module-navigator .cover-nav.active,
+.modular-studio .module-nav-item > .module-nav-select.active {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--c-linen) 62%, transparent);
+}
+.modular-studio .module-nav-item > .module-nav-select {
+  margin: 2px 0;
+  padding: 6px 8px;
+}
+.modular-studio .module-nav-select.is-shot {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 52px;
+}
+.modular-studio .nav-thumbs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  width: 52px;
+  height: 38px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--dk-raised);
+  color: var(--dk-text-muted);
+}
+.modular-studio .nav-thumbs img {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.modular-studio .nav-thumbs > svg {
+  margin: auto;
+}
+.modular-studio .module-nav-select > .nav-shot-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dk-text);
+}
+/* Kapitel: Serifenzeile mit Tageszahl und Datum. */
+.modular-studio .module-nav-select.is-day {
+  padding: 12px 8px 8px;
+  margin-top: 14px;
+}
+.modular-studio .module-nav-item span.nav-day {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 10px;
+  margin: 0;
+  color: var(--dk-text);
+}
+.modular-studio .module-nav-item span.nav-day-no {
+  display: inline;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--dk-text-muted);
+}
+.modular-studio .nav-day strong {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modular-studio .nav-day small {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--dk-text-muted);
+}
+/* Module des Kapitels hängen an einer feinen senkrechten Linie. */
+.modular-studio .module-nav-children {
+  margin-left: 15px;
+  padding-left: 9px;
+  border-left: 1px solid var(--dk-hair-strong);
+}
+/* Griff und Papierkorb erst bei Überfahren oder Fokus – auf Touch immer. */
+@media (hover: hover) and (pointer: fine) {
+  .modular-studio .module-nav-item > .module-nav-select {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .modular-studio .module-navigator .module-drag-handle,
+  .modular-studio .module-navigator .module-delete-button {
+    top: 2px;
+    width: 30px;
+    height: 44px;
+    opacity: 0;
+    color: var(--dk-text);
+    transition: opacity 220ms var(--dk-ease);
+  }
+  .modular-studio .module-navigator .module-drag-handle {
+    left: 1px;
+    background: linear-gradient(to right, color-mix(in srgb, var(--dk-panel) 92%, transparent) 55%, transparent);
+  }
+  .modular-studio .module-navigator .module-delete-button {
+    right: 1px;
+    background: linear-gradient(to left, var(--dk-panel) 60%, transparent);
+  }
+  .modular-studio .module-nav-item:hover > .module-drag-handle,
+  .modular-studio .module-nav-item:focus-within > .module-drag-handle,
+  .modular-studio .module-nav-item:hover > .module-delete-button,
+  .modular-studio .module-nav-item:focus-within > .module-delete-button,
+  .modular-studio .module-dragging > .module-drag-handle {
+    opacity: 1;
+  }
+  .modular-studio .module-nav-item:has(> .is-day) > :is(.module-drag-handle, .module-delete-button) {
+    top: 14px;
+  }
+  .modular-studio .module-navigator .module-delete-button:hover,
+  .modular-studio .module-navigator .module-delete-button:focus-visible {
+    color: var(--c-clay);
+    background: linear-gradient(to left, var(--dk-panel) 60%, transparent);
+  }
+}
+@media (hover: none), (pointer: coarse) {
+  .modular-studio .module-nav-item > .module-nav-select {
+    padding-left: 46px;
+    padding-right: 46px;
+  }
+}
+
+/* ── Rechte Spalte: fester Kopf, Reiter, Gruppen ────────────────────── */
+.modular-studio .inspector-top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--dk-panel);
+  border-bottom: 1px solid var(--dk-hair);
+}
+.modular-studio .module-inspector .inspector-head {
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 18px 22px 16px;
+  border-bottom: 0;
+}
+.modular-studio .inspector-head-thumb {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--dk-raised);
+  box-shadow: 0 0 0 1px var(--dk-hair);
+  color: var(--dk-text-muted);
+}
+.modular-studio .inspector-head-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.modular-studio .inspector-head-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.modular-studio .inspector-head-text small {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dk-text-muted);
+}
+.modular-studio .inspector-head-text strong {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 21px;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  color: var(--dk-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modular-studio .inspector-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px 12px;
+}
+.modular-studio .inspector-tabs [role="tab"] {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dk-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 220ms var(--dk-ease), background-color 220ms var(--dk-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .modular-studio .inspector-tabs [role="tab"]:hover {
+    color: var(--dk-text);
+  }
+}
+.modular-studio .inspector-tabs [role="tab"][aria-selected="true"] {
+  background: var(--dk-active);
+  color: var(--dk-text);
+}
+.modular-studio .inspector-tabs [role="tab"]:focus-visible {
+  outline: 2px solid var(--dk-text);
+  outline-offset: 1px;
+}
+/* Gruppen: eigener Block, Überschrift in Kapitälchen, Luft dazwischen. */
+.modular-studio .module-inspector .inspector-group-title {
+  margin: 34px 0 14px;
+  padding-top: 22px;
+  border-top: 1px solid var(--dk-hair);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dk-text-muted);
+}
+.modular-studio .module-inspector :is(.inspector-selection + .inspector-group-title, .inspector-pane > .inspector-group-title:first-child) {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
+}
+.modular-studio .module-inspector .inspector-pane + .inspector-pane:not([hidden]) {
+  margin-top: 8px;
+}
+.modular-studio .module-inspector .field > span,
+.modular-studio .module-inspector .range-field-head > span,
+.modular-studio .module-inspector .margin-field-head > span {
+  color: var(--dk-text-soft);
+}
+.modular-studio .module-inspector input[type="range"] {
+  accent-color: #dfe6df;
+}
+/* Regler: Wert rechts als Zahl. */
+.modular-studio .range-field-head,
+.modular-studio .margin-field-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.modular-studio .range-field-head > span {
+  font-size: 11px;
+  font-weight: 500;
+}
+.modular-studio :is(.range-field-head, .margin-field-head) > output {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dk-text);
+  white-space: nowrap;
+}
+.modular-studio .margin-field-head > output + .margin-reset {
+  margin-left: 0;
+}
+.modular-studio .module-inspector .inspector-fine-pane {
+  padding-top: 2px;
+}
+
+/* ── Bühne: Etikett und Aktionen (im Vorschau-Dokument) ──────────────── */
+.preview-document .canvas-module-label {
+  gap: 0;
+  padding: 3px 12px 2px;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--c-ink-black) 90%, transparent);
+  color: var(--c-linen);
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+.preview-document .canvas-module-label > svg {
+  display: none;
+}
+.preview-document .stage-actions:not([hidden]) {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  gap: 1px;
+  padding: 1px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--c-ink-black) 90%, transparent);
+  animation: dk-stage-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.preview-document .stage-actions button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--c-linen);
+  transition: background-color 220ms cubic-bezier(0.2, 0.7, 0.2, 1), color 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.preview-document .stage-actions button::after {
+  content: "";
+  position: absolute;
+  inset: -9px -6px;
+}
+.preview-document .stage-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+@media (hover: hover) and (pointer: fine) {
+  .preview-document .stage-actions button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--c-linen) 12%, transparent);
+  }
+  .preview-document .stage-actions .stage-action-delete:hover {
+    color: #dc9580;
+  }
+}
+.preview-document .stage-actions button:focus-visible {
+  outline: 2px solid var(--c-linen);
+  outline-offset: -2px;
+}
+@keyframes dk-stage-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Vorschau: die Besucherseite selbst, darüber nur eine schmale Pille ── */
+.story-preview-layer {
+  position: relative;
+  min-height: 100vh;
+  animation: dk-preview-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes dk-preview-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.story-preview-pill {
+  position: fixed;
+  z-index: 1000;
+  bottom: 22px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 18px;
+  border: 1px solid color-mix(in srgb, var(--c-linen) 16%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, #0b0d0c 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.6);
+  color: var(--c-linen);
+  font: 500 12px / 1 var(--sans);
+  letter-spacing: 0.04em;
+}
+.story-preview-pill > span:first-child {
+  margin-right: 8px;
+  color: color-mix(in srgb, var(--c-linen) 62%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+.story-preview-devices {
+  display: flex;
+  padding: 0 6px;
+  border-left: 1px solid color-mix(in srgb, var(--c-linen) 14%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--c-linen) 14%, transparent);
+}
+.story-preview-pill button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--c-linen) 70%, transparent);
+  font: inherit;
+  cursor: pointer;
+  transition: color 220ms cubic-bezier(0.2, 0.7, 0.2, 1), background-color 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.story-preview-pill button:hover,
+.story-preview-pill button[aria-pressed="true"] {
+  color: var(--c-linen);
+}
+.story-preview-pill button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--c-linen) 10%, transparent);
+}
+.story-preview-pill .story-preview-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--c-linen);
+  color: #0b0d0c;
+}
+.story-preview-pill .story-preview-edit:hover {
+  color: #0b0d0c;
+  background: color-mix(in srgb, var(--c-linen) 86%, white);
+}
+.story-preview-pill button:focus-visible {
+  outline: 2px solid var(--c-linen);
+  outline-offset: 2px;
+}
+.story-preview-layer.is-phone {
+  display: grid;
+  place-items: start center;
+  padding: 84px 16px 48px;
+  background: #0b0d0c;
+}
+.story-preview-phone {
+  width: 390px;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--c-linen) 14%, transparent);
+  border-radius: 28px;
+  box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.8);
+}
+.story-preview-phone .preview-scale { height: min(844px, calc(100vh - 140px)) !important; }
+.story-preview-phone .preview-frame { position: static; display: block; height: min(844px, calc(100vh - 140px)) !important; }
+@media (max-width: 760px) {
+  .story-preview-pill { bottom: 14px; }
+  .story-preview-pill > span:first-child { display: none; }
+}
+/* No studio chrome around the preview: the studio header steps aside. */
+body:has(.story-preview-layer) :is(header.site-header, .studio-header-slot) { display: none; }
+
+/* Bewegung aus: keine Übergänge, keine Einblendungen. */
+@media (prefers-reduced-motion: reduce) {
+  .modular-studio *,
+  .preview-document .stage-actions,
+  .preview-document .stage-actions button {
+    transition: none !important;
+  }
+  .story-preview-layer,
+  .preview-document .stage-actions:not([hidden]) {
+    animation: none;
+  }
+}
+html[data-motion="off"] .modular-studio *,
+html[data-motion="off"] .preview-document .stage-actions,
+html[data-motion="off"] .preview-document .stage-actions button {
+  transition: none !important;
+}
+html[data-motion="off"] .story-preview-layer,
+html[data-motion="off"] .story-preview-pill button,
+html[data-motion="off"] .preview-document .stage-actions:not([hidden]) {
+  animation: none;
+}
+
+/* Module rows: the whole row picks the module up (grip, thumbnail, name). */
+.modular-studio .module-navigator .module-nav-item,
+.modular-studio .module-navigator .module-nav-item > .module-nav-select {
+  cursor: grab;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.modular-studio .module-navigator .module-nav-item > .module-delete-button { cursor: pointer; }
+.modular-studio .module-navigator .module-dragging,
+.modular-studio .module-navigator .module-dragging * { cursor: grabbing; }
+
+/* Inspector thumbnails: drag to reorder when a module holds more than one photo. */
+.module-inspector .placement-list.is-sortable .placement-image {
+  cursor: grab;
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.module-inspector .placement-list.is-sorting .placement-image { cursor: grabbing; }
+.module-inspector .placement-list li.is-dragged { opacity: 0.45; }
+.module-inspector .placement-list li.is-drop-target .placement-image {
+  outline: 2px solid var(--c-forest, currentColor);
+  outline-offset: 2px;
+}
+.module-inspector .placement-list li { transition: opacity 220ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { .module-inspector .placement-list li { transition: none; } }
+html[data-motion="off"] .module-inspector .placement-list li { transition: none; }
+
+/* Story title in the editor bar: edited in place. */
+.modular-studio .editor-identity .editor-title-input {
+  display: block;
+  max-width: min(400px, 36vw);
+  margin: -2px -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  cursor: text;
+  transition: background-color 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.modular-studio .editor-identity .editor-title-input:hover { background: color-mix(in srgb, currentColor 7%, transparent); }
+.modular-studio .editor-identity .editor-title-input:focus-visible {
+  outline: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+@media (max-width: 760px) { .modular-studio .editor-identity .editor-title-input { font-size: 17px; } }
+@media (prefers-reduced-motion: reduce) { .modular-studio .editor-identity .editor-title-input { transition: none; } }
+html[data-motion="off"] .modular-studio .editor-identity .editor-title-input { transition: none; }
+
+/* The draft notice sits top centre below the bar, clear of "Add module". */
+.story-draft-toast-region {
+  top: calc(var(--editor-bar-bottom, 76px) + 12px);
+  bottom: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .story-draft-toast { animation-name: story-draft-drop; }
+  @keyframes story-draft-drop {
+    from { opacity: 0; transform: translateY(-8px); }
+  }
+}
+html[data-motion="off"] .story-draft-toast { animation: none; }
+
+/* "Add photographs" in the inspector: one slim row, not a dashed drop area. */
+.modular-studio .module-inspector .upload-component { margin: 12px 0; }
+.modular-studio .module-inspector .upload-pick {
+  min-height: 44px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--dk-hair, var(--c-mist));
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.modular-studio .module-inspector .upload-pick:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.modular-studio .module-inspector .upload-pick > svg { width: 16px; height: 16px; flex: none; }
+.modular-studio .module-inspector .upload-pick > span { font-size: 13px; }
+.modular-studio .module-inspector .upload-pick > small {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: reduce) { .modular-studio .module-inspector .upload-pick { transition: none; } }
+html[data-motion="off"] .modular-studio .module-inspector .upload-pick { transition: none; }
+
+/* "Show selection in preview": a small eye in the head of the right column. */
+.modular-studio .module-inspector .inspector-reveal {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -12px -8px auto;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.62;
+  cursor: pointer;
+  transition: opacity 220ms cubic-bezier(0.2, 0.7, 0.2, 1), background-color 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.modular-studio .module-inspector .inspector-reveal:hover,
+.modular-studio .module-inspector .inspector-reveal:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+@media (prefers-reduced-motion: reduce) { .modular-studio .module-inspector .inspector-reveal { transition: none; } }
+html[data-motion="off"] .modular-studio .module-inspector .inspector-reveal { transition: none; }
+
+/* Gestaltung: one block per topic (Variante · Bild · Text · Abstand · Fläche), then „Mehr“. */
+.modular-studio .module-inspector .inspector-design-block + .inspector-design-block {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--dk-hair, var(--c-mist));
+}
+.modular-studio .module-inspector .inspector-design-block > .inspector-group-title { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .story-preview-pill button { transition: none; }
+}
+html[data-motion="off"] .story-preview-pill button { transition: none; }

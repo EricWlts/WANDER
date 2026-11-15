@@ -1,6 +1,7 @@
 import { tr } from "./I18n";
-import { useState, type FormEvent } from "react";
-import { ArrowUp, ArrowDown, Check, Trash2 } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { ArrowUp, ArrowDown, Check, Eye, Link2, Trash2 } from "lucide-react";
 import { api, json } from "./api";
 import { Modal, Field } from "./components";
 import { ImageControls } from "./ImageControls";
@@ -175,6 +176,83 @@ export function Confirm({
           <Trash2 size={16} />
         </button>
       </div>
+    </Modal>
+  );
+}
+
+/** Quiet closing moment after a successful publish: small cover, one line, view and copy the link. */
+export function PublishedDialog({
+  title,
+  slug,
+  cover,
+  newerChanges,
+  onClose,
+}: {
+  title: string;
+  slug: string;
+  cover: Photo | null;
+  newerChanges: boolean;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return undefined;
+    const id = window.setTimeout(() => setCopied(false), 2400);
+    return () => window.clearTimeout(id);
+  }, [copied]);
+  async function copy() {
+    const url = `${window.location.origin}/journeys/${slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = url;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      try {
+        document.execCommand("copy");
+      } finally {
+        field.remove();
+      }
+    }
+    setCopied(true);
+  }
+  return (
+    <Modal key="published" title={t("Published", "Veröffentlicht")} className="publish-done" onClose={onClose}>
+      {cover && (
+        <div className="publish-done-cover">
+          <img src={cover.url} srcSet={cover.srcset} sizes="160px" alt="" draggable={false} />
+        </div>
+      )}
+      <h2>{t("Your story is published.", "Deine Geschichte ist veröffentlicht.")}</h2>
+      <p className="publish-done-title">{title}</p>
+      {newerChanges && (
+        <p className="publish-done-note">
+          {t(
+            "Newer changes remain in your draft and are not published.",
+            "Neuere Änderungen bleiben im Entwurf und sind unveröffentlicht.",
+          )}
+        </p>
+      )}
+      <div className="confirm-actions">
+        <Link className="button" to={`/journeys/${slug}`} target="_blank" rel="noopener">
+          {t("View", "Ansehen")}
+          <Eye size={17} />
+        </Link>
+        <button type="button" className="button button-outline" onClick={() => void copy()}>
+          {t("Copy link", "Link kopieren")}
+          <Link2 size={17} />
+        </button>
+      </div>
+      <p className="publish-done-copied" role="status">
+        {copied ? t("Copied", "Kopiert") : ""}
+      </p>
+      <button type="button" className="text-link publish-done-close" onClick={onClose}>
+        {t("Close", "Schließen")}
+      </button>
     </Modal>
   );
 }

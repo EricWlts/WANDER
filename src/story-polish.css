@@ -1,0 +1,76 @@
+/* Story polish: mobile-first reading rhythm for JournalCanvas (public story and editor preview).
+   Loaded last. Author-set values (padding, gap, title size, text size/font/width) always win:
+   JournalCanvas / PhotoWall leave those custom properties unset, and the defaults below are
+   only used as var() fallbacks or class-gated "default" rules. */
+
+:root {
+  /* Vertical rhythm: small / medium / chapter pause. */
+  --story-s: 48px;
+  --story-m: 72px;
+  --story-l: 112px;
+  --story-chrome: 104px; /* site header, used to size immersive covers */
+}
+@media (min-width: 761px) {
+  :root {
+    --story-s: 72px;
+    --story-m: 120px;
+    --story-l: 176px;
+  }
+}
+.showcase-story {
+  --story-chrome: 150px; /* header + edition bar */
+}
+
+/* ---------- 1. Lead / introduction ---------- */
+.journal-intro {
+  max-width: 32ch;
+  margin: var(--story-m) auto calc(var(--story-m) - var(--story-s) / 2);
+  font: 400 clamp(23px, calc(14px + 1.35vw), 33px) / 1.4 var(--serif);
+  letter-spacing: -0.005em;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+.journal-intro p {
+  margin: 0;
+  font: inherit; /* a global `p { line-height: 1.85 }` would otherwise win */
+  letter-spacing: inherit;
+}
+@media (max-width: 760px) {
+  .journal-intro {
+    max-width: none;
+    margin-block: var(--story-m) calc(var(--story-m) - var(--story-s) / 2);
+    font-size: 23px;
+  }
+}
+
+/* Defaults only: these classes exist when the author has not set font/size/width. */
+.chapter-prose-default-size .module-day-heading .module-prose {
+  font-size: 17px;
+  line-height: 1.6;
+}
+.chapter-prose-default-width .module-day-heading .module-prose {
+  width: min(100%, 64ch);
+  max-width: 64ch;
+}
+@media (min-width: 761px) {
+  .chapter-prose-default-size .module-day-heading .module-prose {
+    font-size: 18px;
+  }
+}
+@media (min-width: 1280px) {
+  .chapter-prose-default-size .module-day-heading .module-prose {
+    font-size: 19px;
+  }
+}
+/* Two automatic photos: equal row height, widths weighted by frame ratio
+   (portrait narrower, landscape wider) so both carry a similar visual mass. */
+@media (min-width: 761px) {
+  .cover-overlap h1 {
+    font-size: clamp(28px, var(--cover-title-size, clamp(56px, 7.2vw, 100px)), 160px);
+  }
+}
+
+/* ---------- 7. Minimum 12px for story-facing small text ---------- */
+.journal-canvas .eyebrow, .favorite-frame figcaption {
+  font-size: 12px;
+}

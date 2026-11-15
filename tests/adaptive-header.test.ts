@@ -4,6 +4,10 @@ import { initialHeaderScroll, updateHeaderScroll, resetHeaderGesture, headerIsCo
 
 const compact = () => ({ ...initialHeaderScroll, compact: true, lastY: 1500, lastTime: 1000 });
 const input = (now: number, upwardIntent = true) => ({ now, upwardIntent });
+// A deliberate fast flick: 6 frames of 16ms (96ms, >= upSustain) covering ~1.1x upTravel (~2.5 px/ms, >= upSpeed).
+// After 5 frames (80ms) the travel is still below upTravel, so only the sixth frame can expand.
+const flickFrames = 6;
+const flickStep = Math.ceil((t.upTravel * 1.1) / flickFrames);
 
 test("downward collapse retains distance hysteresis and opening area", () => {
   let state = updateHeaderScroll(initialHeaderScroll, 150, input(1000));
@@ -20,18 +24,18 @@ test("long slow upward travel never expands", () => {
 });
 test("fast upward travel needs both sustained time and minimum net distance", () => {
   let state = compact();
-  state = updateHeaderScroll(state, 1468, input(1016));
-  state = updateHeaderScroll(state, 1436, input(1032));
-  state = updateHeaderScroll(state, 1404, input(1048));
+  for (let i = 1; i < flickFrames; i++)
+    state = updateHeaderScroll(state, 1500 - i * flickStep, input(1000 + i * 16));
   assert.equal(state.compact, true);
-  state = updateHeaderScroll(state, 1372, input(1064));
+  state = updateHeaderScroll(state, 1500 - flickFrames * flickStep, input(1000 + flickFrames * 16));
   assert.equal(state.compact, false);
 });
 test("same time and distance produce the same result at different event rates", () => {
   for (const interval of [8, 16, 32, 64]) {
     let state = compact();
+    // 2.5 px/ms for 128ms = 320px, above upTravel and upSpeed regardless of event rate.
     for (let elapsed = interval; elapsed <= 128; elapsed += interval)
-      state = updateHeaderScroll(state, 1500 - elapsed, input(1000 + elapsed));
+      state = updateHeaderScroll(state, 1500 - elapsed * 2.5, input(1000 + elapsed));
     assert.equal(state.compact, false);
   }
 });
@@ -50,10 +54,11 @@ test("micro jitter cannot accumulate into a gesture", () => {
 });
 test("small reversals subtract from upward travel without direction flicker", () => {
   let state = compact();
-  for (const [y, now] of [[1470, 1016], [1475, 1032], [1435, 1048], [1405, 1064]])
+  // Net upward travel after the 5th frame is 195px at 80ms (below upTravel); the 6th frame reaches 235px.
+  for (const [y, now] of [[1450, 1016], [1455, 1032], [1405, 1048], [1355, 1064], [1305, 1080]])
     state = updateHeaderScroll(state, y, input(now));
   assert.equal(state.compact, true);
-  state = updateHeaderScroll(state, 1385, input(1080));
+  state = updateHeaderScroll(state, 1265, input(1096));
   assert.equal(state.compact, false);
 });
 test("meaningful reversal starts a fresh burst", () => {
@@ -118,11 +123,11 @@ test("pixel, line and page wheel modes use direction while actual CSS-px travel 
   for (const mode of [0, 1, 2]) {
     let wheel = initialHeaderWheel;
     let state = compact();
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= flickFrames; i++) {
       const now = 1000 + i * 16;
       wheel = updateHeaderWheel(wheel, -1, mode, now);
       assert.equal(wheel.upward, true);
-      state = updateHeaderScroll(state, 1500 - i * 32, input(now, wheel.upward));
+      state = updateHeaderScroll(state, 1500 - i * flickStep, input(now, wheel.upward));
     }
     assert.equal(state.compact, false);
   }
@@ -131,8 +136,9 @@ test("a short wheel flick cannot use its long decaying tail to complete expansio
   let wheel = initialHeaderWheel;
   let state = compact();
   let y = 1500;
-  // Total travel is162px over112ms: fast and far enough without tail protection.
-  for (const [i, magnitude] of [48, 36, 27, 20, 14, 10, 7].entries()) {
+  // Total travel is 242px over 112ms (~2.2 px/ms): above upTravel, upSustain and upSpeed, so the scroll side
+  // alone would expand on the last frame; only the wheel tail protection prevents it.
+  for (const [i, magnitude] of [72, 54, 40, 30, 21, 15, 10].entries()) {
     const now = 1016 + i * 16;
     wheel = updateHeaderWheel(wheel, -magnitude, 0, now);
     y -= magnitude;
@@ -146,7 +152,7 @@ test("sustained deliberate fast wheel movement remains eligible through mild var
   let wheel = initialHeaderWheel;
   let state = compact();
   let y = 1500;
-  for (const [i, magnitude] of [32, 31, 33, 31, 32].entries()) {
+  for (const [i, magnitude] of [40, 39, 41, 39, 40, 41].entries()) {
     const now = 1016 + i * 16;
     wheel = updateHeaderWheel(wheel, -magnitude, 0, now);
     assert.equal(wheel.upward, true);
@@ -188,11 +194,11 @@ test("slow-to-fast cadence with identical line/page steps rearms an expired burs
     }
     assert.equal(wheel.upward, false);
     assert.equal(state.compact, true);
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= flickFrames; i++) {
       const now = 1400 + i * 16;
       wheel = updateHeaderWheel(wheel, -1, mode, now);
       assert.equal(wheel.upward, true);
-      y -= 32;
+      y -= flickStep;
       state = updateHeaderScroll(state, y, input(now, wheel.upward));
     }
     assert.equal(wheel.start, 1416);
@@ -208,4 +214,39 @@ test("faster cadence cannot rearm a still-declining wheel momentum tail", () => 
     assert.equal(wheel.upward, false);
     assert.equal(wheel.tail, true);
   }
+});
+
+const compactAt = (y: number) => ({ ...initialHeaderScroll, compact: true, lastY: y, lastTime: 1000 });
+test("fast upward gesture at y=1200 expands; slow movement stays compact", () => {
+  let state = compactAt(1200);
+  for (let i = 1; i <= flickFrames; i++) state = updateHeaderScroll(state, 1200 - i * flickStep, input(1000 + i * 16));
+  assert.equal(state.compact, false);
+  state = compactAt(1200);
+  for (let i = 1; i <= 40; i++) state = updateHeaderScroll(state, 1200 - i * 4, input(1000 + i * 40));
+  assert.equal(state.compact, true);
+});
+test("without a gesture the header stays compact at y=60 and expands only near the top", () => {
+  assert.equal(updateHeaderScroll(compactAt(200), 60, { now: 1016 }).compact, true);
+  assert.equal(updateHeaderScroll(compactAt(200), 60, input(1016, false)).compact, true);
+  assert.equal(updateHeaderScroll(compactAt(60), 20, { now: 1016 }).compact, false);
+  assert.equal(updateHeaderScroll(compactAt(60), t.top, { now: 1016 }).compact, false);
+  assert.equal(updateHeaderScroll(compactAt(60), t.top + 1, { now: 1016 }).compact, true);
+});
+test("decaying momentum tail after a flick at y=1200 does not expand without fresh intent", () => {
+  let wheel = initialHeaderWheel;
+  let state = compactAt(1200);
+  let y = 1200;
+  for (const [i, m] of [4, 3.5, 3, 2.5, 2, 1.5].entries()) {
+    const now = 1016 + i * 16;
+    wheel = updateHeaderWheel(wheel, -(m * 8), 0, now);
+    y -= m * 8;
+    state = updateHeaderScroll(state, y, input(now, i === 0 ? false : wheel.upward));
+    assert.equal(state.compact, true);
+  }
+});
+
+test("story routes stay compact at the very top, other pages expand", () => {
+  const compact = { ...initialHeaderScroll, compact: true };
+  assert.equal(updateHeaderScroll(compact, 0, { now: 10, storyRoute: true }).compact, true);
+  assert.equal(updateHeaderScroll(compact, 0, { now: 10, storyRoute: false }).compact, false);
 });

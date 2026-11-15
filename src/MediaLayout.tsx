@@ -30,15 +30,32 @@ export function MediaLayout({
       layout.media_spacing !== undefined ||
       layout.media_spacing_top !== undefined ||
       layout.media_spacing_bottom !== undefined);
+  const measureRef = useRef<(() => void) | null>(null);
+  // Observer and resize listener live as long as the layout values do, not per render.
   useLayoutEffect(() => {
     const element = host.current;
-    if (!active || !element) return;
+    if (!active || !element) {
+      measureRef.current = null;
+      return;
+    }
     const content = element.firstElementChild as HTMLElement;
-    const canvas = element.closest(".journal-canvas");
-    const cover = canvas?.querySelector<HTMLElement>(".journal-cover");
-    const image = cover?.querySelector<HTMLElement>(":scope > .parallax-frame");
     const view = element.ownerDocument.defaultView;
+    const observed = new Set<Element>();
     const measure = () => {
+      const canvas = element.closest(".journal-canvas");
+      const cover = canvas?.querySelector<HTMLElement>(".journal-cover");
+      const image = cover?.querySelector<HTMLElement>(":scope > .parallax-frame");
+      // The cover may be replaced while this module stays: follow the current nodes.
+      for (const gone of [...observed])
+        if (!gone.isConnected) {
+          observer?.unobserve(gone);
+          observed.delete(gone);
+        }
+      for (const target of [element, cover, image])
+        if (target && !observed.has(target)) {
+          observed.add(target);
+          observer?.observe(target);
+        }
       const target =
         layout.media_width === "cover-image"
           ? image
@@ -57,17 +74,20 @@ export function MediaLayout({
         : `calc(100% - ${spacing * 2}px)`;
       content.style.marginLeft = `${left + spacing}px`;
     };
-    measure();
     const observer = view?.ResizeObserver
       ? new view.ResizeObserver(measure)
       : undefined;
-    for (const target of [element, cover, image])
-      if (target) observer?.observe(target);
+    measureRef.current = measure;
     view?.addEventListener("resize", measure);
     return () => {
       observer?.disconnect();
       view?.removeEventListener("resize", measure);
+      if (measureRef.current === measure) measureRef.current = null;
     };
+  }, [active, layout.media_width, layout.media_spacing]);
+  // Measure after every render, as before, without rebuilding the observer.
+  useLayoutEffect(() => {
+    measureRef.current?.();
   });
   return active ? (
     <div

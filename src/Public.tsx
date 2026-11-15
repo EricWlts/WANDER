@@ -361,7 +361,7 @@ export function Home() {
           <span className="eyebrow">{t("Two editions", "Zwei Editionen")}</span>
           <h2 id="editions-heading" className="home-lights-intro-title">{t("Every story has its light.", "Jede Geschichte hat ihr Licht.")}</h2>
           <div className="home-lights-diptych">
-            <div className="home-lights-panel is-first">
+            <Link to="/showcase/quiet-atlas" className="home-lights-panel is-first">
               {showcase?.cover && (
                 <div className="home-lights-photo">
                   <Picture photo={showcase.cover} sizes="(max-width: 760px) 40vw, 240px" />
@@ -372,8 +372,8 @@ export function Home() {
               <strong>{t("First light", "Erstes Licht")}</strong>
               <p>{t("Bright, framed, quiet.", "Hell, gerahmt, still.")}</p>
               </div>
-            </div>
-            <div className="home-lights-panel is-last">
+            </Link>
+            <Link to="/showcase/after-hours" className="home-lights-panel is-last">
               {lastStory?.cover && (
                 <div className="home-lights-photo">
                   <Picture photo={lastStory.cover} sizes="(max-width: 760px) 40vw, 280px" />
@@ -384,7 +384,7 @@ export function Home() {
               <strong>{t("Last light", "Letztes Licht")}</strong>
               <p>{t("Dark, borderless, cinematic.", "Dunkel, randlos, filmisch.")}</p>
               </div>
-            </div>
+            </Link>
           </div>
           <p className="home-lights-choose">
             {t("Or combine both, module by module.", "Oder kombiniere beide, Modul für Modul.")}

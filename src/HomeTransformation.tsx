@@ -439,7 +439,6 @@ export function HomeTransformation() {
   return (
     <div className="page-width home-transform-inner">
       <header className="home-transform-head">
-        <span className="eyebrow">{t("Before · After", "Vorher · Nachher")}</span>
         <h2 id="home-transform-title" className="ht-title">
           <span className="ht-swap">
             <span className="ht-line-set" data-on={!isAfter} aria-hidden={isAfter}>
@@ -456,7 +455,7 @@ export function HomeTransformation() {
           <div className="ht-swap">
             <div className="ht-action" data-on={!isAfter} inert={isAfter}>
               <button ref={buttonRef} type="button" className="ht-button" onClick={play}>
-                {t("Set as a story", "Zur Geschichte setzen")}
+                {t("Make it a story", "Eine Geschichte daraus machen")}
               </button>
             </div>
             <div className="ht-action" data-on={isAfter} inert={!isAfter}>

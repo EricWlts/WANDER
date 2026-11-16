@@ -1,0 +1,26 @@
+{
+  "name": "WANDER",
+  "short_name": "WANDER",
+  "start_url": "/WANDER/",
+  "display": "standalone",
+  "background_color": "#eeece6",
+  "theme_color": "#141712",
+  "icons": [
+    {
+      "src": "/WANDER/assets/brand/app/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/WANDER/assets/brand/app/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/WANDER/assets/brand/app/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

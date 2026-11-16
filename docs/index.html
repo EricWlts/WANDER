@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var d = document.documentElement;
+        var off = false;
+        try {
+          off = localStorage.getItem("wander-motion") === "off";
+          d.lang = localStorage.getItem("wander-language") === "en" ? "en" : "de";
+        } catch (e) {}
+        if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) off = true;
+        d.dataset.motion = off ? "off" : "on";
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#141712" />
+    <meta
+      name="description"
+      content="WANDER — eine persönliche Sammlung von Orten, Fotografien und Momenten, die es wert sind, erinnert zu werden."
+    />
+    <meta property="og:title" content="WANDER — Manche Momente bleiben." />
+    <meta
+      property="og:description"
+      content="Eine persönliche Sammlung von Orten, Fotografien und Momenten, die es wert sind, erinnert zu werden."
+    />
+    <meta property="og:site_name" content="WANDER" />
+    <meta property="og:type" content="website" />
+    <!-- White W on a transparent ground, filling the full icon width. -->
+    <link rel="icon" type="image/svg+xml" href="/WANDER/assets/brand/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/WANDER/assets/brand/favicon/favicon.ico" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/WANDER/assets/brand/app/apple-touch-icon.png"
+    />
+    <link rel="manifest" href="/WANDER/site.webmanifest" />
+    <link
+      rel="preload"
+      href="/WANDER/fonts/instrument-serif.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/WANDER/fonts/instrument-serif-italic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/WANDER/fonts/manrope.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>WANDER — Manche Momente bleiben.</title>
+    <script type="module" crossorigin src="/WANDER/assets/index-PEHrFY_i.js"></script>
+    <link rel="modulepreload" crossorigin href="/WANDER/assets/api-DQ7xSk38.js">
+    <link rel="stylesheet" crossorigin href="/WANDER/assets/index-CWuu6UQK.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

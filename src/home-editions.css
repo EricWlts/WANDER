@@ -629,3 +629,9 @@ html body .home-page .home-lights-panel:focus-visible { outline: 2px solid var(-
 }
 html[data-motion="off"] body .home-page .home-lights-photo img,
 html[data-motion="off"] body .home-page .home-lights-panel::after { transition: none; }
+
+/* Der Editionen-Block ist auf jeder Breite mittig (eine ältere Regel begrenzte #editionen links bündig auf 1680 px). */
+html body .home-page #editionen.home-lights-intro { max-width: none; margin-inline: 0; }
+html body .home-page .home-lights-intro-inner { margin-inline: auto; }
+/* „Beide Editionen ansehen“ steht in einer eigenen Zeile unter dem Satz. */
+html body .home-page .home-lights-choose { flex-direction: column; align-items: center; gap: 10px; }

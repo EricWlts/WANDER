@@ -28,6 +28,8 @@ function openGraphImage() {
 }
 
 export default defineConfig({
+  // GitHub Pages serves the static showcase under /WANDER/ (npm run pages); locally "/".
+  base: process.env.PAGES_BASE || "/",
   plugins: [react(), openGraphImage()],
   server: {
     port: 5173,

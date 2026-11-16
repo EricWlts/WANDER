@@ -24,6 +24,7 @@ import { isStoryPath, initialHeaderScroll, updateHeaderScroll, resetHeaderGestur
 import { SignatureWordmark } from "./SignatureBrand";
 import { registerPreload, restoreScrollFor, useViewTransitionLinks } from "./viewTransitions";
 import { isMotionOff } from "./motionState";
+import { STATIC_SITE, withBase } from "./staticSite";
 
 /** Setzt den Seitentitel pro Route. Stories setzen ihren Titel selbst. */
 export function usePageTitle(de: string, en: string) {
@@ -220,6 +221,16 @@ function SetupRedirect() {
 }
 function StudioRoute({ page }: { page: StudioPageName }) {
   const { pathname } = useLocation();
+  if (STATIC_SITE)
+    return (
+      <PageState
+        title={t("The studio runs on the author's computer.", "Das Studio läuft auf dem Rechner des Autors.")}
+        text={t(
+          "This is the published version of WANDER: every story here can be read, but not edited.",
+          "Das hier ist die veröffentlichte Version von WANDER: Alle Geschichten lassen sich lesen, aber nicht bearbeiten.",
+        )}
+      />
+    );
   // Moving to another studio URL clears a previous route failure.
   return (
     <div className="studio-route">
@@ -538,13 +549,13 @@ function OriginalBrand({
         <>
           {/* The white wordmark as a luminance mask, filled with the exact palette colour. */}
           <mask id={`wander-word-mask-${part}${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1280" height="345">
-            <image href="/assets/brand/logos/wander-logo-horizontal-white.svg" width="1280" height="345" />
+            <image href={withBase("/assets/brand/logos/wander-logo-horizontal-white.svg")} width="1280" height="345" />
           </mask>
           <rect width="1280" height="345" fill={paint} mask={`url(#wander-word-mask-${part}${id})`} />
         </>
       ) : (
         <image
-          href="/assets/brand/logos/wander-logo-horizontal-white.svg"
+          href={withBase("/assets/brand/logos/wander-logo-horizontal-white.svg")}
           width="1280"
           height="345"
         />

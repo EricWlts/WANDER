@@ -13,7 +13,9 @@
     "start": ".venv/bin/python scripts/dev.py",
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
-    "e2e:axe": "node scripts/axe-summary.mjs"
+    "e2e:axe": "node scripts/axe-summary.mjs",
+    "pages": "PAGES_BASE=/WANDER/ VITE_STATIC=1 vite build --outDir docs --emptyOutDir && PAGES_BASE=/WANDER/ node --experimental-strip-types scripts/export-pages.ts",
+    "pages:preview": "vite preview --outDir docs --base /WANDER/ --host 127.0.0.1 --port 4173"
   },
   "keywords": [],
   "author": "",

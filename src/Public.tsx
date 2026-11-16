@@ -1,3 +1,4 @@
+import { BASE_URL } from "./staticSite";
 import { t, tr, useLocale } from "./I18n";
 import { archiveStats, issueNumbers, sortByTravelDate, toRoman, travelDate } from "./issueLabel";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
@@ -766,8 +767,8 @@ export function About() {
   useBackdropParallax(openingRef, motionOff);
   useBackdropParallax(closingRef, motionOff);
   const still = (name: string) => ({
-    src: `/images/${name}-1280.webp`,
-    srcSet: `/images/${name}-640.webp 640w, /images/${name}-1280.webp 1280w, /images/${name}-2200.webp 2200w`,
+    src: `${BASE_URL}images/${name}-1280.webp`,
+    srcSet: `${BASE_URL}images/${name}-640.webp 640w, ${BASE_URL}images/${name}-1280.webp 1280w, ${BASE_URL}images/${name}-2200.webp 2200w`,
   });
   const jetty = still("ch-steg");
   const cave = still("tf-hoehle");
@@ -851,8 +852,8 @@ export function About() {
               <Reveal as="div" config={{ effect: "fade", duration: 1400 }} textEffect={false}>
                 <span className="picture">
                   <img
-                    src={`/images/${photo.name}-1280.webp`}
-                    srcSet={`/images/${photo.name}-640.webp 640w, /images/${photo.name}-1280.webp 1280w, /images/${photo.name}-2200.webp 2200w`}
+                    src={`${BASE_URL}images/${photo.name}-1280.webp`}
+                    srcSet={`${BASE_URL}images/${photo.name}-640.webp 640w, ${BASE_URL}images/${photo.name}-1280.webp 1280w, ${BASE_URL}images/${photo.name}-2200.webp 2200w`}
                     sizes={i === 0 ? sizesBig : sizesSmall}
                     alt={photo.alt()}
                     width={photo.w}
@@ -876,8 +877,8 @@ export function About() {
               <li key={item.title} className="about-trio-item">
                 <img
                   className="about-trio-img"
-                  src={`/images/${pic.name}-1280.webp`}
-                  srcSet={`/images/${pic.name}-640.webp 640w, /images/${pic.name}-1280.webp 1280w`}
+                  src={`${BASE_URL}images/${pic.name}-1280.webp`}
+                  srcSet={`${BASE_URL}images/${pic.name}-640.webp 640w, ${BASE_URL}images/${pic.name}-1280.webp 1280w`}
                   sizes="(max-width: 760px) calc(100vw - 44px), 30vw"
                   alt=""
                   width={pic.width}

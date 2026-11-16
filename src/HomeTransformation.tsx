@@ -1,3 +1,4 @@
+import { BASE_URL } from "./staticSite";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
@@ -14,7 +15,7 @@ import "./home-editions.css";
    B – MoodSwitch: one motif, set in both editions, switched by the reader. */
 
 type Shot = { src: string; alt: () => string };
-const img = (name: string, size = 640) => `/images/${name}-${size}.webp`;
+const img = (name: string, size = 640) => `${BASE_URL}images/${name}-${size}.webp`;
 const shot = (name: string, en: string, de: string): Shot => ({ src: name, alt: () => t(en, de) });
 
 const SHOTS = {

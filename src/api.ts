@@ -1,4 +1,5 @@
 import { t } from "./I18n";
+import { BASE_URL, STATIC_SITE, staticDataPath } from "./staticSite";
 const uploadKeys = new WeakMap<File, string>();
 let csrfToken = "";
 
@@ -47,6 +48,7 @@ async function request<T>(
   path: string,
   options: RequestInit,
 ): Promise<T> {
+  if (STATIC_SITE) return staticRequest<T>(path, options);
   const headers = new Headers(options.headers);
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
@@ -147,4 +149,19 @@ export function uploadPhoto<T>(
     if (chapterId !== null) data.append("chapter_id", String(chapterId));
     xhr.send(data);
   });
+}
+
+/** GitHub Pages build: GET requests read the exported JSON files; nothing can be changed. */
+async function staticRequest<T>(path: string, options: RequestInit): Promise<T> {
+  if ((options.method && options.method !== "GET") || options.body) {
+    throw new ApiError(t("This version of WANDER is read-only.", "Diese Version von WANDER ist nur zum Ansehen."), "read_only");
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}static/${staticDataPath(path)}`, { signal: options.signal });
+  } catch {
+    throw new Error(t("WANDER is not reachable right now. Please try again in a moment.", "WANDER ist gerade nicht erreichbar. Bitte versuche es gleich noch einmal."));
+  }
+  if (!response.ok) throw new ApiError(t("This story is out of reach."), "not_found");
+  return (await response.json()) as T;
 }

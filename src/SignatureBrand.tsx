@@ -1,8 +1,9 @@
+import { withBase } from "./staticSite";
 // Approved source art only: compose the mountain W with the existing ANDER glyphs.
 // A shared SVG coordinate system keeps cap height, spacing and baseline independent
 // of web-font loading. The single monogram is no longer used on its own.
-const horizontalLight = "/assets/brand/logos/wander-logo-horizontal-white.svg";
-const horizontalDark = "/assets/brand/logos/wander-logo-horizontal-black.svg";
+const horizontalLight = withBase("/assets/brand/logos/wander-logo-horizontal-white.svg");
+const horizontalDark = withBase("/assets/brand/logos/wander-logo-horizontal-black.svg");
 
 export function SignatureWordmark({ tone = "light", className = "brand-signature" }: { tone?: "light" | "dark"; className?: string }) {
   const horizontalBrand = tone === "dark" ? horizontalDark : horizontalLight;

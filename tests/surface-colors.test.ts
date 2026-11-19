@@ -24,11 +24,11 @@ test("edition surfaces keep their established brand ink with accessible contrast
   const before = structuredClone(editionColors);
   assert.deepEqual(surfaceColors(editionColors["quiet-atlas"]), {
     background: "#EEECE6",
-    ink: "#26302B",
+    ink: "#312D2A",
   });
   assert.deepEqual(surfaceColors(editionColors["after-hours"]), {
-    background: "#1A1D18",
-    ink: "#F2F3EF",
+    background: "#1C1B19",
+    ink: "#F2F1F0",
   });
   for (const background of Object.values(editionColors)) {
     const { ink } = surfaceColors(background);
@@ -41,8 +41,8 @@ test("#949494 uses a neutral fallback that reaches 4.5:1 without rounding", () =
   const result = surfaceColors("#949494");
   assert.equal(result.ink, "#000000");
   assert.ok(expectedContrast(result.ink, result.background) >= 4.5);
-  assert.equal(expectedContrast("#26302B", "#949494") < 4.5, true);
-  assert.equal(expectedContrast("#F2F3EF", "#949494") < 4.5, true);
+  assert.equal(expectedContrast("#312D2A", "#949494") < 4.5, true);
+  assert.equal(expectedContrast("#F2F1F0", "#949494") < 4.5, true);
 });
 
 test("automatic ink handles black, white, and colored midtone backgrounds", () => {
@@ -53,8 +53,8 @@ test("automatic ink handles black, white, and colored midtone backgrounds", () =
       `${ink} on ${background} must reach 4.5:1`,
     );
   }
-  assert.equal(surfaceColors("#000000").ink, "#F2F3EF");
-  assert.equal(surfaceColors("#FFFFFF").ink, "#26302B");
+  assert.equal(surfaceColors("#000000").ink, "#F2F1F0");
+  assert.equal(surfaceColors("#FFFFFF").ink, "#312D2A");
 });
 
 test("three- and six-digit HEX inputs are equivalent and remain unchanged", () => {
@@ -74,8 +74,8 @@ test("three- and six-digit HEX inputs are equivalent and remain unchanged", () =
 });
 
 test("contrastRatio reports the linear sRGB ratio without rounded thresholds", () => {
-  const precise = contrastRatio("#26302B", "#949494");
-  assert.ok(precise > 4.494 && precise < 4.496);
+  const precise = contrastRatio("#312D2A", "#949494");
+  assert.ok(precise > 4.494 && precise < 4.499);
   assert.ok(precise < 4.5);
   assert.ok(contrastRatio("#000000", "#949494") > 4.5);
 });

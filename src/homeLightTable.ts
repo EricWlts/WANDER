@@ -1,4 +1,4 @@
-// "Vorher · Nachher" on the home page: the light table and the FLIP flight of a print into its frame.
+// "Vorher · Nachher" on the home page: the light table and the flight of its prints towards the story preview.
 // Pure geometry, no DOM – HomeTransformation.tsx measures, this file computes.
 
 export type Box = { x: number; y: number; w: number; h: number };
@@ -42,107 +42,18 @@ export function countWord(n: number): { en: string; de: string } {
   return { en: String(n), de: String(n) };
 }
 
-/** The whole photo as object-fit: cover lays it into `box` (it overflows on one axis); f = object-position. */
-export function coverOf(box: Box, ratio: number, fx = 0.5, fy = 0.5): Box {
-  const w = box.w / box.h > ratio ? box.w : box.h * ratio;
-  const h = w / ratio;
-  return { x: box.x + (box.w - w) * fx, y: box.y + (box.h - h) * fy, w, h };
-}
-
-/** clip-path inset (top, right, bottom, left) that cuts `photo` down to `box`, in local units of a scale k. */
-export function insetOf(box: Box, photo: Box, k = 1): [number, number, number, number] {
-  const v = (n: number) => Math.max(0, n / k);
-  return [
-    v(box.y - photo.y),
-    v(photo.x + photo.w - box.x - box.w),
-    v(photo.y + photo.h - box.y - box.h),
-    v(box.x - photo.x),
-  ];
-}
-export function insetCss(inset: readonly number[]): string {
-  return `inset(${inset.map((n) => `${n.toFixed(2)}px`).join(" ")})`;
-}
-
-export type Flight = {
-  /** Where the clone sits for good: the whole photo behind the target frame. */
-  photo: Box;
-  /** Start transform (translate, then tilt, then uniform scale – origin at the photo's centre). */
-  tx: number;
-  ty: number;
-  scale: number;
-  tilt: number;
-  startInset: [number, number, number, number];
-  endInset: [number, number, number, number];
-};
+export type Flight = { tx: number; ty: number; scale: number };
 
 /**
- * FLIP for one print: `from` is the print's unrotated box (its centre is where it lies, tilt included),
- * `to` the target frame. Both show the same photo (aspect `ratio`) with object-fit: cover, so working
- * with the whole photo keeps the scale uniform; the crop travels in the clip-path.
+ * Flight of one print: `from` is its layout box, `to` the middle of the story preview. The prints do not pile up on
+ * one spot; they settle in a loose fan (`spread` px between neighbours, a gentle wave in height) and shrink.
  */
-export function planFlight(
-  from: Box,
-  to: Box,
-  ratio: number,
-  tilt: number,
-  focusFrom: [number, number] = [0.5, 0.5],
-  focusTo: [number, number] = [0.5, 0.5],
-): Flight {
-  const a = coverOf(from, ratio, ...focusFrom);
-  const b = coverOf(to, ratio, ...focusTo);
-  const scale = a.w / b.w;
-  const angle = (tilt * Math.PI) / 180;
-  // Offset of the print's centre from the photo's centre, before tilting.
-  const vx = from.x + from.w / 2 - (a.x + a.w / 2);
-  const vy = from.y + from.h / 2 - (a.y + a.h / 2);
-  // The tilt turns around the print's centre, so the photo's centre lands here.
-  const cx = from.x + from.w / 2 - (vx * Math.cos(angle) - vy * Math.sin(angle));
-  const cy = from.y + from.h / 2 - (vx * Math.sin(angle) + vy * Math.cos(angle));
+export function flightOf(from: Box, to: Point, index: number, count: number, spread = 36, scale = 0.46): Flight {
+  const centre = (count - 1) / 2;
+  const offset = index - centre;
   return {
-    photo: b,
-    tx: cx - (b.x + b.w / 2),
-    ty: cy - (b.y + b.h / 2),
+    tx: to.x + offset * spread - (from.x + from.w / 2),
+    ty: to.y + Math.sin(index * 1.7) * spread * 0.5 - (from.y + from.h / 2),
     scale,
-    tilt,
-    startInset: insetOf(from, a, scale),
-    endInset: insetOf(to, b, 1),
   };
-}
-
-/** Maps a point of the clone (page coordinates of its final layout) through the start transform. */
-export function startPoint(flight: Flight, p: Point): Point {
-  const c = { x: flight.photo.x + flight.photo.w / 2, y: flight.photo.y + flight.photo.h / 2 };
-  const angle = (flight.tilt * Math.PI) / 180;
-  const x = (p.x - c.x) * flight.scale;
-  const y = (p.y - c.y) * flight.scale;
-  return {
-    x: c.x + flight.tx + x * Math.cos(angle) - y * Math.sin(angle),
-    y: c.y + flight.ty + x * Math.sin(angle) + y * Math.cos(angle),
-  };
-}
-
-/** For each target, the nearest unused print of the same photo; result in print order (for the stagger). */
-export function pairPrints<T extends { shot: string; at: Point }>(
-  prints: readonly T[],
-  targets: readonly T[],
-): { print: number; target: number }[] {
-  const used = new Set<number>();
-  const pairs: { print: number; target: number }[] = [];
-  targets.forEach((target, ti) => {
-    let best = -1;
-    let distance = Infinity;
-    prints.forEach((print, pi) => {
-      if (used.has(pi) || print.shot !== target.shot) return;
-      const d = Math.hypot(print.at.x - target.at.x, print.at.y - target.at.y);
-      if (d < distance) {
-        distance = d;
-        best = pi;
-      }
-    });
-    if (best >= 0) {
-      used.add(best);
-      pairs.push({ print: best, target: ti });
-    }
-  });
-  return pairs.sort((p, q) => p.print - q.print);
 }

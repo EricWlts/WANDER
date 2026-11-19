@@ -2035,6 +2035,13 @@ export function ModularEditor() {
                   selectCanvas({ type: "module", id });
                   setTextFocus({ moduleId: id, field: "story", nonce: Date.now() });
                 }}
+                onEditText={(target, value) => {
+                  if ("journey" in target) {
+                    // A story keeps a title: an emptied title springs back.
+                    if (target.journey === "title" && !value) return;
+                    change({ [target.journey]: value });
+                  } else moduleChange(target.module, { [target.field]: value });
+                }}
                 onPhoto={(p, sequence = j.photos) => {
                   setViewerPhotos(sequence);
                   setViewer(sequenceIndex(sequence, p));

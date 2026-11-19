@@ -13,12 +13,12 @@ import {
   type ReactNode,
 } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, LogOut, Menu, X } from "lucide-react";
 import { LanguageSwitch, t, useLocale } from "./I18n";
 import { api, json } from "./api";
 import { Compass } from "./components";
 import { Home, Archive, About } from "./Public";
-import { Inspiration, ExampleStory, JourneyStory, ShowcaseStory } from "./StoryExperience";
+import { Inspiration, ExampleStory, JourneyStory } from "./StoryExperience";
 import { closeNavigationOnEscape } from "./mobileNavigation";
 import { isStoryPath, initialHeaderScroll, updateHeaderScroll, resetHeaderGesture, headerIsCompact } from "./adaptiveHeader";
 import { SignatureWordmark } from "./SignatureBrand";
@@ -121,7 +121,7 @@ export default function App() {
         <Route path="/archive" element={<Archive />} />
         <Route path="/about" element={<About />} />
         <Route path="/journeys/:slug" element={<JourneyStory />} />
-        <Route path="/showcase/:edition" element={<ShowcaseStory />} />
+        <Route path="/showcase/:edition" element={<ShowcaseRedirect />} />
         <Route path="/studio" element={<StudioRoute page="Studio" />} />
         <Route path="/inspiration" element={<Inspiration />} />
         <Route path="/inspiration/:templateId" element={<ExampleStory />} />
@@ -219,6 +219,13 @@ function SetupRedirect() {
   const { slug = "" } = useParams();
   return <Navigate to={`/studio/${encodeURIComponent(slug)}/edit`} replace />;
 }
+
+/** Old /showcase/<edition> links lead to the real edition example. */
+function ShowcaseRedirect() {
+  const { edition } = useParams();
+  const { search } = useLocation();
+  return <Navigate to={`/inspiration/${encodeURIComponent(edition ?? "")}${search}`} replace />;
+}
 function StudioRoute({ page }: { page: StudioPageName }) {
   const { pathname } = useLocation();
   if (STATIC_SITE)
@@ -246,6 +253,7 @@ function StudioRoute({ page }: { page: StudioPageName }) {
 // is (or becomes) compact, so the W can never be missing from the wordmark.
 let brandIntroPlayed = false;
 function Header() {
+  const { authenticated, logout } = useApp();
   const [intro, setIntro] = useState(() => !brandIntroPlayed);
   const [introRun, setIntroRun] = useState(0);
   const navigate = useNavigate();
@@ -261,6 +269,16 @@ function Header() {
   const [menuCompact, setMenuCompact] = useState<boolean | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const brandRef = useRef<HTMLAnchorElement>(null);
+  const pressInside = useRef(false);
+  useEffect(() => {
+    const release = () => window.setTimeout(() => { pressInside.current = false; }, 0);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+  }, []);
   const cancelHoverClose = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
   };
@@ -376,8 +394,20 @@ function Header() {
   }, [menu, focused, hovered, publicHeader, location.pathname]);
   useEffect(() => {
     if (!menu) return;
-    const onKeyDown = (event: KeyboardEvent) =>
-      closeNavigationOnEscape(event, closeMenu, toggleRef.current);
+    document.documentElement.classList.add("nav-locked");
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (closeNavigationOnEscape(event, closeMenu, toggleRef.current)) return;
+      if (event.key !== "Tab") return;
+      // Keep Tab inside the open menu: links, language switch and the close button.
+      const items = Array.from(
+        navigationRef.current?.parentElement?.querySelectorAll<HTMLElement>("nav a[href], nav button, select, .menu-toggle") ?? [],
+      ).filter((el) => !el.hasAttribute("disabled"));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     const onPointerDown = (event: PointerEvent) => {
       if (
         // Language and other header controls stay usable without dismissing
@@ -395,6 +425,7 @@ function Header() {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("pointerdown", onPointerDown);
     return () => {
+      document.documentElement.classList.remove("nav-locked");
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("pointerdown", onPointerDown);
     };
@@ -415,10 +446,15 @@ function Header() {
           // within the header; language and burger alone never trigger expansion.
           if (!menu && ((brandRef.current === event.target && event.target.matches(":focus-visible")) || navigationRef.current?.contains(event.target as Node))) setFocused(true);
         }}
+        onPointerDownCapture={() => {
+          // Touch browsers (iOS Safari) do not focus a tapped link: the blur of the previously focused
+          // item then has no relatedTarget and must not fold the menu before the tap's click fires.
+          pressInside.current = true;
+        }}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) {
             setFocused(false);
-            closeMenu();
+            if (!pressInside.current) closeMenu();
           }
         }}
       >
@@ -478,6 +514,17 @@ function Header() {
         <div className="header-running" id="header-running" aria-hidden="true" />
         {/* Pages place their own quiet actions here (e.g. share/edit on a journey). */}
         <div className="header-actions" id="header-actions" />
+        {authenticated && location.pathname === "/studio" && !STATIC_SITE && (
+          // Studio overview only: "Abmelden" next to the language (never "Anmelden").
+          <button
+            type="button"
+            className="header-auth"
+            onClick={() => void logout().then(() => navigate("/studio"))}
+          >
+            {t("Sign out", "Abmelden")}
+            <LogOut size={14} aria-hidden="true" />
+          </button>
+        )}
         <LanguageSwitch />
         <button
           ref={toggleRef}

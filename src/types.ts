@@ -40,6 +40,8 @@ export interface Layout {
   text_align?: "left" | "center" | "right";
   inset?: number;
   media_width?: "cover-image" | "cover-frame";
+  /** Pair/group/wall: photographs of one format run edge to edge in a single row. */
+  edge_to_edge?: boolean;
   media_spacing?: number;
   media_spacing_top?: number;
   media_spacing_bottom?: number;
@@ -78,6 +80,8 @@ export interface Layout {
   parallax?: boolean;
   speed?: number;
   rail_mode?: "free" | "single";
+  /** Photo row: width/height of the photographs; unset = "normal". */
+  rail_size?: "normal" | "large";
   rail_loop?: boolean;
   /** Photo wall: „Ausgewogen“ (rows of equal height) or the classic grid; unset = grid (legacy walls). */
   wall_mode?: "balanced" | "grid";

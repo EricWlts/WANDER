@@ -181,11 +181,22 @@ export interface Rect {
  * hides the part of `to` the smaller, differently cropped `from` never showed.
  */
 export function focusFlip(from: Rect, to: Rect) {
-  const scale = to.width > 0 ? from.width / to.width : 1;
+  // Cover the origin box with one uniform scale (never distorts); whatever
+  // overhangs on one axis is cut away with an inset on that axis.
+  const byWidth = to.width > 0 ? from.width / to.width : 1;
+  const byHeight = to.height > 0 ? from.height / to.height : 1;
+  const scale = Math.max(byWidth, byHeight);
   const x = from.left + from.width / 2 - (to.left + to.width / 2);
   const y = from.top + from.height / 2 - (to.top + to.height / 2);
-  const visible = scale > 0 ? from.height / scale : to.height;
-  return { x, y, scale, clip: Math.max(0, (to.height - visible) / 2) };
+  const visibleH = scale > 0 ? from.height / scale : to.height;
+  const visibleW = scale > 0 ? from.width / scale : to.width;
+  return {
+    x,
+    y,
+    scale,
+    clip: Math.max(0, (to.height - visibleH) / 2),
+    clipX: Math.max(0, (to.width - visibleW) / 2),
+  };
 }
 
 /** Keep the outgoing neighbour mounted long enough to glide and fade out, even in a pair. */

@@ -22,7 +22,7 @@ from werkzeug.exceptions import BadRequest, HTTPException
 
 
 # Boolean layout keys. Keep in sync with Layout in src/types.ts (tests/layoutContract.test.ts).
-LAYOUT_FLAGS = {"parallax", "image_parallax", "show_title", "text_animations", "rail_loop", "edition_fill", "dates_from_photos", "frame", "wall_center", "all_photos"}
+LAYOUT_FLAGS = {"parallax", "image_parallax", "show_title", "text_animations", "rail_loop", "edition_fill", "dates_from_photos", "frame", "wall_center", "all_photos", "edge_to_edge"}
 
 
 class LayoutError(BadRequest):
@@ -259,7 +259,7 @@ def create_app(config=None):
             raise LayoutError(None)
         if editions_j.is_edition_slug(journey.slug) and value.get("edition", "inherit") not in {"inherit", journey.story_template}:
             abort(403, description="This edition is fixed and cannot switch to the other one.")
-        choices = {"form": {"journey", "collection", "moment"}, "rail_mode": {"free", "single"}, "media_width": {"cover-image", "cover-frame"}, "font": {"serif", "sans"}, "text_align": {"left", "center", "right"}, "text_position": {"left", "center", "right", "full"}, "text_preset": {"small", "medium", "large", "display"}, "edition": {"inherit", "quiet-atlas", "after-hours"}, "ratio": {"original", "free", "1:1", "3:2", "4:3", "4:5", "16:9"}, "align": {"flush", "staggered"}, "title_style": {"overlay", "overlap", "below"}, "fit": {"cover", "contain"}, "wall_mode": {"balanced", "grid"}}
+        choices = {"form": {"journey", "collection", "moment"}, "rail_mode": {"free", "single"}, "rail_size": {"normal", "large"}, "media_width": {"cover-image", "cover-frame"}, "font": {"serif", "sans"}, "text_align": {"left", "center", "right"}, "text_position": {"left", "center", "right", "full"}, "text_preset": {"small", "medium", "large", "display"}, "edition": {"inherit", "quiet-atlas", "after-hours"}, "ratio": {"original", "free", "1:1", "3:2", "4:3", "4:5", "16:9"}, "align": {"flush", "staggered"}, "title_style": {"overlay", "overlap", "below"}, "fit": {"cover", "contain"}, "wall_mode": {"balanced", "grid"}}
         ranges = {"media_spacing_top": (0, 160), "media_spacing_bottom": (0, 160), "media_spacing": (0, 160), "hover_zoom": (0, 20), "parallax_intensity": (20, 140), "text_width": (24, 100), "font_weight": (400, 700), "text_size": (14, 64), "inset": (0, 120), "columns": (1, 8), "rows": (1, 12), "gap": (-64, 80), "padding": (0, 160), "offset": (-160, 160), "title_size": (28, 160), "speed": (10, 180), "mobile_columns": (1, 4), "mobile_gap": (-40, 40), "mobile_padding": (0, 80), "parent_id": (-10000000000000, 10000000000000), "title_x": (0, 100), "title_y": (0, 100), "margin_x": (0, 120), "stagger": (-100, 100), "wall_row": (1, 6)}
         unknown = set(value) - set(choices) - set(ranges) - LAYOUT_FLAGS - {"photo_ids", "photo_edits", "placements", "filmstrip_placements", "background", "text_color", "column_offsets", "archive_focus"}
         if unknown:
@@ -1094,6 +1094,67 @@ def create_app(config=None):
         db.session.commit()
         return jsonify(edition_payload(edition, edition_locale()))
 
+    # ---- Chosen example journeys (a real, published journey shown as an edition's example) ----------------
+    EXAMPLES_KEY = "edition_examples"
+
+    def example_choices():
+        row = db.session.get(SiteSetting, EXAMPLES_KEY)
+        value = row.value if row and isinstance(row.value, dict) else {}
+        return {edition: value[edition] for edition in EDITION_IDS if type(value.get(edition)) is int}
+
+    def example_candidate(journey):
+        """A real journey that visitors can read: published, not a hidden helper or edition journey."""
+        return bool(journey and journey.published and journey.slug != HERO_HOLDER_SLUG
+                    and not editions_j.is_edition_slug(journey.slug))
+
+    def chosen_example_journey(edition):
+        journey_id = example_choices().get(edition)
+        journey = db.session.get(Journey, journey_id) if journey_id is not None else None
+        return journey if example_candidate(journey) else None
+
+    def chosen_example_story(journey, edition):
+        """The journey as visitors see it, flagged as the edition's example (same banner and navigation as before)."""
+        story = editions_j.public_snapshot(journey, lambda j: journey_dict(j, current=True))
+        chapters = story.get("chapters", [])
+        photos = story.get("photos", [])
+        story.update(is_example=True, published=True, photo_count=len(photos), chapter_count=len(chapters))
+        story.pop("has_unpublished_changes", None)
+        story.pop("composition_version", None)
+        return story
+
+    def example_payload():
+        choices = example_choices()
+        return {edition: (choices[edition] if chosen_example_journey(edition) else None) for edition in EDITION_IDS}
+
+    @app.get("/api/site/edition-examples")
+    @admin_required
+    def get_edition_examples():
+        return jsonify(example_payload())
+
+    @app.put("/api/site/edition-examples/<string:edition>")
+    @admin_required
+    def set_edition_example(edition):
+        if edition not in EDITION_IDS:
+            abort(404)
+        data = body()
+        journey_id = data.get("journey_id")
+        row = db.session.get(SiteSetting, EXAMPLES_KEY)
+        value = dict(row.value) if row and isinstance(row.value, dict) else {}
+        if journey_id is None:
+            value.pop(edition, None)
+        else:
+            if type(journey_id) is not int or not example_candidate(db.session.get(Journey, journey_id)):
+                abort(400, description="Choose a published journey.")
+            value[edition] = journey_id
+        if row and not value:
+            db.session.delete(row)
+        elif row:
+            row.value = value
+        elif value:
+            db.session.add(SiteSetting(key=EXAMPLES_KEY, value=value))
+        db.session.commit()
+        return jsonify(example_payload())
+
     @app.get("/media/<int:photo_id>/<string:size>")
     def media(photo_id, size):
         photo = db.get_or_404(Photo, photo_id)
@@ -1127,12 +1188,20 @@ def create_app(config=None):
             cards.append({**item, "cover_photo": payload["cover"] or None,
                           "cover_focus": payload["focus"] if payload["cover_photo_id"] is not None or payload["focus"] != {d: {"x": 50.0, "y": 50.0} for d in payload["focus"]} else None,
                           "title_override": payload["title"]})
+            chosen = chosen_example_journey(item["id"])
+            if chosen:
+                story = chosen_example_story(chosen, item["id"])
+                cards[-1].update(cover_photo=story.get("cover"), cover_focus=story.get("cover_focus") or None,
+                                 title_override={"de": story.get("title", ""), "en": story.get("title", "")})
         return jsonify(cards)
 
     @app.get("/api/templates/<string:template_id>/example")
     def template_example(template_id):
         from .story_templates import make_example
         locale = "de" if request.args.get("lang") == "de" else "en"
+        chosen = chosen_example_journey(template_id) if template_id in EDITION_IDS else None
+        if chosen:
+            return jsonify(chosen_example_story(chosen, template_id))
         journey = editions_j.find_journey(template_id, locale) if template_id in EDITION_IDS else None
         if journey:
             snapshot = editions_j.public_snapshot(journey, lambda j: journey_dict(j, current=True))

@@ -76,6 +76,7 @@ function Carousel({ photos, onPhoto, layout }: RailProps) {
   const count = photos.length;
   const copies = count > 1 ? railEdgeCopies : 0;
   const whole = layout?.rail_mode === "single";
+  const large = layout?.rail_size === "large";
   const parallax = fixedParallax("rail").enabled;
 
   function offset(position: number) {
@@ -256,6 +257,7 @@ function Carousel({ photos, onPhoto, layout }: RailProps) {
     <div
       className="photo-rail-shell editorial-carousel"
       data-whole={whole || undefined}
+      data-size={large ? "large" : undefined}
       data-single={count === 1 || undefined}
       onKeyDown={(event) => {
         // Anywhere inside the carousel (photograph, arrows, segments), except form fields.

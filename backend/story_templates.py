@@ -5,7 +5,7 @@ TEMPLATES = [
      "cover": "/images/ch-panorama-1280.webp", "preset": "quiet",
      "prompts": ["What was the first thing you noticed?", "Which small detail brings the day back?", "What did you carry home?"]},
     {"id": "after-hours", "name": "Last Light", "kicker": "EDITION II",
-     "description": "The cinematic edition. Deep olive, large images, the glow before it grows dark.",
+     "description": "The cinematic edition. Deep charcoal, large images, the glow before it grows dark.",
      "cover": "/images/tf-calima-1280.webp", "preset": "cinematic",
      "prompts": ["Where did the light find you?", "Which moment made you stop?", "How did the day change you?"]},
 ]

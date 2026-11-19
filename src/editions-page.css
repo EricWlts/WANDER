@@ -163,7 +163,7 @@ html body main#main.inspiration-page .ed-seam-title { display: none; }
     overflow: clip;
     pointer-events: none;
   }
-  /* Zwei deckungsgleiche Kopien, an der Naht (50vw + --seam-shift) geschnitten: Tinte links, Leinen rechts. */
+  /* Zwei deckungsgleiche Kopien, an der Naht (50vw + --seam-shift) geschnitten: links hell (Leinen), rechts dunkel (Tinte). */
   html:root body main#main.inspiration-page .ed-seam-copy {
     grid-area: 1 / 1;
     display: flex;
@@ -173,13 +173,13 @@ html body main#main.inspiration-page .ed-seam-title { display: none; }
     transition: clip-path 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   html:root body main#main.inspiration-page .ed-seam-copy.is-ink {
-    color: var(--c-ink);
-    text-shadow: 0 1px 22px color-mix(in srgb, var(--c-linen) 55%, transparent);
+    color: var(--c-linen);
+    text-shadow: none;
     clip-path: inset(-24px calc(50% - var(--seam-shift)) -24px -24px);
   }
   html:root body main#main.inspiration-page .ed-seam-copy.is-linen {
-    color: var(--c-linen);
-    text-shadow: 0 1px 22px color-mix(in srgb, var(--c-ink-black) 62%, transparent);
+    color: var(--c-ink);
+    text-shadow: none;
     clip-path: inset(-24px -24px -24px calc(50% + var(--seam-shift)));
   }
   html:root body main#main.inspiration-page .ed-seam-line {
@@ -188,8 +188,9 @@ html body main#main.inspiration-page .ed-seam-title { display: none; }
     white-space: nowrap;
   }
   html:root body main#main.inspiration-page .ed-seam-line.is-italic { font-style: italic; }
-  html:root body main#main.inspiration-page .is-ink .ed-seam-line.is-italic { color: var(--c-moss); }
-  html:root body main#main.inspiration-page .is-linen .ed-seam-line.is-italic { color: var(--c-fog); }
+  /* Italic line: same tone as the first line, just quieter – no extra colour. */
+  html:root body main#main.inspiration-page .is-ink .ed-seam-line.is-italic { color: color-mix(in srgb, var(--c-linen) 72%, transparent); }
+  html:root body main#main.inspiration-page .is-linen .ed-seam-line.is-italic { color: color-mix(in srgb, var(--c-ink) 72%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   html:root body main#main.inspiration-page :is(.ed-dark, .ed-seam-copy, .ed-card .ed-link) { transition: none !important; }

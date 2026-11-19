@@ -44,7 +44,7 @@
   font-size: 11px;
   line-height: 1.4;
   letter-spacing: 0.04em;
-  background: rgba(14, 22, 16, 0.62);
+  background: rgba(19, 18, 17, 0.62);
 }
 .edition-slot-label { top: 0; }
 .edition-slot-shape { bottom: 0; right: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -57,7 +57,7 @@
   height: 7px;
   border-radius: 50%;
   background: var(--c-linen, #f1ece2);
-  box-shadow: 0 0 0 1px rgba(14, 22, 16, 0.5);
+  box-shadow: 0 0 0 1px rgba(19, 18, 17, 0.5);
 }
 .edition-warning { color: var(--c-clay, #8a5a3c); font-weight: 600; }
 .edition-subhead {
@@ -121,3 +121,10 @@ html body .new-edition > div img { display: block; height: 100%; object-fit: cov
 }
 .upload-remove:hover, .upload-remove:focus-visible { color: var(--c-clay); }
 .upload-remove:disabled { opacity: 0.4; cursor: default; }
+
+/* Example journey per edition (home page and "The Editions"). */
+.edition-example-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 16px; }
+.edition-example-field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.edition-example-field select { min-height: 40px; padding: 0 10px; font: inherit; color: var(--text, inherit); background: transparent; border: 1px solid var(--line); border-radius: 0; }
+.edition-example-picker > .hero-editor-note, .edition-example-picker > .form-error { grid-column: 1 / -1; }
+@media (max-width: 760px) { .edition-example-picker { grid-template-columns: minmax(0, 1fr); } }

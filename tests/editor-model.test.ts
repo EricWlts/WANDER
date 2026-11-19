@@ -265,8 +265,8 @@ test("signed offsets and automatic contrast support light and dark editorial sur
     offsetsFor({ column_offsets: [-100, 0, 100] }, 3),
     [-100, 0, 100],
   );
-  assert.equal(surfaceColors("#ECEDEB").ink, "#26302B");
-  assert.equal(surfaceColors("#20241F").ink, "#F2F3EF");
+  assert.equal(surfaceColors("#ECEDEB").ink, "#312D2A");
+  assert.equal(surfaceColors("#20241F").ink, "#F2F1F0");
 });
 
 test("root sequences keep independent occurrence IDs and replacing source references does not duplicate files", () => {

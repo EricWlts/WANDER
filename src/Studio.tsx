@@ -2,18 +2,17 @@ import { tr } from "./I18n";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowRight,
+  ArrowDownUp,
   ArrowUpRight,
   EyeOff,
   LockKeyhole,
-  LogOut,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
 import { api, json } from "./api";
 import { PageState, useApp } from "./App";
-import { shouldShowEmptyLibrary } from "./studioLibraryModel";
+import { shouldShowEmptyLibrary, studioStatusLine, studioStoriesLine } from "./studioLibraryModel";
 import { Compass, Field, Picture } from "./components";
 import type { Journey } from "./types";
 import { ModularEditor } from "./ModularEditor";
@@ -25,7 +24,8 @@ import { t } from "./I18n";
 import { archiveFocusVars } from "./editionOverrides";
 import { StudioIntro } from "./StudioIntro";
 import { armStudioIntro, markStudioIntroPlayed } from "./studioIntroState";
-import { issueKicker, issueNumbers, seasonOf, travelDate } from "./issueLabel";
+import { issueKicker, issueNumbers, travelDate } from "./issueLabel";
+import { STUDIO_ORDER_KEY, parseStudioOrder, sortStudioJourneys, type StudioOrder } from "./studioSort";
 import "./builder.css";
 import "./studio-polish.css";
 import "./editor-simplify.css";
@@ -77,7 +77,6 @@ function Login() {
           <br />
           {tr("and the moments you want to keep.")}
         </p>
-        <Compass />
       </div>
       <form onSubmit={submit} className="login-form">
         <LockKeyhole size={23} strokeWidth={1} />
@@ -103,23 +102,9 @@ function Login() {
           {busy ? tr("Opening…") : tr("Enter the studio")}
           <ArrowUpRight size={18} />
         </button>
-        <small>
-          {t("Forgot your password? You can reset it on your Mac.", "Passwort vergessen? Du kannst es auf deinem Mac neu setzen.")}
-        </small>
       </form>
     </main>
   );
-}
-const STUDIO_SEASONS: Record<string, [string, string]> = {
-  winter: ["Winter", "Winter"],
-  spring: ["Spring", "Frühling"],
-  summer: ["Summer", "Sommer"],
-  autumn: ["Autumn", "Herbst"],
-};
-function studioSeasonYear(date: string | null | undefined, de: boolean): string {
-  const k = seasonOf(date);
-  const y = /^(\d{4})/.exec(date ?? "")?.[1] ?? "";
-  return [k ? STUDIO_SEASONS[k][de ? 1 : 0] : "", y].filter(Boolean).join(" ");
 }
 export function Studio() {
   return (
@@ -128,14 +113,40 @@ export function Studio() {
     </Guard>
   );
 }
+/** Cover of the newest story, shown inside the W at the end of the studio entrance (undefined while loading, null if none). */
+function coverUrl(journey: Journey): string | null {
+  const photo = journey.cover ?? journey.photos?.[0] ?? null;
+  return photo ? photo.large_url || photo.url || null : null;
+}
+function introPhoto(journeys: Journey[]): string | null {
+  const newest = journeys.filter((j) => j.cover || j.photos?.length).sort((a, b) => b.id - a.id)[0];
+  const photo = newest ? (newest.cover ?? newest.photos[0]) : null;
+  return photo ? photo.large_url || photo.url || null : null;
+}
 function StudioLibrary() {
-  const { logout, notify } = useApp();
+  const { notify } = useApp();
   const navigate = useNavigate();
   const [journeys, setJourneys] = useState<Journey[]>([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [deleting, setDeleting] = useState<Journey | null>(null);
+  const [order, setOrder] = useState<StudioOrder>(() => {
+    try {
+      return parseStudioOrder(localStorage.getItem(STUDIO_ORDER_KEY));
+    } catch {
+      return "created";
+    }
+  });
+  const changeOrder = (next: StudioOrder) => {
+    setOrder(next);
+    try {
+      localStorage.setItem(STUDIO_ORDER_KEY, next);
+    } catch {
+      /* storage unavailable: the choice just isn't remembered */
+    }
+  };
   const issues = useMemo(() => issueNumbers(journeys), [journeys]);
+  const sorted = useMemo(() => sortStudioJourneys(journeys, order), [journeys, order]);
   const load = () => {
     setError("");
     setLoading(true);
@@ -158,66 +169,27 @@ function StudioLibrary() {
       setError((e as Error).message);
     }
   };
-  return (
-    <main id="main" className="studio-page studio-lib page-width">
-      <StudioIntro />
-      <header className="studio-masthead">
-        <div className="studio-masthead-top">
-          <span className="eyebrow">{t("WANDER Studio", "WANDER Studio")}</span>
-          <button
-            type="button"
-            className="studio-signout"
-            onClick={() => logout().catch((e) => setError(e.message))}
-          >
-            {tr("Sign out")}
-            <LogOut size={14} />
-          </button>
-        </div>
-        <h1>
-          {t("Your studio.", "Dein Studio.")} <em>{t("Your stories.", "Deine Geschichten.")}</em>
-        </h1>
-      </header>
-      {error && (
-        <div role="alert">
-          <p className="form-error">{error}</p>
-          <button className="text-link" onClick={() => void load()}>
-            {tr("Try again")}
-          </button>
-        </div>
-      )}
-      <section className="studio-section studio-journeys" aria-labelledby="studio-journeys-title">
-        <h2 id="studio-journeys-title" className="sr-only">
-          {tr("Your stories")}
-        </h2>
-        <ol className="am-grid studio-am" aria-label={t("All stories", "Alle Geschichten")}>
-          <li className="am-item studio-am-new">
-            <button type="button" className="studio-new-row" onClick={() => navigate("/studio/new")}>
-              <span className="studio-new-circle" aria-hidden="true">
-                <Plus size={20} />
-              </span>
-              <span className="studio-new-title">{tr("New story")}</span>
-              <span className="studio-new-note">
-                {t("Upload photos and shape a story", "Fotos hochladen und Geschichte gestalten")}
-              </span>
-              <ArrowRight className="studio-new-arrow" size={20} strokeWidth={1.4} aria-hidden="true" />
-            </button>
-          </li>
-          {loading
-            ? [0, 1].map((n) => (
-                <li className="am-item" key={n} aria-hidden="true" aria-busy="true">
-                  <div className="am-card is-bare studio-am-skeleton" />
-                </li>
-              ))
-            : journeys.map((j, index) => {
+  // The latest published story is the studio's title band: its cover runs up to the top edge behind the header,
+  // "Your studio" lies on it as in the archive. Without a published story the studio starts with the masthead.
+  const lead = !loading && sorted[0]?.published ? sorted[0] : null;
+  const rest = lead ? sorted.slice(1) : sorted;
+  const storiesLine = studioStoriesLine(journeys.length);
+  const publishedCount = journeys.filter((j) => j.published).length;
+  const statusLine = studioStatusLine(publishedCount, journeys.length - publishedCount);
+  /** `wide`: the last story of an odd count takes the whole row instead of leaving an empty box beside it. */
+  const renderItem = (j: (typeof sorted)[number], index: number, wide = false) => {
                 const issue = issues.get(j.id) ?? index + 1;
                 const when0 = travelDate(j);
                 const kicker = t(issueKicker(issue, when0, "en"), issueKicker(issue, when0, "de"));
-                const when = t(studioSeasonYear(when0, false), studioSeasonYear(when0, true));
                 const place = [j.location, j.country].filter(Boolean).join(", ");
-                const blurb = j.subtitle || j.description || place;
                 const hasCover = Boolean(j.cover?.url);
                 return (
-                  <li id={`issue-${issue}`} className="am-item studio-am-item" key={j.id}>
+                  <li
+                    id={`issue-${issue}`}
+                    // The latest published story leads the studio as its title band (like the archive).
+                    className={`am-item studio-am-item${lead && j.id === lead.id ? " studio-am-lead" : ""}${wide ? " studio-am-wide" : ""}`}
+                    key={j.id}
+                  >
                     <Link
                       to={`/studio/${j.slug}`}
                       className={`am-card${hasCover ? "" : " is-bare"}`}
@@ -228,21 +200,21 @@ function StudioLibrary() {
                           className={`am-cover${j.layout?.archive_focus || j.cover_focus ? " has-cover-focus" : ""}`}
                           style={archiveFocusVars(j) as CSSProperties | undefined}
                         >
-                          <Picture animate photo={j.cover} sizes="100vw" />
+                          <Picture
+                            // The title image is what the studio entrance flies into: it must already stand there, fully visible.
+                            animate={!(lead && j.id === lead.id)}
+                            eager={!!lead && j.id === lead.id}
+                            photo={j.cover}
+                            sizes="100vw"
+                          />
                         </div>
                       )}
                       <div className="am-shade" aria-hidden="true" />
-                      <p className="am-no" aria-hidden="true">{String(issue).padStart(2, "0")}</p>
+                      {/* Studio: only title and place – always in the same spot, bottom left above the bar. */}
                       <div className="am-copy">
-                        {when && <p className="am-when" aria-hidden="true">{when}</p>}
                         <h2 className="am-title">{j.title}</h2>
-                        {blurb && <p className="am-sub">{blurb}</p>}
+                        {place && <p className="am-place">{place}</p>}
                       </div>
-                      {place && (
-                        <p className="am-kicker" aria-hidden="true">
-                          <span>{place}</span>
-                        </p>
-                      )}
                     </Link>
                     <div className="studio-am-bar">
                       <span
@@ -296,7 +268,90 @@ function StudioLibrary() {
                     </div>
                   </li>
                 );
-              })}
+  };
+  return (
+    <main id="main" className={`studio-page studio-lib page-width${lead ? " has-lead" : ""}`}>
+      {/* The flight through the W ends on the studio's own title image (the latest published story), so only
+          one photograph appears; without a published story the newest cover is used. */}
+      <StudioIntro photoUrl={loading ? undefined : lead ? coverUrl(lead) : introPhoto(journeys)} />
+      {lead && (
+        <ol className="am-grid studio-am studio-am-top" aria-label={t("Latest published story", "Zuletzt veröffentlichte Geschichte")}>
+          {renderItem(lead, 0)}
+        </ol>
+      )}
+      <header className="studio-masthead">
+        <h1>
+          {t("Your studio.", "Dein Studio.")}{" "}
+          <em>{loading ? t("Your stories.", "Deine Geschichten.") : t(storiesLine.en, storiesLine.de)}</em>
+        </h1>
+        {!loading && statusLine.de && <p className="studio-masthead-meta">{t(statusLine.en, statusLine.de)}</p>}
+      </header>
+      {error && (
+        <div role="alert">
+          <p className="form-error">{error}</p>
+          <button className="text-link" onClick={() => void load()}>
+            {tr("Try again")}
+          </button>
+        </div>
+      )}
+      <section className="studio-section studio-journeys" aria-labelledby="studio-journeys-title">
+        <h2 id="studio-journeys-title" className="sr-only">
+          {tr("Your stories")}
+        </h2>
+        <ol className="am-grid studio-am" aria-label={t("All stories", "Alle Geschichten")}>
+          <li className="am-item studio-am-new">
+            <button
+              type="button"
+              className="studio-new-row"
+              onClick={() => navigate("/studio/new")}
+            >
+              <span className="studio-new-light" aria-hidden="true" />
+              <span className="studio-new-motes" aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <i key={n} style={{ "--n": n } as CSSProperties} />
+                ))}
+              </span>
+              <span className="studio-new-circle" aria-hidden="true">
+                <Plus size={20} />
+              </span>
+              <span className="studio-new-title">{tr("New story")}</span>
+              <span className="studio-new-note">
+                {t("Your photos become a story.", "Aus deinen Fotos wird eine Geschichte.")}
+              </span>
+            </button>
+            {/* Sorting sits in the same row, at its right end (the count lives in the title now). */}
+            {!loading && journeys.length > 1 && (
+              <div className="studio-sort">
+          <button
+            type="button"
+            className="studio-sort-toggle"
+            onClick={() => changeOrder(order === "created" ? "travel" : "created")}
+            aria-label={
+              order === "created"
+                ? t(
+                    "Sorted: recently created. Switch to by travel date",
+                    "Sortiert: zuletzt erstellt. Umschalten auf Nach Reisedatum",
+                  )
+                : t(
+                    "Sorted: by travel date. Switch to recently created",
+                    "Sortiert: nach Reisedatum. Umschalten auf Zuletzt erstellt",
+                  )
+            }
+          >
+            <span className="studio-sort-label">{t("Sorted:", "Sortiert:")}</span>
+            <ArrowDownUp size={14} aria-hidden="true" className={order === "travel" ? "is-flipped" : ""} />
+            {order === "created" ? t("Recently created", "Zuletzt erstellt") : t("By travel date", "Nach Reisedatum")}
+          </button>
+              </div>
+            )}
+          </li>
+          {loading
+            ? [0, 1].map((n) => (
+                <li className="am-item" key={n} aria-hidden="true" aria-busy="true">
+                  <div className="am-card is-bare studio-am-skeleton" />
+                </li>
+              ))
+            : rest.map((j, i) => renderItem(j, lead ? i + 1 : i, rest.length % 2 === 1 && i === rest.length - 1))}
         </ol>
       </section>
       <section className="studio-design" aria-labelledby="studio-design-title">

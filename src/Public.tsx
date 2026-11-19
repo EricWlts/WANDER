@@ -1,6 +1,6 @@
 import { BASE_URL } from "./staticSite";
 import { t, tr, useLocale } from "./I18n";
-import { archiveStats, issueNumbers, sortByTravelDate, toRoman, travelDate } from "./issueLabel";
+import { archiveStats, issueNumbers, toRoman, travelDate } from "./issueLabel";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownUp, ArrowUpRight } from "lucide-react";
@@ -20,6 +20,17 @@ import { ArchiveMagazine } from "./ArchiveMagazine";
 import { HomeTransformation } from "./HomeTransformation";
 import { usePageTitle } from "./App";
 import { prefersReducedMotion } from "./motionState";
+import { nextArchiveOrder, sortArchiveJourneys, type ArchiveOrder } from "./studioSort";
+/** Label of the archive's sort toggle (cycles: recently created → latest trip → earliest trip). */
+function archiveOrderLabel(order: ArchiveOrder): string {
+  if (order === "created") return t("Recently created", "Zuletzt erstellt");
+  return order === "newest" ? t("Latest trip first", "Neueste Reise zuerst") : t("Earliest trip first", "Älteste Reise zuerst");
+}
+function archiveOrderAria(order: ArchiveOrder): string {
+  const next = archiveOrderLabel(nextArchiveOrder(order));
+  return t(`Sorted: ${archiveOrderLabel(order)}. Switch to ${next}`, `Sortiert: ${archiveOrderLabel(order)}. Umschalten auf ${next}`);
+}
+
 
 const showcaseReveal = { effect: "up", intensity: 18 } as const;
 
@@ -140,6 +151,17 @@ function useBackdropParallax(target: RefObject<HTMLElement | null>, off: boolean
   }, [target, off]);
 }
 
+// Bundled stills (public/images): fixed home-page pictures, independent of the journeys chosen as edition examples.
+function bundled(id: number, name: string, width: number, height: number, title = "", alt = ""): Photo {
+  return {
+    id, chapter_id: null, position: 0, featured: false, demo: true,
+    title, alt, description: "", credit: "", source_url: "", width, height,
+    url: `${BASE_URL}images/${name}-1280.webp`, large_url: `${BASE_URL}images/${name}-2200.webp`, original_url: null,
+    srcset: `${BASE_URL}images/${name}-640.webp 640w, ${BASE_URL}images/${name}-1280.webp 1280w, ${BASE_URL}images/${name}-2200.webp 2200w`,
+  } as unknown as Photo;
+}
+const CLOSING_PHOTO = bundled(-904, "tf-wolken", 2200, 1467);
+
 export function Home() {
   usePageTitle("WANDER — Manche Momente bleiben.", "WANDER — Some moments stay.");
   const { journeys, loading, error } = useJourneys();
@@ -157,7 +179,7 @@ export function Home() {
   } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    api<Journey>(`/showcase/after-hours?lang=${locale}`, { signal: controller.signal })
+    api<Journey>(`/templates/after-hours/example?lang=${locale}`, { signal: controller.signal })
       .then((story) => {
         if (!controller.signal.aborted) setLastResult({ locale, story });
       })
@@ -172,7 +194,7 @@ export function Home() {
   } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    api<Journey>(`/showcase/quiet-atlas?lang=${locale}`, {
+    api<Journey>(`/templates/quiet-atlas/example?lang=${locale}`, {
       signal: controller.signal,
     })
       .then((story) => {
@@ -202,7 +224,7 @@ export function Home() {
     showcaseResult?.locale === locale ? showcaseResult.story : null;
   const journey = showcase ?? journeys[0];
   const featureUrl = showcase
-    ? "/showcase/quiet-atlas"
+    ? "/inspiration/quiet-atlas"
     : `/journeys/${journey?.slug}`;
   const featureLabel = showcase
     ? t("Featured photo essay", "Fotoessay im Fokus")
@@ -256,19 +278,21 @@ export function Home() {
           },
         }
       : undefined;
-  const detailPhotos = showcase
-    ? [showcase.photos[4], showcase.photos[5]].filter((x): x is Photo => Boolean(x))
-    : [];
+  const detailPhotos = [
+    bundled(-911, "ch-see", 2200, 1467, t("Still water", "Stilles Wasser"), t("A calm lake with a mountain range in haze", "Ein ruhiger See vor einer Bergkette im Dunst")),
+    bundled(-912, "ch-bruecke", 2200, 1467, t("Bridge between the peaks", "Brücke zwischen den Gipfeln"), t("A suspension bridge between snow-covered summits", "Eine Hängebrücke zwischen verschneiten Gipfeln")),
+  ];
   // A custom hero is editorially paired with the Tenerife essay unless it uses the featured cover.
   const heroStory = featureLoading
     ? null
     : customHero && !crossfade && customHero.id !== journey?.cover?.id
       ? lastStory
       : journey;
-  const heroStoryUrl = heroStory === lastStory ? "/showcase/after-hours" : featureUrl;
-  const lastDetailPhotos = lastStory
-    ? [lastStory.photos[4], lastStory.photos[6]].filter((x): x is Photo => Boolean(x))
-    : [];
+  const heroStoryUrl = heroStory === lastStory ? "/inspiration/after-hours" : featureUrl;
+  const lastDetailPhotos = [
+    bundled(-913, "tf-hoehle", 2200, 1467, t("In the cave arch", "Im Höhlenbogen"), t("A silhouette in the arch of a cave", "Eine Silhouette im Bogen einer Höhle")),
+    bundled(-914, "tf-silhouette", 2200, 1467, t("Against the light", "Im Gegenlicht"), t("Silhouette of a man in backlight", "Silhouette eines Mannes im Gegenlicht")),
+  ];
   // Hero: a very slow cross-fade between the light and the dark edition cover (second layer).
   const heroAlt = crossfade ? (lastStory?.cover ?? null) : null;
   const heroAltFocus = heroAlt && lastStory?.cover_focus ? normalizeFocus(lastStory.cover_focus) : null;
@@ -279,12 +303,9 @@ export function Home() {
         "--hero-pos-mobile": focusToPosition(heroAltFocus.mobile),
       } as CSSProperties)
     : undefined;
-  // Closing: a calmer frame of the Tenerife story, never one of the hero photographs.
-  const heroIds = [heroPhoto?.id, heroAlt?.id];
-  const closingPhoto =
-    [lastStory?.photos[3], showcase?.photos[7], lastStory?.photos[1]].find(
-      (photo): photo is Photo => Boolean(photo) && !heroIds.includes(photo!.id),
-    ) ?? null;
+  // Closing: fixed for now – the clouds over the ridge on Tenerife (a bundled image, independent of
+  // whichever journey is chosen as an edition example).
+  const closingPhoto = CLOSING_PHOTO;
   return (
     <main id="main" className="home-page" data-page-ready={heroPending ? "false" : "true"}>
       <section
@@ -337,10 +358,10 @@ export function Home() {
                  so text and target always match the visible photograph. Hidden = visibility: hidden,
                  which also takes it out of the tab order and the accessibility tree. */
               <span className="home-hero-swap">
-                <Link to="/showcase/quiet-atlas" className="home-hero-link is-quiet home-hero-swap-link is-first">
+                <Link to="/inspiration/quiet-atlas" className="home-hero-link is-quiet home-hero-swap-link is-first">
                   {t(`Read “${showcase.title}”`, `${showcase.title} lesen`)} <ArrowUpRight size={18} />
                 </Link>
-                <Link to="/showcase/after-hours" className="home-hero-link is-quiet home-hero-swap-link is-alt">
+                <Link to="/inspiration/after-hours" className="home-hero-link is-quiet home-hero-swap-link is-alt">
                   {t(`Read “${lastStory.title}”`, `${lastStory.title} lesen`)} <ArrowUpRight size={18} />
                 </Link>
               </span>
@@ -362,10 +383,10 @@ export function Home() {
           <span className="eyebrow">{t("Two editions", "Zwei Editionen")}</span>
           <h2 id="editions-heading" className="home-lights-intro-title">{t("Every story has its light.", "Jede Geschichte hat ihr Licht.")}</h2>
           <div className="home-lights-diptych">
-            <Link to="/showcase/quiet-atlas" className="home-lights-panel is-first">
-              {showcase?.cover && (
+            <Link to="/inspiration/quiet-atlas" className="home-lights-panel is-first">
+              {(
                 <div className="home-lights-photo">
-                  <Picture photo={showcase.cover} sizes="(max-width: 760px) 40vw, 240px" />
+                  <Picture photo={bundled(-915, "ch-panorama", 2200, 1467, t("Alpine panorama", "Alpenpanorama"))} sizes="(max-width: 760px) 40vw, 240px" />
                 </div>
               )}
               <div className="home-lights-copy">
@@ -374,10 +395,10 @@ export function Home() {
               <p>{t("Bright, framed, quiet.", "Hell, gerahmt, still.")}</p>
               </div>
             </Link>
-            <Link to="/showcase/after-hours" className="home-lights-panel is-last">
-              {lastStory?.cover && (
+            <Link to="/inspiration/after-hours" className="home-lights-panel is-last">
+              {(
                 <div className="home-lights-photo">
-                  <Picture photo={lastStory.cover} sizes="(max-width: 760px) 40vw, 280px" />
+                  <Picture photo={bundled(-916, "tf-calima", 2200, 1467, t("Calima sun", "Calima-Sonne"))} sizes="(max-width: 760px) 40vw, 280px" />
                 </div>
               )}
               <div className="home-lights-copy">
@@ -497,7 +518,7 @@ export function Home() {
                     <small className="home-showcase-note">{lastStory.country}</small>
                   </p>
                 )}
-                <Link className="text-link" to="/showcase/after-hours">
+                <Link className="text-link" to="/inspiration/after-hours">
                   {tr("Read the photo essay")} <ArrowUpRight size={18} />
                 </Link>
               </div>
@@ -581,8 +602,8 @@ export function Archive() {
   const { journeys, loading, error } = useJourneys();
   // 13.11.: the archive is always the magazine; the Magazin/Index switch is gone (index markup kept, unreachable).
   const view = "editorial" as "editorial" | "index";
-  const [order, setOrder] = useState("newest");
-  const sorted = sortByTravelDate(journeys, order as "newest" | "oldest");
+  const [order, setOrder] = useState<ArchiveOrder>("created");
+  const sorted = sortArchiveJourneys(journeys, order);
   const issues = issueNumbers(journeys);
   const stats = archiveStats(journeys);
   return (
@@ -634,12 +655,12 @@ export function Archive() {
                   <button
                       type="button"
                       className="sort-toggle"
-                      onClick={() => setOrder(order === "newest" ? "oldest" : "newest")}
-                      aria-label={order === "newest" ? t("Sorted: latest trip first. Reverse order", "Sortiert: neueste Reise zuerst. Reihenfolge umkehren") : t("Sorted: earliest trip first. Reverse order", "Sortiert: älteste Reise zuerst. Reihenfolge umkehren")}
+                      onClick={() => setOrder(nextArchiveOrder(order))}
+                      aria-label={archiveOrderAria(order)}
                     >
                       <span className="sort-toggle-label">{t("Sorted:", "Sortiert:")}</span>
                       <ArrowDownUp size={14} aria-hidden="true" className={order === "oldest" ? "is-flipped" : ""} />
-                      {order === "newest" ? t("Latest trip first", "Neueste Reise zuerst") : t("Earliest trip first", "Älteste Reise zuerst")}
+                      {archiveOrderLabel(order)}
                     </button>
                 </div>
               </div>
@@ -671,12 +692,12 @@ export function Archive() {
                     <button
                       type="button"
                       className="sort-toggle"
-                      onClick={() => setOrder(order === "newest" ? "oldest" : "newest")}
-                      aria-label={order === "newest" ? t("Sorted: latest trip first. Reverse order", "Sortiert: neueste Reise zuerst. Reihenfolge umkehren") : t("Sorted: earliest trip first. Reverse order", "Sortiert: älteste Reise zuerst. Reihenfolge umkehren")}
+                      onClick={() => setOrder(nextArchiveOrder(order))}
+                      aria-label={archiveOrderAria(order)}
                     >
                       <span className="sort-toggle-label">{t("Sorted:", "Sortiert:")}</span>
                       <ArrowDownUp size={14} aria-hidden="true" className={order === "oldest" ? "is-flipped" : ""} />
-                      {order === "newest" ? t("Latest trip first", "Neueste Reise zuerst") : t("Earliest trip first", "Älteste Reise zuerst")}
+                      {archiveOrderLabel(order)}
                     </button>
                   </div>
                 </div>
@@ -796,7 +817,7 @@ export function About() {
     t("Original quality – your photos stay exactly as you uploaded them.", "Originalqualität – deine Fotos bleiben genau so, wie du sie hochgeladen hast."),
     t("Drafts stay private. Nothing is visible until you publish.", "Entwürfe bleiben privat. Nichts ist sichtbar, bevor du veröffentlichst."),
     t("Published journeys are only reachable by link – not through a public feed.", "Veröffentlichte Reisen sind nur über einen Link erreichbar – nicht über einen öffentlichen Feed."),
-    t("You can download your photos and delete them completely.", "Du kannst deine Fotos herunterladen und vollständig löschen."),
+    t("You can delete individual photos or entire journeys completely at any time.", "Du kannst einzelne Fotos oder gesamte Reisen jederzeit vollständig löschen."),
   ];
   const nots = [
     t("No feed.", "Kein Feed."),
@@ -809,8 +830,8 @@ export function About() {
     [t("Can I create stories myself?", "Kann ich selbst Geschichten erstellen?"), t("Right now only Eric creates stories. The plan is that soon everyone can sign up and publish their own journeys.", "Gerade gestaltet nur Eric Geschichten. Geplant ist, dass sich bald jede und jeder anmelden und eigene Reisen veröffentlichen kann.")],
     [t("Who can see my journeys?", "Wer kann meine Reisen sehen?"), t("Drafts only you. Published journeys are only reachable by link – not through a public feed.", "Entwürfe nur du. Veröffentlichte Reisen sind nur über einen Link erreichbar – nicht über einen öffentlichen Feed.")],
     [t("Does it work on the phone?", "Funktioniert das auch am Handy?"), t("Yes. On the road you can upload your favourites every day, write a few words and share the whole journey at the end.", "Ja. Du kannst unterwegs jeden Tag deine Favoriten hochladen, ein paar Worte dazu schreiben und am Ende die ganze Reise teilen.")],
-    [t("Can I download or delete my photos?", "Kann ich meine Fotos wieder herunterladen oder löschen?"), t("Yes, both. Deleted photos are removed completely.", "Ja, beides. Gelöschte Fotos sind vollständig entfernt.")],
-    [t("Where are my photos stored?", "Wo liegen meine Fotos?"), t("Currently on a private server. A server in Germany is planned for later. Your photos are not used for advertising or AI training.", "Aktuell auf einem privaten Server. Für später ist ein Server in Deutschland geplant. Deine Fotos werden nicht für Werbung oder KI-Training genutzt.")],
+    [t("Can I delete my photos?", "Kann ich meine Fotos löschen?"), t("Yes. You can delete individual photos or entire journeys at any time – they are then removed completely.", "Ja. Du kannst einzelne Fotos oder ganze Reisen jederzeit löschen – sie sind dann vollständig entfernt.")],
+    [t("Where are my photos stored?", "Wo liegen meine Fotos?"), t("Currently on a private server. A server in Germany is planned for later.", "Aktuell auf einem privaten Server. Für später ist ein Server in Deutschland geplant.")],
   ];
   const sizesBig = "(max-width: 760px) calc(100vw - 44px), 40vw";
   const sizesSmall = "(max-width: 760px) 44vw, 20vw";
@@ -913,7 +934,6 @@ export function About() {
             ))}
           </ul>
         </div>
-        <p className="about-pledge">{t("We do not use your photos for advertising or AI training.", "Wir nutzen deine Fotos nicht für Werbung oder KI-Training.")}</p>
       </section>
 
       <section className="about-not" aria-labelledby="about-not-title">

@@ -153,7 +153,7 @@ export function ColorControl({
         </small>
       )}
       <div className="color-swatches">
-        {["#EEECE6", "#F5F5F2", "#DCE2DE", "#C5CDC5", "#1A1D18", "#182722"].map(
+        {["#EEECE6", "#f4f4f3", "#e1e0dd", "#cdcac5", "#1c1b19", "#22201d"].map(
           (c) => (
             <button
               type="button"

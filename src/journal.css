@@ -3726,19 +3726,6 @@ html body .journal-canvas .journal-module.has-margin-x {
   }
 }
 
-/* „Gerahmt“ (single image): Erstes Licht shows the photograph on a fine paper mount like
-   the cover; Letztes Licht stays frameless and keeps only the space around it. */
-.module-image.module-framed.module-theme-quiet-atlas .single-image .single-image-frame {
-  box-sizing: border-box;
-  width: min(100%, calc(var(--single-max-h) * var(--single-ratio, 1.5) + 2 * var(--mount, 16px)));
-  padding: var(--mount, 16px);
-  --mount: clamp(10px, 1.5vw, 22px);
-  background: color-mix(in srgb, #ffffff 55%, var(--c-paper, #eeece6));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--c-ink, #1c1b18) 9%, transparent),
-    0 22px 44px -32px color-mix(in srgb, var(--c-ink, #1c1b18) 45%, transparent);
-}
-
 /* ==========================================================================
    15.11. abends – „Erstes Licht“ auch in den Modulen erkennbar (keine neuen Regler).
    1. Feiner Papierrand um jedes Bild (Einzelbild, Bildpaar, Fotowand) – wie beim Titelbild.
@@ -3747,19 +3734,49 @@ html body .journal-canvas .journal-module.has-margin-x {
    „Letztes Licht“ bleibt randlos und groß. Eigene Abstände des Autors (--module-padding,
    text_width) gewinnen weiterhin.
    ========================================================================== */
-.journal-canvas .module-theme-quiet-atlas:is(.module-image:not(.module-framed), .module-pair, .module-wall) .picture {
-  --paper-rim: clamp(5px, 0.55vw, 8px);
+/* Erstes Licht: every photograph sits on a fine paper mount like a fine-art print – an even,
+   generous margin (warm paper white, slightly lifted from the page), a 1px hairline and a very soft
+   shadow. The mount is drawn outside the image (box-shadow spread), so it never changes the layout
+   and is identical on all four sides. Captions sit clearly below the print. */
+.journal-canvas .module-theme-quiet-atlas {
+  --print-mount: clamp(5px, 0.6vw, 9px);
+  --print-gap: 18px; /* min. gap between neighbouring frame edges = this minus the 2px hairlines */
+  --print-paper: color-mix(in srgb, #fffdf8 66%, var(--c-paper, #eeece6));
+  --print-line: color-mix(in srgb, #8a7f6f 26%, transparent);
+  --print-shadow: color-mix(in srgb, #4a3f2e 22%, transparent);
+}
+.journal-canvas .module-theme-quiet-atlas:is(.module-image, .module-pair, .module-wall, .module-gallery, .module-rail) .picture,
+.journal-canvas .module-theme-quiet-atlas.module-chapter :is(.photo-rail-shell, .photo-wall, .wall-group) .picture {
   box-shadow:
-    0 0 0 var(--paper-rim) color-mix(in srgb, #ffffff 55%, var(--c-paper, #eeece6)),
-    0 0 0 calc(var(--paper-rim) + 1px) color-mix(in srgb, var(--c-ink, #1c1b18) 9%, transparent),
-    0 22px 40px -30px color-mix(in srgb, var(--c-ink, #1c1b18) 40%, transparent);
+    0 0 0 var(--print-mount) var(--print-paper),
+    0 0 0 calc(var(--print-mount) + 1px) var(--print-line),
+    0 calc(var(--print-mount) + 6px) 22px calc(var(--print-mount) - 16px) var(--print-shadow);
 }
-/* The rim sits outside the photograph: keep it clear of the neighbours. */
-.journal-canvas .module-theme-quiet-atlas.module-wall .photo-wall.wall-balanced { --gap: max(28px, var(--wall-gap, 12px)); }
+/* The mount sits outside the photograph: keep it clear of the neighbours. */
+.journal-canvas .module-theme-quiet-atlas:is(.module-wall, .module-chapter) .photo-wall.wall-balanced { --gap: max(var(--wall-gap, 12px), calc(2 * var(--print-mount) + var(--print-gap))); }
 @media (max-width: 760px) {
-  .journal-canvas .module-theme-quiet-atlas.module-wall .photo-wall.wall-balanced { --gap: max(16px, var(--wall-mobile-gap, var(--wall-gap, 8px))); }
+  .journal-canvas .module-theme-quiet-atlas:is(.module-wall, .module-chapter) .photo-wall.wall-balanced { --gap: max(var(--wall-mobile-gap, var(--wall-gap, 8px)), calc(2 * var(--print-mount) + var(--print-gap))); }
 }
-.journal-canvas .module-theme-quiet-atlas.module-pair .wall-group { column-gap: clamp(28px, 2.8vw, 40px); row-gap: clamp(28px, 2.8vw, 40px); }
+.journal-canvas .module-theme-quiet-atlas:is(.module-pair, .module-gallery, .module-wall, .module-chapter) .wall-group {
+  --print-clear: calc(2 * var(--print-mount) + var(--print-gap));
+  column-gap: max(var(--separation, 0px), var(--print-clear));
+  row-gap: max(var(--separation, 0px), var(--print-clear));
+}
+.journal-canvas .module-theme-quiet-atlas .carousel-track { gap: calc(2 * var(--print-mount) + var(--print-gap)); }
+@media (max-width: 760px) {
+  .journal-canvas .module-theme-quiet-atlas { --print-gap: 14px; }
+  .journal-canvas .module-theme-quiet-atlas .carousel-viewport { padding-inline: var(--print-mount); }
+}
+/* Single image: room for the mount on all sides, including below (caption or not). */
+.journal-canvas .module-theme-quiet-atlas.module-image .single-image-frame {
+  width: min(calc(100% - 2 * var(--print-mount)), calc(var(--single-max-h) * var(--single-ratio, 1.5)));
+  margin-block: var(--print-mount);
+}
+/* Rail: the viewport and the slides must not cut the mount off. */
+.journal-canvas .module-theme-quiet-atlas .carousel-viewport { padding-block: calc(var(--print-mount) + 26px); }
+.journal-canvas .module-theme-quiet-atlas .carousel-track > figure,
+.journal-canvas .module-theme-quiet-atlas .carousel-track > figure[data-active] { clip-path: inset(-60px); }
+.journal-canvas .module-theme-quiet-atlas :is(.wall-group, .carousel-track) figure > figcaption { margin-top: var(--print-mount); }
 .journal-canvas .module-theme-quiet-atlas :is(figure > figcaption, .wall-group figcaption, .module-photo-grid figcaption) {
   padding-top: 14px;
   font: italic 400 14px / 1.45 "Instrument Serif", Georgia, serif;
@@ -3781,4 +3798,36 @@ html body .journal-canvas .journal-module.has-margin-x {
   max-width: min(100%, 46ch);
   margin-inline: auto;
   text-align: center;
+}
+
+/* Photo row size: „Groß“ is wider and taller than „Normal“ (both editions); phones go nearly edge to edge. */
+.photo-rail-shell.editorial-carousel[data-size="large"] .carousel-track > figure {
+  width: clamp(40cqw, calc(82svh * var(--frame-ratio)), 94cqw);
+}
+.photo-rail-shell.editorial-carousel[data-size="large"] .carousel-track .picture {
+  width: min(100%, calc(82svh * var(--frame-ratio)));
+}
+@media (max-width: 760px) {
+  .photo-rail-shell.editorial-carousel[data-size="large"] .carousel-track > figure {
+    width: clamp(40cqw, calc(90svh * var(--frame-ratio)), 94cqw);
+  }
+  .photo-rail-shell.editorial-carousel[data-size="large"] .carousel-track .picture {
+    width: min(100%, calc(90svh * var(--frame-ratio)));
+  }
+}
+
+/* Laufender Fotostreifen (19.11.2026): Hintergrund = Fläche der Edition (kein eigener Stein-/Hebeton),
+   Breite per Regler „Breite“ (layout.margin_x invertiert): --strip-bleed 0 = Textspalte, 1 = bis an den Fensterrand.
+   Der Canvas schneidet Überstand ab (siehe edge-media.css), 100vw ist daher unkritisch. */
+html body .journal-canvas .module-filmstrip .filmstrip-section {
+  background: transparent;
+  color: inherit;
+}
+html body .journal-canvas .journal-module.module-filmstrip.has-margin-x {
+  padding-inline: 0;
+}
+html body .journal-canvas .module-filmstrip.has-margin-x .film-window {
+  width: calc(100% + (100vw - 100%) * var(--strip-bleed, 0));
+  max-width: none;
+  margin-inline: calc((100% - 100vw) * var(--strip-bleed, 0) / 2);
 }

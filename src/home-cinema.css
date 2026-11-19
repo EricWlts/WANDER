@@ -88,55 +88,13 @@ html body .home-page .home-transform-after {
 }
 html body .home-page .hs-bar { align-items: center; margin-bottom: 14px; border-bottom: 0; }
 html body .home-page .hs-bar .home-transform-label { padding: 0; color: var(--c-linen); border: 0; }
-/* Zähler bleibt für Screenreader, sichtbar sind die Fortschrittsstriche. */
-html body .home-page .hs-count {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-html body .home-page .hs-dashes { display: flex; align-items: center; gap: 6px; margin-right: 10px; }
-html body .home-page .hs-dashes span {
-  display: block;
-  width: 24px;
-  height: 1px;
-  background: color-mix(in srgb, var(--c-linen) 30%, transparent);
-  transition: background-color 0.4s ease;
-}
-html body .home-page .hs-dashes span.is-active { background: var(--c-linen); }
-html body .home-page .hs-arrow { color: color-mix(in srgb, var(--c-linen) 78%, transparent); }
-@media (hover: hover) and (pointer: fine) {
-  html body .home-page .hs-arrow:not(:disabled):hover { color: var(--c-linen); }
-}
-html body .home-page .hs-arrow:focus-visible,
-html body .home-page .hs-viewport:focus-visible { outline-color: var(--c-linen); }
-html body .home-page .hs-view { box-shadow: none; }
 html body .home-page .home-transform-after > figcaption { margin-top: 14px; color: var(--c-fog); }
-@media (min-width: 1024px) {
-  /* Der Streifen läuft rechts bis an die Bildschirmkante; die nächste Ansicht schaut hervor. */
-  html body .home-page .hs-viewport { margin-right: calc((100% - 100vw) / 2); }
-  html body .home-page .hs-track { gap: clamp(14px, 1.4vw, 22px); padding-right: calc((100vw - 100%) / 2); }
-  html body .home-page .hs-view {
-    flex: 0 0 auto;
-    height: clamp(380px, 60svh, 620px);
-    aspect-ratio: 3 / 2;
-  }
-}
 html body .home-page .home-transform-cta {
   grid-area: cta;
   justify-self: start;
   margin-top: clamp(22px, 3svh, 36px);
   color: var(--c-linen);
 }
-@media (prefers-reduced-motion: reduce) {
-  html body .home-page .hs-dashes span { transition: none; }
-}
-html[data-motion="off"] body .home-page .hs-dashes span { transition: none; }
-
 /* ==========================================================================
    13.11. nachmittags – „Vorher · Nachher“ passt auf einen Bildschirm (wie das Titelbild).
    Kopf: Überschrift links, rechts Satz + Link. Darunter der Kontaktstreifen, dann füllt die
@@ -184,13 +142,8 @@ html body .home-page .hs-bar-note {
   }
   html body .home-page .hs-bar { flex: none; margin-bottom: clamp(6px, 1.2svh, 14px); }
   html body .home-page .home-transform-reveal { flex: 1 1 auto; min-height: 0; }
-  html body .home-page .hs-viewport,
-  html body .home-page .hs-track { height: 100%; }
-  html body .home-page .hs-view { height: 100%; }
 }
-/* Handy: die Fortschrittsstriche weichen der Notiz neben „Nachher“; die Pfeile bleiben. */
 @media (max-width: 639px) {
-  html body .home-page .hs-dashes { display: none; }
   html body .home-page .hs-bar .home-transform-label { flex: 1 1 auto; min-width: 0; }
 }
 
@@ -333,100 +286,28 @@ html body .home-page .ht-print img {
   html body .home-page .ht-print { padding: 5px; }
 }
 
-/* Übersicht während des Flugs: alle Seiten der Geschichte klein nebeneinander, jedes Foto hat sein Ziel.
-   Danach öffnet sie sich (FLIP in HomeTransformation.tsx) zum Streifen. */
-html body .home-page .ht-stage[data-phase="flying"] .hs-viewport { overflow: hidden; margin-right: 0; }
-html body .home-page .ht-stage[data-phase="flying"] .hs-track {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: center;
-  gap: 10px;
-  padding-right: 0;
-}
-html body .home-page .ht-stage[data-phase="flying"] .hs-view { box-sizing: border-box; width: 100%; min-width: 0; height: auto; padding: 0; align-self: center; }
-@media (min-width: 640px) {
-  html body .home-page .ht-stage[data-phase="flying"] .hs-track {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: clamp(10px, 1.2vw, 18px);
-  }
-  html body .home-page .ht-stage[data-phase="flying"] .hs-view { aspect-ratio: 3 / 2; }
-}
-
-/* Phasen: before → flying (Abzüge fliegen, Papier blendet ein) → after. */
+/* Phasen: before → flying (Abzüge fliegen zur Reise, die Reise blendet ein) → after. */
 html body .home-page .ht-after {
   opacity: 0;
   visibility: hidden;
   transition: opacity 420ms var(--ht-ease), visibility 0s linear 420ms;
 }
-html body .home-page .ht-stage:not([data-phase="before"]) .ht-after {
+html body .home-page .ht-stage[data-phase="after"] .ht-after,
+html body .home-page .ht-stage[data-preview="on"] .ht-after {
   opacity: 1;
   visibility: visible;
-  transition: opacity 900ms var(--ht-ease), visibility 0s linear 0s;
+  transition: opacity 1100ms var(--ht-ease), visibility 0s linear 0s;
 }
-html body .home-page .ht-stage[data-phase="flying"] .ht-after { pointer-events: none; }
 html body .home-page .ht-before { transition: opacity 420ms var(--ht-ease), visibility 0s linear 0s; }
+html body .home-page .ht-stage[data-phase="flying"] .ht-before { z-index: 2; pointer-events: none; }
+html body .home-page .ht-before .ht-bar { transition: opacity 300ms var(--ht-ease); }
+html body .home-page .ht-stage[data-phase="flying"] .ht-before .ht-bar { opacity: 0; }
 html body .home-page .ht-stage[data-phase="after"] .ht-before {
   opacity: 0;
   visibility: hidden;
   transition: opacity 420ms var(--ht-ease), visibility 0s linear 420ms;
 }
-html body .home-page .ht-stage:not([data-phase="before"]) .ht-print { opacity: 0; scale: 0.94; }
-html body .home-page .ht-print.is-lifted { visibility: hidden; transition: none; }
-html body .home-page .ht-after img.is-landing { opacity: 0; }
-html body .home-page .ht-flight { position: absolute; inset: 0; z-index: 3; overflow: visible; pointer-events: none; }
-html body .home-page .ht-flier {
-  position: absolute;
-  display: block;
-  max-width: none;
-  margin: 0;
-  transform-origin: 50% 50%;
-  will-change: transform, clip-path;
-}
-
-/* Doppelseite in Erstes Licht: links das gerahmte Titelbild, rechts Tag 1; in der Mitte der Falz. */
-html body .home-page .hs-spread { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-html body .home-page .hs-spread::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(50% - 3cqi);
-  z-index: 1;
-  width: 6cqi;
-  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--c-ink) 8%, transparent) 50%, transparent);
-  pointer-events: none;
-}
-html body .home-page .hs-page { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-html body .home-page .hs-page.is-cover { padding: 4cqi 3.4cqi 4cqi 4cqi; }
-html body .home-page .hs-page.is-cover .hs-frame { flex: 1 1 auto; }
-html body .home-page .hs-page.is-cover .hs-frame::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, color-mix(in srgb, var(--c-night) 56%, transparent), transparent 58%);
-}
-html body .home-page .hs-spread .hs-cover-type { left: calc(4cqi + 2.6cqi); right: calc(3.4cqi + 2.6cqi); bottom: calc(4cqi + 2.8cqi); }
-html body .home-page .hs-spread .hs-cover-title { margin: 6px 0 4px; font-size: clamp(24px, 4.4cqi, 44px); }
-html body .home-page .hs-spread .hs-cover-sub { font-size: clamp(13px, 1.6cqi, 16px); }
-html body .home-page .hs-page.is-day {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 2.6cqi;
-  padding: 4.6cqi 4cqi 4cqi 3.4cqi;
-}
-html body .home-page .hs-page.is-day .hs-title { font-size: clamp(20px, 3.2cqi, 32px); }
-html body .home-page .hs-page.is-day .hs-text { max-width: 36ch; margin-top: 1.2cqi; font-size: clamp(12px, 1.3cqi, 14px); }
-html body .home-page .hs-day-images {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 1.6cqi;
-  min-height: 0;
-}
-html body .home-page .hs-day-images .hs-figure:first-child { grid-row: 1 / -1; }
-html body .home-page .hs-spread .hs-figure figcaption { margin-top: 6px; font-size: 12px; }
-html body .home-page .hs-single { display: flex; flex-direction: column; padding: 5cqi 11cqi 4cqi; }
-html body .home-page .hs-single .hs-figure { flex: 1 1 auto; }
+html body .home-page .ht-stage[data-phase="after"] .ht-print { opacity: 0; scale: 0.94; }
 
 @media (min-width: 900px) {
   html body .home-page .home-transform-head h2.ht-title { font-size: clamp(36px, min(3.3vw, 5.6svh), 58px); }
@@ -439,23 +320,11 @@ html body .home-page .hs-single .hs-figure { flex: 1 1 auto; }
   html body .home-page .ht-stage { margin-top: clamp(14px, 3svh, 36px); }
   html body .home-page .ht-table { container-type: size; padding: 0; }
   html body .home-page .ht-sheet { width: min(100%, 88cqh * var(--cols, 4) / var(--rows, 2) * 3 / 2); }
-  html body .home-page .ht-after .hs-viewport { flex: 1 1 auto; height: auto; min-height: 0; }
+  html body .home-page .ht-preview { flex: 1 1 auto; height: auto; min-height: 0; }
 }
-/* Handy: Doppelseite untereinander – oben das Titelbild, darunter Tag 1 ohne Fließtext. */
+/* Handy: kleinere Abzüge. */
 @media (max-width: 639px) {
   html body .home-page .ht-print { padding: 2px; }
-  html body .home-page .hs-spread { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
-  html body .home-page .hs-spread::before { display: none; }
-  html body .home-page .hs-page.is-cover { padding: 5cqi 5cqi 2.5cqi; }
-  html body .home-page .hs-page.is-day { gap: 3cqi; padding: 2.5cqi 5cqi 5cqi; }
-  html body .home-page .hs-page.is-day .hs-text { display: none; }
-  html body .home-page .hs-page.is-day .hs-title { font-size: clamp(20px, 6.4cqi, 26px); }
-  html body .home-page .hs-day-images { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 2.4cqi; }
-  html body .home-page .hs-day-images .hs-figure:first-child { grid-row: auto; }
-  html body .home-page .hs-day-images .hs-figure figcaption { display: none; }
-  html body .home-page .hs-spread .hs-cover-type { left: 10cqi; right: 10cqi; bottom: calc(2.5cqi + 5cqi); }
-  html body .home-page .hs-spread .hs-cover-title { font-size: clamp(26px, 9cqi, 36px); }
-  html body .home-page .hs-single { padding: 8cqi 7cqi 6cqi; }
 }
 /* Ohne Bewegung: keine Wege, keine Skalierung – nur eine Überblendung (420 ms). Die globale
    Abschaltung in styles.css (transition: none !important) wird hier gezielt übersteuert,
@@ -498,3 +367,104 @@ html[data-motion="off"] body .home-page .ht-print { transition: opacity 420ms li
   html body .home-page .ht-stage { margin-top: 18px; }
   html body .home-page .ht-table { padding-block: 8px; }
 }
+
+
+/* ==========================================================================
+   19.11.2026 – Nachher = die echte Reise. Die Seite von /inspiration/quiet-atlas (JournalCanvas) steht in einem
+   Iframe fester virtueller Breite (1280 px, Handy 390 px), per scale() auf den freien Platz verkleinert; ein
+   Bildschirm hoch, gleitet langsam nach unten (HomeTransformation.tsx, JourneyPreview). Nichts darin ist bedienbar.
+   ========================================================================== */
+html body .home-page .ht-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+html body .home-page .ht-more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 8px;
+  color: color-mix(in srgb, var(--c-linen) 82%, transparent);
+  font: 500 12px / 1.2 var(--sans, "Manrope", sans-serif);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 220ms var(--ht-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  html body .home-page .ht-more:hover { color: var(--c-linen); }
+}
+html body .home-page .ht-more:focus-visible { outline: 2px solid var(--c-linen); outline-offset: 4px; }
+html body .home-page .ht-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper, var(--c-linen));
+  box-shadow: 0 18px 48px color-mix(in srgb, #000 38%, transparent);
+  scale: 0.985;
+  transition: scale 1400ms var(--ht-ease);
+}
+@media (max-width: 1023px), (max-height: 659px) {
+  html body .home-page .ht-preview { height: clamp(320px, 56svh, 560px); }
+}
+html body .home-page .ht-stage[data-phase="after"] .ht-preview,
+html body .home-page .ht-stage[data-preview="on"] .ht-preview { scale: 1; }
+html body .home-page .ht-preview-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  max-width: none;
+  border: 0;
+  transform-origin: 0 0;
+  background: var(--paper, var(--c-linen));
+}
+@media (max-width: 639px) {
+  html body .home-page .ht-more { letter-spacing: 0.12em; }
+  html body .home-page .ht-preview { height: clamp(280px, 41svh, 400px); }
+  html body .home-page .ht-bar { flex-wrap: wrap; align-items: center; gap: 0 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html body .home-page .ht-preview { scale: none; transition: none; }
+}
+html[data-motion="off"] body .home-page .ht-preview { scale: none; transition: none; }
+
+/* Im Vorschaufenster steht alles still: Einblenden und Parallax aus, nichts rutscht. */
+.home-preview-document,
+.home-preview-document * {
+  --scroll-opacity: 1 !important;
+  --scroll-x: 0px !important;
+  --scroll-y: 0px !important;
+  --scroll-scale: 1 !important;
+  --parallax-y: 0px !important;
+}
+.home-preview-document { overflow-x: clip; overflow-y: visible; scrollbar-width: none; }
+.home-preview-document::-webkit-scrollbar { display: none; }
+html.is-home-frame { scrollbar-width: none; }
+
+/* Kapitelleiste: im Vorschaufenster gibt es keine Kopfzeile, die Leiste haftet ganz oben (wie auf der Reiseseite unter der Kopfzeile). */
+html .story-experience.is-home-preview {
+  --header-visible: 0px;
+  --story-line-h: 0px;
+}
+html body .story-experience.is-home-preview .chapter-bar,
+html body .story-experience.is-home-preview .chapter-bar.is-docked { top: 0 !important; }
+
+/* Kleiner Hinweis unten rechts in der Vorschau; verschwindet nach der ersten Berührung. */
+html body .home-page .ht-preview-hint {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  padding: 5px 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-linen);
+  background: color-mix(in srgb, #000 46%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ht-ease);
+}
+html body .home-page .ht-preview-hint[data-on="true"] { opacity: 0.85; }
+@media (prefers-reduced-motion: reduce) {
+  html body .home-page .ht-preview-hint { transition: none; }
+}
+html[data-motion="off"] body .home-page .ht-preview-hint { transition: none; }

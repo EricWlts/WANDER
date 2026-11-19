@@ -30,7 +30,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(transparent 30%, rgba(22, 28, 24, 0.4));
+  background: linear-gradient(transparent 30%, rgba(27, 25, 23, 0.4));
   pointer-events: none;
 }
 .title-position-block {
@@ -39,7 +39,7 @@
   width: max-content;
   max-width: 88%;
   padding: 4px 8px;
-  border: 1px dashed rgba(242, 243, 239, 0.85);
+  border: 1px dashed rgba(242, 241, 240, 0.85);
   border-radius: 4px;
   color: var(--c-linen);
   font: 400 15px/1.1 "Instrument Serif", serif;
@@ -80,7 +80,7 @@
   inset: 6px;
   border-radius: 50%;
   background: var(--c-linen);
-  box-shadow: 0 0 0 1px rgba(22, 28, 24, 0.5);
+  box-shadow: 0 0 0 1px rgba(27, 25, 23, 0.5);
 }
 .title-position-preview:hover .title-snap,
 .title-position-preview:focus-within .title-snap {
@@ -269,35 +269,35 @@
    damit Felder, Knöpfe und Linien ohne Einzelregeln folgen. Die Vorschau
    ist ein eigenes Dokument (iframe) und bleibt davon unberührt. */
 .modular-studio {
-  --dk-stage: #0b0d0b;
-  --dk-bar: #121512;
-  --dk-panel: #171b17;
-  --dk-raised: #1f2520;
-  --dk-hover: #252c26;
-  --dk-active: #2c342e;
+  --dk-stage: #0d0c0b;
+  --dk-bar: #151412;
+  --dk-panel: #1b1917;
+  --dk-raised: #242320;
+  --dk-hover: #2b2926;
+  --dk-active: #33312d;
   --dk-hair: color-mix(in srgb, var(--c-linen) 9%, transparent);
   --dk-hair-strong: color-mix(in srgb, var(--c-linen) 20%, transparent);
   --dk-text: var(--c-linen);
-  --dk-text-soft: #c9d0ca;
-  --dk-text-muted: #a3ada6;
+  --dk-text-soft: #d0cdc9;
+  --dk-text-muted: #ada9a3;
   --dk-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   background: var(--dk-stage);
   color: var(--dk-text);
 }
 .modular-studio :is(.editor-bar, .module-navigator, .module-inspector, .canvas-selection, .canvas-context, .studio-mobile-tabs, .editor-error, .recovery-banner) {
   color-scheme: dark;
-  --c-white: #f7f8f5;
+  --c-white: #f7f7f6;
   --c-chalk: var(--dk-raised);
   --c-paper: var(--dk-hover);
   --c-stone: var(--dk-active);
-  --c-stone-deep: #343d36;
+  --c-stone-deep: #3c3a35;
   --c-line: var(--dk-hair);
   --c-line-strong: var(--dk-hair-strong);
-  --c-mist: #8e9a91;
-  --c-sage: #a3ada6;
+  --c-mist: #9a968e;
+  --c-sage: #ada9a3;
   --c-muted: var(--dk-text-muted);
-  --c-olive: #c3ccc4;
-  --c-moss: #dfe6df;
+  --c-olive: #cbc9c4;
+  --c-moss: #e4e3e1;
   --c-ink-soft: var(--dk-text-soft);
   --c-ink: var(--dk-text);
   --c-clay: #dc9580;
@@ -307,9 +307,9 @@
   --paper: var(--dk-panel);
   --panel: var(--dk-panel);
   --line: var(--dk-hair);
-  --olive: #c3ccc4;
+  --olive: #cbc9c4;
   --muted: var(--dk-text-muted);
-  --accent: #c3ccc4;
+  --accent: #cbc9c4;
   --ink-soft: var(--dk-text-soft);
   color: var(--dk-text);
 }
@@ -664,7 +664,7 @@
   color: var(--dk-text-soft);
 }
 .modular-studio .module-inspector input[type="range"] {
-  accent-color: #dfe6df;
+  accent-color: #e4e3e1;
 }
 /* Regler: Wert rechts als Zahl. */
 .modular-studio .range-field-head,
@@ -778,7 +778,7 @@
   padding: 4px 4px 4px 18px;
   border: 1px solid color-mix(in srgb, var(--c-linen) 16%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, #0b0d0c 82%, transparent);
+  background: color-mix(in srgb, #0d0c0b 82%, transparent);
   backdrop-filter: blur(14px) saturate(1.2);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.6);
@@ -821,10 +821,10 @@
   align-items: center;
   gap: 8px;
   background: var(--c-linen);
-  color: #0b0d0c;
+  color: #0d0c0b;
 }
 .story-preview-pill .story-preview-edit:hover {
-  color: #0b0d0c;
+  color: #0d0c0b;
   background: color-mix(in srgb, var(--c-linen) 86%, white);
 }
 .story-preview-pill button:focus-visible {
@@ -835,7 +835,7 @@
   display: grid;
   place-items: start center;
   padding: 84px 16px 48px;
-  background: #0b0d0c;
+  background: #0d0c0b;
 }
 .story-preview-phone {
   width: 390px;

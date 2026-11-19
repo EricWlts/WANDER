@@ -326,7 +326,7 @@ export function HeroCoverEditor({ journeys }: { journeys: Journey[] }) {
   // The automatic cover also feeds the collapsed card, so it loads right away.
   useEffect(() => {
     let alive = true;
-    api<Journey>(`/showcase/quiet-atlas?lang=${locale}`)
+    api<Journey>(`/templates/quiet-atlas/example?lang=${locale}`)
       .then((story) => alive && setAutomatic(story.cover ? toTile(story.cover) : null))
       .catch(() => undefined);
     return () => {

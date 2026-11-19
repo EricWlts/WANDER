@@ -41,12 +41,12 @@ test("moves inside the studio and non-page URLs cut as before", () => {
 
 test("prefetch paths match the requests each page starts with", () => {
   assert.deepEqual(prefetchPathsFor("/", "en"), [
-    "/journeys?public=1", "/showcase/after-hours?lang=en", "/showcase/quiet-atlas?lang=en", "/site/hero",
+    "/journeys?public=1", "/templates/after-hours/example?lang=en", "/templates/quiet-atlas/example?lang=en", "/site/hero",
   ]);
   assert.deepEqual(prefetchPathsFor("/archive", "de"), ["/journeys?public=1"]);
   assert.deepEqual(prefetchPathsFor("/inspiration", "de"), ["/templates"]);
   assert.deepEqual(prefetchPathsFor("/journeys/lisboa", "de"), ["/journeys/lisboa?public=1"]);
-  assert.deepEqual(prefetchPathsFor("/showcase/after-hours", "fr"), ["/showcase/after-hours?lang=de"]);
+  assert.deepEqual(prefetchPathsFor("/showcase/after-hours", "fr"), ["/templates/after-hours/example?lang=de"]);
   assert.deepEqual(prefetchPathsFor("/inspiration/quiet-atlas", "en"), ["/templates/quiet-atlas/example?lang=en"]);
   assert.deepEqual(prefetchPathsFor("/about", "de"), []);
   assert.deepEqual(prefetchPathsFor("/studio", "de"), []);

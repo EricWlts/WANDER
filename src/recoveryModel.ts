@@ -52,8 +52,8 @@ export const LAYOUT_KEYS = [
   "media_spacing_top", "media_spacing_bottom", "frame", "edition", "photo_ids", "parent_id", "columns", "rows",
   "gap", "padding", "offset", "mobile_columns", "mobile_gap", "mobile_padding", "ratio", "fit", "align",
   "title_style", "title_size", "title_x", "title_y", "edition_fill", "margin_x", "stagger", "dates_from_photos",
-  "archive_focus", "show_title", "parallax", "speed", "rail_mode", "rail_loop", "wall_mode", "wall_center",
-  "wall_row", "all_photos",
+  "archive_focus", "show_title", "parallax", "speed", "rail_mode", "rail_size", "rail_loop", "wall_mode", "wall_center",
+  "wall_row", "all_photos", "edge_to_edge",
 ] as const;
 
 function layout(value: unknown): boolean {
@@ -67,11 +67,12 @@ function layout(value: unknown): boolean {
     optional(value, "background text_color", text) &&
     Object.keys(value).every((key) => (LAYOUT_KEYS as readonly string[]).includes(key)) &&
     optional(value, "hover_zoom parallax_intensity text_width font_weight text_size inset columns rows gap padding offset mobile_columns mobile_gap mobile_padding title_size speed media_spacing media_spacing_top media_spacing_bottom title_x title_y margin_x stagger wall_row", number) &&
-    optional(value, "text_animations show_title parallax image_parallax rail_loop edition_fill dates_from_photos frame wall_center all_photos", boolean) &&
+    optional(value, "text_animations show_title parallax image_parallax rail_loop edition_fill dates_from_photos frame wall_center all_photos edge_to_edge", boolean) &&
     optional(value, "form", oneOf("journey", "collection", "moment")) &&
     optional(value, "media_width", oneOf("cover-image", "cover-frame")) &&
     optional(value, "wall_mode", oneOf("balanced", "grid")) &&
     optional(value, "rail_mode", oneOf("free", "single")) &&
+    optional(value, "rail_size", oneOf("normal", "large")) &&
     optional(value, "text_position", oneOf("left", "center", "right", "full")) &&
     optional(value, "text_align", oneOf("left", "center", "right")) &&
     optional(value, "text_preset", oneOf("small", "medium", "large", "display")) &&

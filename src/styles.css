@@ -1065,9 +1065,9 @@ p {
 }
 /* Ladezustand im Studio-Pfad (PageState zeigt dort den Kompass): dunkel wie die Studio-Seite. */
 .page-state:has(> .compass) {
-  background: #0a0c0b;
+  background: #0c0b0a;
   color: var(--c-linen);
-  box-shadow: 0 0 0 100vmax #0a0c0b;
+  box-shadow: 0 0 0 100vmax #0c0b0a;
   clip-path: inset(0 -100vmax);
 }
 .page-state:has(> .compass) .compass { color: var(--c-linen); }

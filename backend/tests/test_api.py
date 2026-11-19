@@ -849,11 +849,12 @@ def test_invalid_vertical_media_spacing_rejected_atomically(client, axis, invali
 
 @pytest.mark.parametrize("mode", ["free", "single"])
 @pytest.mark.parametrize("loop", [False, True])
-def test_manual_rail_options_roundtrip_and_public_snapshot(client, mode, loop):
+@pytest.mark.parametrize("size", ["normal", "large"])
+def test_manual_rail_options_roundtrip_and_public_snapshot(client, mode, loop, size):
     headers = auth(client)
     journey = create(client, headers)
     legacy = {"padding": 72, "gap": 18}
-    layout = {**legacy, "rail_mode": mode, "rail_loop": loop}
+    layout = {**legacy, "rail_mode": mode, "rail_loop": loop, "rail_size": size}
     modules = [{"id": -1, "kind": "rail", "title": "Manual", "layout": layout},
                {"id": -2, "kind": "filmstrip", "title": "Automatic", "layout": {"speed": 52}},
                {"id": -3, "kind": "chapter", "title": "Legacy", "gallery_mode": "horizontal", "layout": legacy}]
@@ -875,6 +876,7 @@ def test_manual_rail_options_roundtrip_and_public_snapshot(client, mode, loop):
 @pytest.mark.parametrize("invalid", [
     {"rail_mode": "automatic"}, {"rail_mode": None}, {"rail_mode": []},
     {"rail_loop": "true"}, {"rail_loop": 1}, {"rail_loop": None},
+    {"rail_size": "huge"}, {"rail_size": None}, {"rail_size": 2},
 ])
 def test_invalid_manual_rail_options_are_rejected_atomically(client, invalid):
     headers = auth(client)
@@ -1451,3 +1453,19 @@ def test_invalid_layout_names_module_and_key(client, layout, key):
     assert response.status_code == 400
     assert response.json['code'] == 'invalid_layout'
     assert response.json['module_id'] == -7 and response.json['key'] == key
+
+
+def test_edge_to_edge_flag_persists_and_rejects_non_boolean(client):
+    headers = auth(client)
+    journey = create(client, headers)
+    response = composition(client, headers, journey, [
+        {"id": -1, "kind": "pair", "title": "Edge", "layout": {"edge_to_edge": True}}
+    ])
+    assert response.status_code == 200, response.json
+    saved = client.get(f"/api/journeys/{journey['slug']}").json
+    assert saved['chapters'][0]['layout'] == {"edge_to_edge": True}
+    for bad in ("yes", 1, None):
+        response = composition(client, headers, saved, [
+            {"id": -1, "kind": "wall", "title": "Bad", "layout": {"edge_to_edge": bad}}
+        ])
+        assert response.status_code == 400, response.json

@@ -381,6 +381,61 @@ function EditionCard({
   );
 }
 
+/** Which real, published journey the home page and "The Editions" show as an edition's example. */
+function ExamplePicker({ journeys }: { journeys: Journey[] }) {
+  const { notify } = useApp();
+  const [choice, setChoice] = useState<Record<string, number | null> | null>(null),
+    [busy, setBusy] = useState(""),
+    [error, setError] = useState("");
+  const published = useMemo(() => journeys.filter((journey) => journey.published && !journey.demo), [journeys]);
+  useEffect(() => {
+    let alive = true;
+    api<Record<string, number | null>>("/site/edition-examples")
+      .then((value) => alive && setChoice(value))
+      .catch((e) => alive && setError((e as Error).message));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  async function choose(edition: string, value: string) {
+    setBusy(edition);
+    setError("");
+    try {
+      const next = await api<Record<string, number | null>>(`/site/edition-examples/${edition}`, json("PUT", { journey_id: value ? Number(value) : null }));
+      setChoice(next);
+      notify(t("Example journey saved.", "Beispielreise gespeichert."));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+  if (!choice) return error ? <p className="form-error" role="alert">{error}</p> : null;
+  return (
+    <div className="edition-example-picker">
+      {EDITIONS.map(({ id, name }) => (
+        <label key={id} className="edition-example-field">
+          <span>{t(`Example journey for ${name()}`, `Beispielreise für ${name()}`)}</span>
+          <select value={choice[id] ?? ""} disabled={busy === id} onChange={(event) => void choose(id, event.target.value)}>
+            <option value="">{t("Automatic (default)", "Automatisch (Standard)")}</option>
+            {published.map((journey) => (
+              <option key={journey.id} value={journey.id}>
+                {journey.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+      <p className="hero-editor-note">{t("The home page and “The Editions” show this journey.", "Diese Reise zeigen Startseite und „Die Editionen“.")}</p>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function EditionEditor({ journeys }: { journeys: Journey[] }) {
   const { locale } = useLocale();
   const [editions, setEditions] = useState<Record<string, SiteEdition> | null>(null),
@@ -424,6 +479,7 @@ export function EditionEditor({ journeys }: { journeys: Journey[] }) {
             ) : null,
           )}
       </div>
+      <ExamplePicker journeys={journeys} />
     </section>
   );
 }

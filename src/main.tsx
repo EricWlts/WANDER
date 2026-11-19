@@ -31,6 +31,7 @@ import "./single-image.css";
 import "./public-journal.css";
 import "./hero-overlay.css";
 import "./home-cinema.css";
+import "./edge-media.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <LanguageProvider>

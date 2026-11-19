@@ -29,7 +29,7 @@
 .home-page .home-closing .home-step-no {
   display: block;
   margin: 0 auto;
-  color: rgba(236, 237, 235, 0.72);
+  color: rgba(237, 236, 235, 0.72);
   font: 400 40px / 0.9 var(--serif);
   letter-spacing: -0.03em;
 }
@@ -42,7 +42,7 @@
 .home-page .home-closing .home-step p {
   max-width: 32ch;
   margin: 0 auto;
-  color: rgba(236, 237, 235, 0.82);
+  color: rgba(237, 236, 235, 0.82);
   font: 400 14px / 1.55 var(--sans, "Manrope", sans-serif);
   text-wrap: pretty;
 }
@@ -214,12 +214,7 @@
   .home-page .home-transform-aside { display: block; margin: 4px 0 0; padding: 0; border: 0; }
 }
 
-/* ==========================================================================
-   J2 „Nachher“: kein Buch, sondern WANDER selbst – fünf Ansichten einer Geschichte
-   in Erstes Licht, waagerecht wischbar (scroll-snap). Bilder mit Passepartout und
-   Haarlinie, feste Seitenverhältnisse, die nächste Ansicht schaut rechts hervor.
-   Bedienung: zwei feine Pfeile, Zähler „2 / 5“, Pfeiltasten im Streifen.
-   ========================================================================== */
+/* „Vorher“ und „Nachher“ tragen eine Leiste mit Etikett und kursiver Notiz (Feinschliff in home-cinema.css). */
 .home-page .hs-bar {
   display: flex;
   align-items: flex-end;
@@ -229,236 +224,6 @@
   border-bottom: 1px solid var(--c-line-strong, var(--c-line));
 }
 .home-page .hs-bar .home-transform-label { margin: 0; padding-bottom: 13px; border-bottom: 0; }
-.home-page .hs-controls { display: flex; align-items: center; margin-right: -12px; }
-.home-page .hs-count {
-  min-width: 5ch;
-  margin-right: 6px;
-  color: var(--c-ink-soft);
-  font: 500 12px / 1 var(--sans, "Manrope", sans-serif);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.18em;
-  text-align: right;
-}
-.home-page .hs-arrow {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  color: var(--c-moss);
-  background: none;
-  cursor: pointer;
-  transition: color 0.3s ease, opacity 0.3s ease;
-}
-.home-page .hs-arrow:disabled { opacity: 0.3; cursor: default; }
-@media (hover: hover) and (pointer: fine) {
-  .home-page .hs-arrow:not(:disabled):hover { color: var(--c-ink); }
-}
-.home-page .hs-arrow:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -4px; }
-
-.home-page .hs-viewport {
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  background: none;
-}
-.home-page .hs-viewport::-webkit-scrollbar { display: none; }
-.home-page .hs-viewport:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 4px; }
-.home-page .hs-track {
-  display: flex;
-  gap: clamp(10px, 1.1vw, 16px);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.home-page .hs-view {
-  position: relative;
-  flex: 0 0 86%;
-  aspect-ratio: 3 / 2;
-  overflow: hidden;
-  container-type: inline-size;
-  scroll-snap-align: start;
-  color: var(--c-ink);
-  background: var(--c-chalk);
-  box-shadow: 0 0 0 1px var(--c-line) inset;
-}
-.home-page .hs-view > div { position: absolute; inset: 0; }
-.home-page .hs-kicker {
-  display: block;
-  color: var(--c-olive);
-  font: 500 12px / 1.4 var(--sans, "Manrope", sans-serif);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-}
-.home-page .hs-title {
-  margin: 8px 0 0;
-  font: 400 clamp(22px, 5.2cqi, 40px) / 1.04 var(--serif);
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-.home-page .hs-text {
-  max-width: 32ch;
-  margin: clamp(10px, 2.2cqi, 18px) 0 0;
-  color: var(--c-ink-soft);
-  font: 400 clamp(13px, 1.9cqi, 15px) / 1.6 var(--sans, "Manrope", sans-serif);
-  text-wrap: pretty;
-}
-/* Passepartout: das Bild sitzt mit Haarlinie im hellen Papier. */
-.home-page .hs-figure { display: flex; flex-direction: column; min-width: 0; min-height: 0; margin: 0; }
-.home-page .hs-frame {
-  position: relative;
-  display: block;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--c-stone);
-  outline: 1px solid color-mix(in srgb, var(--c-ink) 14%, transparent);
-  outline-offset: -1px;
-}
-.home-page .hs-frame img {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.home-page .hs-figure figcaption {
-  flex: none;
-  margin-top: 8px;
-  color: var(--c-muted, var(--c-ink-soft));
-  font: italic 400 13px / 1.3 var(--serif);
-  text-align: center;
-}
-
-/* 1 Titelbild: gerahmt, Titel im Bild. */
-.home-page .hs-cover { display: flex; padding: 4.5cqi; }
-.home-page .hs-cover .hs-frame { flex: 1 1 auto; }
-.home-page .hs-cover .hs-frame::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, color-mix(in srgb, var(--c-night) 52%, transparent), transparent 58%);
-}
-.home-page .hs-cover-type {
-  position: absolute;
-  left: calc(4.5cqi + 5cqi);
-  right: calc(4.5cqi + 5cqi);
-  bottom: calc(4.5cqi + 4.4cqi);
-  z-index: 1;
-  color: var(--c-linen);
-}
-.home-page .hs-cover-type .hs-kicker { color: color-mix(in srgb, var(--c-linen) 86%, transparent); }
-.home-page .hs-cover-title {
-  margin: 8px 0 6px;
-  font: 400 clamp(28px, 7.2cqi, 56px) / 1 var(--serif);
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-.home-page .hs-cover-sub { margin: 0; font: italic 400 clamp(14px, 2.4cqi, 18px) / 1.35 var(--serif); }
-
-/* 2 Kapitel: Text links, Einzelbild rechts. */
-.home-page .hs-chapter {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  align-items: center;
-  gap: 6cqi;
-  padding: 7cqi 6cqi;
-}
-.home-page .hs-chapter .hs-figure { height: 100%; }
-
-/* 3 Bildpaar */
-.home-page .hs-pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4cqi;
-  padding: 6cqi 7cqi 5cqi;
-}
-
-/* 4 Zitat: ein Satz in Serif, viel Papier. */
-.home-page .hs-quote {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8cqi 12cqi;
-  text-align: center;
-}
-.home-page .hs-quote p {
-  max-width: 18ch;
-  margin: 0;
-  font: 400 clamp(28px, 7.2cqi, 56px) / 1.1 var(--serif);
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-.home-page .hs-quote .hs-kicker::after {
-  content: "";
-  display: block;
-  width: 36px;
-  margin: 14px auto clamp(14px, 3cqi, 24px);
-  border-top: 1px solid var(--c-line-strong, var(--c-line));
-}
-
-/* 5 Bildreihe */
-.home-page .hs-row {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 4cqi;
-  padding: 6cqi 6cqi 6cqi;
-}
-.home-page .hs-row-head { display: flex; align-items: baseline; gap: 16px; }
-.home-page .hs-row-head .hs-title { margin: 0; }
-.home-page .hs-row-images {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2.4cqi;
-  min-height: 0;
-}
-
-.home-page .home-transform-after > figcaption { margin-top: 12px; }
-
-/* Tablet und Handy: der Streifen läuft rechts bis an die Bildschirmkante. */
-@media (max-width: 1023px) {
-  .home-page .hs-viewport { margin-right: calc(-1 * var(--gutter)); }
-  .home-page .hs-track { padding-right: var(--gutter); }
-  .home-page .hs-view { flex-basis: 78%; }
-  .home-page .hs-controls { margin-right: -12px; }
-}
-/* Handy: hochformatige Ansichten, Inhalte untereinander. */
-@media (max-width: 639px) {
-  .home-page .hs-view { flex-basis: 84%; aspect-ratio: 4 / 5; }
-  .home-page .hs-cover { padding: 5cqi; }
-  .home-page .hs-chapter {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    align-items: stretch;
-    gap: 6cqi;
-    padding: 8cqi 7cqi 6cqi;
-  }
-  .home-page .hs-title { font-size: clamp(22px, 8cqi, 30px); }
-  .home-page .hs-text { font-size: 13px; line-height: 1.55; }
-  .home-page .hs-pair {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 5cqi;
-    padding: 7cqi 7cqi 5cqi;
-  }
-  .home-page .hs-quote { padding: 10cqi 9cqi; }
-  .home-page .hs-quote p { font-size: clamp(26px, 9.6cqi, 36px); }
-  .home-page .hs-row { padding: 8cqi 7cqi 7cqi; gap: 6cqi; }
-  .home-page .hs-row-head { flex-direction: column; gap: 6px; }
-  .home-page .hs-row-images { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
-  .home-page .hs-row-images .hs-figure:first-child { grid-column: 1 / -1; }
-  .home-page .hs-cover-title { font-size: clamp(28px, 10cqi, 40px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-page .hs-arrow { transition: none; }
-}
-html[data-motion="off"] .home-page .hs-arrow { transition: none; }
 
 /* 15.11. Erzählbogen: der Schlusssatz ist persönlicher – etwas kleiner, damit er ruhig in ein bis zwei Zeilen steht. */
 html body .home-page .home-closing-copy h2 {

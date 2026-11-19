@@ -204,7 +204,7 @@
   overflow: hidden;
   height: 160px;
   padding: 0 clamp(20px, 3vw, 36px);
-  background: var(--c-forest, #243326);
+  background: var(--c-forest, #2f2c28);
   color: var(--c-linen, #f1ece2);
 }
 .hero-editor-bg {
@@ -222,7 +222,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, rgba(14, 22, 16, 0.82) 0%, rgba(14, 22, 16, 0.5) 45%, rgba(14, 22, 16, 0.12) 100%);
+  background: linear-gradient(90deg, rgba(19, 18, 17, 0.82) 0%, rgba(19, 18, 17, 0.5) 45%, rgba(19, 18, 17, 0.12) 100%);
 }
 .hero-editor-toggle:hover .hero-editor-bg,
 .hero-editor-toggle:focus-visible .hero-editor-bg {
@@ -250,7 +250,7 @@
   padding: 0 20px;
   border: 1px solid color-mix(in srgb, var(--c-linen, #f1ece2) 70%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, #0e1610 35%, transparent);
+  background: color-mix(in srgb, #131211 35%, transparent);
   font-size: 13px;
   letter-spacing: 0.04em;
   transition: background-color 0.3s ease, border-color 0.3s ease;

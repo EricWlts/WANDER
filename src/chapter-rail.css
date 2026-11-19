@@ -250,12 +250,12 @@ html .chapter-bar {
 html .chapter-bar::before,
 html .chapter-bar.is-docked::before {
   opacity: 1 !important;
-  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  background: color-mix(in srgb, var(--c-ink-black, #121110) 80%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
 }
 html .chapter-bar .chapter-bar-list {
-  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent) !important;
+  background: color-mix(in srgb, var(--c-ink-black, #121110) 80%, transparent) !important;
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
   border-top: 0;
@@ -396,7 +396,7 @@ html .chapter-bar.is-docked.is-open .chapter-bar-list {
 }
 @media (max-width: 899.98px) {
   html .chapter-bar .chapter-bar-inner {
-    background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+    background: color-mix(in srgb, var(--c-ink-black, #121110) 80%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.2);
     backdrop-filter: blur(18px) saturate(1.2);
   }
@@ -1109,7 +1109,7 @@ html body .chapter-bar .chapter-bar-inner {
   display: block;
   min-height: 48px;
   padding-inline: clamp(16px, 5vw, 92px);
-  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  background: color-mix(in srgb, var(--c-ink-black, #121110) 80%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
 }

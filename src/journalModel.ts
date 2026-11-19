@@ -1,7 +1,7 @@
 import type { Chapter, ImagePlacement, Journey, Layout, Photo } from "./types";
 export const editionColors = {
   "quiet-atlas": "#EEECE6",
-  "after-hours": "#1A1D18",
+  "after-hours": "#1C1B19",
 };
 export const typePresets = {
   small: 17,
@@ -32,8 +32,8 @@ export function contrastRatio(foreground: string, background: string) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 export function surfaceColors(background: string) {
-  const darkBrand = "#26302B";
-  const lightBrand = "#F2F3EF";
+  const darkBrand = "#312D2A";
+  const lightBrand = "#F2F1F0";
   const firstChoice = relativeLuminance(background) > 0.3 ? darkBrand : lightBrand;
   const otherBrand = firstChoice === darkBrand ? lightBrand : darkBrand;
   const ink = [firstChoice, otherBrand].find(

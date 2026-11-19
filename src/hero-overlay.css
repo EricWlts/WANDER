@@ -8,7 +8,7 @@
    2) Alle öffentlichen Seiten: inaktive Punkte 68 % statt 55 %, aktiver Punkt volles Leinenweiß (ohne Strich, ohne Punkt). */
 
 /* Die Kopfzeile rahmt die Seite: sie ist nie heller als die Seite darunter. */
-:root { --brand-frame: #080a08; }
+:root { --brand-frame: #0a0908; }
 /* Beim Scrollen bleibt die schmale Leiste leicht durchsichtig (Milchglas, wie bisher). Im Studio lag sie
    ganz oben auf hellem Grund und wirkte dadurch grau – der reservierte Platz dahinter ist jetzt dunkel. */
 .studio-header-slot { background: var(--brand-frame); }
@@ -21,14 +21,14 @@ html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .arc
 html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact):not(.is-scrolled):not(.has-open-menu)::before {
   /* Dunkler Fade von ganz oben bis unter die Navigation; unten geht er ganz ins Bild über. */
   bottom: -56px;
-  background: linear-gradient(to bottom, rgba(8, 10, 8, 0.72) 0%, rgba(8, 10, 8, 0.5) 45%, rgba(8, 10, 8, 0.22) 78%, rgba(8, 10, 8, 0) 100%);
+  background: linear-gradient(to bottom, rgba(10, 9, 8, 0.72) 0%, rgba(10, 9, 8, 0.5) 45%, rgba(10, 9, 8, 0.22) 78%, rgba(10, 9, 8, 0) 100%);
 }
 html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact):not(.is-scrolled)::after {
   opacity: 0;
 }
 /* Sehr weicher Schatten hält die Zeile auch auf hellem Himmel lesbar. */
 html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .archive-overview, main.inspiration-page > .ed-grid) .site-header.public-header:not(.is-compact) nav:not(.nav-open) > a {
-  text-shadow: 0 1px 14px rgba(10, 13, 10, 0.45);
+  text-shadow: 0 1px 14px rgba(12, 12, 11, 0.45);
 }
 .home-page .home-hero {
   --hero-slot: 0px;
@@ -37,8 +37,8 @@ html:has(.home-page .home-hero, .about-mag .about-hero, main.archive-page > .arc
 /* Weiche Abdunklung oben, damit Logo und Navigation auf dem Foto lesbar bleiben. */
 .home-page .home-hero.has-image .home-hero-shade {
   background:
-    linear-gradient(to top, rgba(20, 24, 20, 0.82) 0%, rgba(20, 24, 20, 0.6) 32%, rgba(20, 24, 20, 0) 68%),
-    linear-gradient(to bottom, rgba(12, 15, 12, 0.62) 0, rgba(12, 15, 12, 0.34) 150px, rgba(12, 15, 12, 0) 320px);
+    linear-gradient(to top, rgba(24, 22, 20, 0.82) 0%, rgba(24, 22, 20, 0.6) 32%, rgba(24, 22, 20, 0) 68%),
+    linear-gradient(to bottom, rgba(14, 14, 13, 0.62) 0, rgba(14, 14, 13, 0.34) 150px, rgba(14, 14, 13, 0) 320px);
 }
 /* Über WANDER: bisher 84svh unter der 164px-Kopfzeile; jetzt füllt das Bild den ersten Bildschirm. */
 .about-mag .about-hero {
@@ -92,7 +92,7 @@ html body main.archive-page:has(> .archive-overview) .archive-masthead h1 {
   margin: 8px 0 0;
   font-size: clamp(24px, 2.3vw, 34px);
   line-height: 1.12;
-  text-shadow: 0 1px 18px rgba(10, 12, 11, 0.4);
+  text-shadow: 0 1px 18px rgba(12, 11, 10, 0.4);
 }
 html body main.archive-page:has(> .archive-overview) .archive-toolbar {
   margin-top: auto;
@@ -108,10 +108,10 @@ html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-ca
 }
 html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-shade {
   background:
-    linear-gradient(to bottom, rgba(10, 12, 11, 0.66) 0, rgba(10, 12, 11, 0.34) 170px, rgba(10, 12, 11, 0) 340px),
-    linear-gradient(to top, rgba(10, 12, 11, 0.86) 0%, rgba(10, 12, 11, 0.5) 30%, rgba(10, 12, 11, 0) 62%),
-    linear-gradient(90deg, rgba(10, 12, 11, 0.5) 0%, rgba(10, 12, 11, 0.24) 32%, rgba(10, 12, 11, 0) 62%),
-    rgba(10, 12, 11, 0.1);
+    linear-gradient(to bottom, rgba(12, 11, 10, 0.66) 0, rgba(12, 11, 10, 0.34) 170px, rgba(12, 11, 10, 0) 340px),
+    linear-gradient(to top, rgba(12, 11, 10, 0.86) 0%, rgba(12, 11, 10, 0.5) 30%, rgba(12, 11, 10, 0) 62%),
+    linear-gradient(90deg, rgba(12, 11, 10, 0.5) 0%, rgba(12, 11, 10, 0.24) 32%, rgba(12, 11, 10, 0) 62%),
+    rgba(12, 11, 10, 0.1);
 }
 html body main.archive-page:has(> .archive-overview) .am-item:first-child .am-copy {
   justify-content: flex-end;
@@ -171,7 +171,7 @@ html body main#main.inspiration-page .inspiration-head {
   padding: 0;
   pointer-events: none;
   color: var(--c-linen);
-  text-shadow: 0 1px 18px rgba(10, 12, 11, 0.45);
+  text-shadow: 0 1px 18px rgba(12, 11, 10, 0.45);
 }
 html body main#main.inspiration-page .inspiration-head .eyebrow { color: color-mix(in srgb, var(--c-linen) 82%, transparent); letter-spacing: 0.28em; }
 html body main#main.inspiration-page .inspiration-head :is(h1, h2) {
@@ -191,7 +191,7 @@ html body main#main.inspiration-page .ed-card::after {
   height: 360px;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(to bottom, rgba(10, 12, 11, 0.62) 0, rgba(10, 12, 11, 0.32) 170px, rgba(10, 12, 11, 0) 100%);
+  background: linear-gradient(to bottom, rgba(12, 11, 10, 0.62) 0, rgba(12, 11, 10, 0.32) 170px, rgba(12, 11, 10, 0) 100%);
 }
 /* Text unten: links bündig zum Seitenrand, unten über dem schwebenden „Bewegung“-Knopf. */
 html body main#main.inspiration-page .ed-type {
@@ -242,7 +242,7 @@ html body main.archive-page:has(> .archive-overview) .archive-toolbar .am-meta {
   align-items: flex-end;
   gap: 2px;
 }
-html body main.archive-page:has(> .archive-overview) .archive-overview .am-count { text-shadow: 0 1px 18px rgba(10, 12, 11, 0.4); }
+html body main.archive-page:has(> .archive-overview) .archive-overview .am-count { text-shadow: 0 1px 18px rgba(12, 11, 10, 0.4); }
 @media (max-width: 699px) {
   html body main.archive-page:has(> .archive-overview) > .archive-overview { flex-direction: column; gap: 6px; }
   html body main.archive-page:has(> .archive-overview) .archive-toolbar { align-self: stretch; }
@@ -270,6 +270,7 @@ html body main.archive-page:has(> .archive-overview) .archive-overview .am-count
   html:not([data-motion="off"]) .archive-page .am-grid .am-item:first-child .am-card:hover .am-shade { opacity: 0.72; }
   html:not([data-motion="off"]) .archive-page .am-grid .am-card:hover .am-cover .picture img {
     transform: scale(1.05);
+    --active-hover: 1.05; /* Fotos mit Ausschnitt tragen ihr transform inline; die Variable greift dort. */
     filter: brightness(1.1) saturate(1.06);
   }
 }

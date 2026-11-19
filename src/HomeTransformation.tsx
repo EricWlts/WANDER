@@ -1,17 +1,22 @@
 import { BASE_URL } from "./staticSite";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
-import { t } from "./I18n";
+import { ArrowUpRight } from "lucide-react";
+import { t, useLocale } from "./I18n";
+import { api } from "./api";
+import { pickShots, type StoryPhoto } from "./homeStoryModel";
+import type { Chapter, Journey, Photo } from "./types";
+import { JournalCanvas } from "./JournalCanvas";
 import { useMotionOff } from "./Motion";
 import { isMotionOff } from "./motionState";
-import { stripIndex, stripLabel, stripStep } from "./homeStripModel";
-import { contactSheet, countWord, insetCss, pairPrints, planFlight, sheetGrid, type Box } from "./homeLightTable";
+import { contactSheet, countWord, flightOf, sheetGrid, type Box } from "./homeLightTable";
 import "./home-editions.css";
 
 /* G4: two home blocks that turn the promise into something to see.
-   A – "Verwandlung" (15.11.): thirty prints on a dark light table; the reader's click sets them into a
-   double page in First light (FLIP), after which the story can be paged through.
+   A – "Verwandlung": eight prints of the real example journey lie loose on a dark light table; the reader's click
+   sends them towards the journey, which then fades in as the real page (First light, the components of
+   /inspiration/quiet-atlas) in a small, quietly scrolling window.
    B – MoodSwitch: one motif, set in both editions, switched by the reader. */
 
 type Shot = { src: string; alt: () => string };
@@ -30,244 +35,311 @@ const SHOTS = {
   klippe: shot("tf-klippe", "A man on a cliff above the sea", "Ein Mann auf einer Klippe über dem Meer"),
 };
 
-// The light table holds exactly the photos of the story below – each once, whole, unsorted.
-// Fixed values only (no randomness): order and tilt of every print.
-const ROLL: Shot[] = [
-  SHOTS.panorama, SHOTS.chalet, SHOTS.kanal, SHOTS.abendrot,
-  SHOTS.steg, SHOTS.steinmann, SHOTS.see, SHOTS.bruecke,
-];
-type Print = { shot: Shot; tilt: number; dx: number; dy: number };
-const SHEET: Print[] = contactSheet(ROLL.length).map((spec) => ({ ...spec, shot: ROLL[spec.shot] }));
-const GRID = sheetGrid(SHEET.length);
-const COUNT = countWord(SHEET.length);
+// The story is the real example journey in First light (/templates/quiet-atlas/example, in the static build the
+// exported JSON file) – the same data as /inspiration/quiet-atlas. The built-in copy below only stands in while it
+// loads or when it cannot be reached.
+const STORY_PATH = (lang: string) => `/templates/quiet-atlas/example?lang=${lang}`;
 
-// The "after" is a small WANDER story in First light: four views, swiped sideways like the real thing.
-type StripView = { key: string; name: () => string };
-const VIEWS: StripView[] = [
-  { key: "spread", name: () => t("Double page", "Doppelseite") },
-  { key: "quote", name: () => t("Quote", "Zitat") },
-  { key: "row", name: () => t("Row of images", "Bildreihe") },
-  { key: "single", name: () => t("Single image", "Einzelbild") },
-];
-
-function StripImage({ item, sizes, caption }: { item: Shot; sizes: string; caption?: string }) {
-  return (
-    <figure className="hs-figure">
-      <span className="hs-frame">
-        <img
-          src={img(item.src)}
-          srcSet={`${img(item.src)} 640w, ${img(item.src, 1280)} 1280w`}
-          sizes={sizes}
-          alt={item.alt()}
-          width={640}
-          height={427}
-          loading="lazy"
-          decoding="async"
-          data-shot={item.src}
-        />
-      </span>
-      {caption && <figcaption>{caption}</figcaption>}
-    </figure>
-  );
+function fallbackJourney(): Journey {
+  const placed = (item: Shot, id: number, chapter: number | null, position: number): Photo => ({
+    id,
+    chapter_id: chapter,
+    position,
+    title: item.alt(),
+    alt: item.alt(),
+    description: "",
+    width: 1280,
+    height: 853,
+    featured: position === 0,
+    demo: true,
+    credit: "",
+    source_url: "",
+    original_url: null,
+    url: img(item.src, 1280),
+    large_url: img(item.src, 1280),
+    srcset: `${img(item.src)} 640w, ${img(item.src, 1280)} 1280w`,
+  });
+  const chapter = (id: number, position: number, date: string, title: string, story: string): Chapter => ({
+    id,
+    kind: "chapter",
+    position,
+    date,
+    title,
+    story,
+    quote: "",
+    gallery_mode: "editorial",
+    reveal: { effect: "up", duration: 2000 },
+  });
+  const photos = [
+    placed(SHOTS.panorama, 1, null, 0),
+    placed(SHOTS.chalet, 2, 11, 0),
+    placed(SHOTS.steinmann, 3, 11, 1),
+    placed(SHOTS.abendrot, 4, 11, 2),
+    placed(SHOTS.steg, 5, 12, 0),
+    placed(SHOTS.see, 6, 12, 1),
+    placed(SHOTS.kanal, 7, 12, 2),
+    placed(SHOTS.bruecke, 8, 13, 0),
+  ];
+  return {
+    id: -1,
+    slug: "quiet-atlas",
+    is_example: true,
+    story_template: "quiet-atlas",
+    studio_step: 4,
+    filmstrip_ids: [],
+    reveal_settings: { default: { effect: "up", duration: 2000 }, images: { effect: "fade", duration: 2400 } },
+    title: t("Between snow and stillness", "Zwischen Schnee und Stille"),
+    subtitle: t("Over the turn of the year in the Bernese Oberland.", "Zum Jahreswechsel im Berner Oberland."),
+    location: t("Bernese Oberland", "Berner Oberland"),
+    country: t("Switzerland", "Schweiz"),
+    start_date: "2024-12-27",
+    end_date: "2025-01-01",
+    description: "",
+    introduction: "",
+    reflection: "",
+    closing: "",
+    preset: "quiet",
+    published: true,
+    demo: true,
+    cover_id: 1,
+    cover: photos[0],
+    photo_count: photos.length,
+    chapter_count: 3,
+    photos,
+    chapters: [
+      chapter(
+        11,
+        0,
+        "2024-12-27",
+        t("Arriving in snow", "Ankommen im Schnee"),
+        t(
+          "The wooden chalet stands against the light. We unpack without hurrying. In the evening the peaks turn red, and we stay outside longer than the cold allows.",
+          "Das Holzchalet steht im Gegenlicht. Wir packen aus, ohne uns zu beeilen. Am Abend färben sich die Gipfel rot, und wir stehen länger draußen, als die Kälte es erlaubt.",
+        ),
+      ),
+      chapter(
+        12,
+        1,
+        "2024-12-29",
+        t("Still water", "Stilles Wasser"),
+        t(
+          "By the lake the haze settles between the mountains. A rusty jetty reaches a little way out and ends in the water.",
+          "Am See liegt der Dunst zwischen den Bergen. Ein rostiger Steg führt ein Stück hinaus und endet im Wasser.",
+        ),
+      ),
+      chapter(
+        13,
+        2,
+        "2025-01-01",
+        t("The first light of the year", "Das erste Licht des Jahres"),
+        t(
+          "On New Year's Day we climb. A suspension bridge spans two snowy summits, and above it the whole panorama opens up.",
+          "Am Neujahrstag gehen wir hinauf. Eine Hängebrücke spannt sich zwischen zwei verschneiten Gipfeln, und darüber öffnet sich das ganze Panorama.",
+        ),
+      ),
+    ],
+  };
 }
 
-function StoryStrip({ active }: { active: boolean }) {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
+type Print = { photo: StoryPhoto; tilt: number; dx: number; dy: number };
+
+/* The real journey in a small window. The page is rendered by the real components (JournalCanvas, as on
+   /inspiration/quiet-atlas) into a same-origin iframe of a fixed virtual width (1280 px, 390 px on a phone), so
+   its media queries, vh units and styles behave exactly like on a real screen; the frame is scaled down to the
+   space that is left (the same technique as the editor preview). The visitor can scroll it (wheel, touch, keys, rail) while links and
+   enlarging pictures do nothing; reveals and parallax are off, and the page glides slowly down by itself until
+   touched – unless motion is off. */
+const VIRTUAL_WIDE = 1280;
+const VIRTUAL_PHONE = 390;
+const GLIDE_DELAY = 10000;
+const GLIDE_SPEED = 46; // virtual px per second
+const GLIDE_RAMP = 1800;
+const GLIDE_RESUME = 10000; // quiet time after the visitor's last touch before the glide carries on
+
+function JourneyPreview({ journey, active }: { journey: Journey; active: boolean }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const [body, setBody] = useState<HTMLElement | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [near, setNear] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const { locale } = useLocale();
   const motionOff = useMotionOff();
-  const count = VIEWS.length;
-  const offsets = () => {
-    const views = Array.from(viewportRef.current?.querySelectorAll<HTMLElement>(".hs-view") ?? []);
-    const first = views[0]?.offsetLeft ?? 0;
-    return views.map((view) => view.offsetLeft - first);
-  };
   useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      setIndex(stripIndex(offsets(), viewport.scrollLeft, viewport.scrollWidth - viewport.clientWidth));
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(update);
-    };
-    viewport.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    update();
+    const el = outer.current;
+    if (!el) return;
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const resize = new ResizeObserver(measure);
+    resize.observe(el);
+    // The window only loads once the block is near the screen.
+    const watch = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setNear(true);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    watch.observe(el);
     return () => {
-      viewport.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
+      resize.disconnect();
+      watch.disconnect();
     };
   }, []);
-  const go = (target: number) => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const next = stripStep(target, 0, count);
-    const left = offsets()[next] ?? 0;
-    viewport.scrollTo({ left, behavior: motionOff || isMotionOff() ? "auto" : "smooth" });
-    setIndex(next);
-  };
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step) {
-      event.preventDefault();
-      go(index + step);
-    } else if (event.key === "Home" || event.key === "End") {
-      event.preventDefault();
-      go(event.key === "Home" ? 0 : count - 1);
+  // The frame keeps the styles of the page (also while Vite swaps them), and never moves.
+  useEffect(() => {
+    if (!body) return;
+    const doc = body.ownerDocument;
+    const sync = () => {
+      doc.head.innerHTML = "";
+      document.querySelectorAll('style,link[rel="stylesheet"]').forEach((node) => doc.head.appendChild(node.cloneNode(true)));
+    };
+    const watch = new MutationObserver(sync);
+    watch.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => watch.disconnect();
+  }, [body]);
+  useEffect(() => {
+    if (!body) return;
+    const root = body.ownerDocument.documentElement;
+    root.lang = locale;
+    root.dataset.motion = "off";
+  }, [body, locale]);
+  // The page glides through all of its photographs: load them up front instead of when they scroll into view.
+  useEffect(() => {
+    if (!body) return;
+    const eager = () => body.querySelectorAll<HTMLImageElement>('img[loading="lazy"]').forEach((image) => (image.loading = "eager"));
+    eager();
+    const watch = new MutationObserver(eager);
+    watch.observe(body, { childList: true, subtree: true });
+    const id = window.setTimeout(() => watch.disconnect(), 5000);
+    return () => {
+      window.clearTimeout(id);
+      watch.disconnect();
+    };
+  }, [body]);
+  // A slow glide down the page once the preview is on stage; back to the top when the table is reset. The visitor can
+  // scroll the journey themselves: any wheel, touch, pointer, key or focus event inside the frame stops the glide,
+  // and after a quiet spell it carries on from wherever the page is (and stops at the end).
+  useEffect(() => {
+    const doc = body?.ownerDocument;
+    const scroller = doc?.scrollingElement;
+    if (!doc || !scroller) return;
+    if (!active) {
+      scroller.scrollTop = 0;
+      setTouched(false);
+      return;
     }
-  };
-  const page = "(max-width: 639px) 80vw, (max-width: 1023px) 38vw, 28vw";
-  const half = "(max-width: 639px) 44vw, (max-width: 1023px) 22vw, 16vw";
-  const small = "(max-width: 639px) 22vw, (max-width: 1023px) 14vw, 11vw";
-  const third = "(max-width: 639px) 40vw, (max-width: 1023px) 22vw, 15vw";
+    const gliding = !(motionOff || isMotionOff());
+    let frame = 0;
+    let startTimer = 0;
+    let resumeTimer = 0;
+    let started = 0;
+    let last = 0;
+    let position = 0;
+    const stop = () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(resumeTimer);
+      cancelAnimationFrame(frame);
+      frame = 0;
+      started = 0;
+    };
+    function interact() {
+      stop();
+      setTouched(true);
+      if (gliding) resumeTimer = window.setTimeout(run, GLIDE_RESUME);
+    }
+    const step = (now: number) => {
+      // Somebody else moved the page (scroll bar, a wheel we did not see): hand over to them.
+      if (Math.abs(scroller.scrollTop - position) > 2) {
+        interact();
+        return;
+      }
+      if (!started) {
+        started = now;
+        last = now;
+      }
+      const elapsed = now - started;
+      const dt = Math.min(64, now - last);
+      last = now;
+      const max = scroller.scrollHeight - scroller.clientHeight;
+      const ramp = Math.min(1, elapsed / GLIDE_RAMP);
+      position = Math.min(max, position + (GLIDE_SPEED * ramp * ramp * (3 - 2 * ramp) * dt) / 1000);
+      scroller.scrollTop = position;
+      frame = position < max ? requestAnimationFrame(step) : 0;
+    };
+    function run() {
+      position = scroller!.scrollTop;
+      started = 0;
+      frame = requestAnimationFrame(step);
+    }
+    // Links lead nowhere from the preview and pictures do not open; the carousel controls (buttons) keep working.
+    const guard = (event: Event) => {
+      const target = event.target as Element | null;
+      if (!target || typeof target.closest !== "function") return;
+      if (target.closest("a")) {
+        event.preventDefault();
+        event.stopPropagation();
+      } else if (target.closest("img, picture") && !target.closest("button")) {
+        event.stopPropagation();
+      }
+    };
+    const events = ["wheel", "touchstart", "pointerdown", "keydown", "focusin"] as const;
+    events.forEach((name) => doc.addEventListener(name, interact, { passive: true, capture: true }));
+    doc.addEventListener("click", guard, true);
+    if (gliding) startTimer = window.setTimeout(run, GLIDE_DELAY);
+    return () => {
+      stop();
+      events.forEach((name) => doc.removeEventListener(name, interact, true));
+      doc.removeEventListener("click", guard, true);
+    };
+  }, [active, body, motionOff]);
+  const width = size.w >= 640 ? VIRTUAL_WIDE : VIRTUAL_PHONE;
+  const scale = size.w > 0 ? Math.min(1, size.w / width) : 1;
+  const edition = journey.story_template || "quiet-atlas";
   return (
-    <div className="ht-layer ht-after" inert={!active}>
-      <div className="hs-bar ht-bar">
-        <span className="home-transform-label">
-          {t("After", "Nachher")}
-          <span className="hs-bar-note">
-            {t("The same photos, as a story in First light.", "Dieselben Fotos, als Geschichte in Erstes Licht.")}
-          </span>
-        </span>
-        <div className="hs-controls">
-          <span className="hs-dashes" aria-hidden="true">
-            {VIEWS.map((view, i) => (
-              <span key={view.key} className={i === index ? "is-active" : undefined} />
-            ))}
-          </span>
-          <span className="hs-count" aria-live="polite" aria-atomic="true">
-            <span className="visually-hidden">{t("View", "Ansicht")} </span>
-            {stripLabel(index, count)}
-          </span>
-          <button
-            type="button"
-            className="hs-arrow"
-            aria-label={t("Previous view", "Vorherige Ansicht")}
-            disabled={index === 0}
-            onClick={() => go(index - 1)}
-          >
-            <ArrowLeft size={18} strokeWidth={1.4} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="hs-arrow"
-            aria-label={t("Next view", "Nächste Ansicht")}
-            disabled={index === count - 1}
-            onClick={() => go(index + 1)}
-          >
-            <ArrowRight size={18} strokeWidth={1.4} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-      <div
-        ref={viewportRef}
-        className="hs-viewport template-quiet-atlas"
-        tabIndex={0}
-        role="region"
-        aria-roledescription={t("carousel", "Bildstreifen")}
-        aria-label={t(
-          "Between snow and stillness, set in First light. Swipe or use the arrow keys.",
-          "Zwischen Schnee und Stille, gesetzt in Erstes Licht. Wischen oder Pfeiltasten nutzen.",
-        )}
-        onKeyDown={onKeyDown}
-      >
-        <ol className="hs-track">
-          {VIEWS.map((view, i) => (
-            <li
-              key={view.key}
-              className={`hs-view hs-${view.key}`}
-              aria-label={t(`View ${i + 1} of ${count}: ${view.name()}`, `Ansicht ${i + 1} von ${count}: ${view.name()}`)}
-            >
-              {view.key === "spread" && (
-                <div className="hs-spread">
-                  <div className="hs-page is-cover">
-                    <span className="hs-frame">
-                      <img
-                        src={img(SHOTS.panorama.src)}
-                        srcSet={`${img(SHOTS.panorama.src)} 640w, ${img(SHOTS.panorama.src, 1280)} 1280w`}
-                        sizes={page}
-                        alt={SHOTS.panorama.alt()}
-                        width={1280}
-                        height={853}
-                        loading="lazy"
-                        decoding="async"
-                        data-shot={SHOTS.panorama.src}
-                      />
-                    </span>
-                    <div className="hs-cover-type">
-                      <span className="hs-kicker">{t("Bernese Oberland · Winter", "Berner Oberland · Winter")}</span>
-                      <p className="hs-cover-title">{t("Between snow and stillness", "Zwischen Schnee und Stille")}</p>
-                      <p className="hs-cover-sub">{t("Six winter days in the mountains.", "Sechs Wintertage in den Bergen.")}</p>
-                    </div>
-                  </div>
-                  <div className="hs-page is-day">
-                    <div className="hs-copy">
-                      <span className="hs-kicker">{t("Day 1", "Tag 1")}</span>
-                      <p className="hs-title">{t("Arriving in the snow", "Ankunft im Schnee")}</p>
-                      <p className="hs-text">
-                        {t(
-                          "Late in the afternoon we reach the chalet. Then the light turns red, and everything goes quiet.",
-                          "Am späten Nachmittag erreichen wir das Chalet. Dann wird das Licht rot, und alles wird still.",
-                        )}
-                      </p>
-                    </div>
-                    <div className="hs-day-images">
-                      <StripImage item={SHOTS.chalet} sizes={half} caption={t("Chalet against the light", "Chalet im Gegenlicht")} />
-                      <StripImage item={SHOTS.kanal} sizes={small} />
-                      <StripImage item={SHOTS.abendrot} sizes={small} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {view.key === "quote" && (
-                <div className="hs-quote">
-                  <span className="hs-kicker">{t("Day 2", "Tag 2")}</span>
-                  <p>{t("In the evening, only the snow still speaks.", "Am Abend spricht nur noch der Schnee.")}</p>
-                </div>
-              )}
-              {view.key === "row" && (
-                <div className="hs-row">
-                  <div className="hs-row-head">
-                    <span className="hs-kicker">{t("Day 3", "Tag 3")}</span>
-                    <p className="hs-title">{t("By the lake", "Am See")}</p>
-                  </div>
-                  <div className="hs-row-images">
-                    {[SHOTS.steg, SHOTS.steinmann, SHOTS.see].map((item) => (
-                      <StripImage key={item.src} item={item} sizes={third} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {view.key === "single" && (
-                <div className="hs-single">
-                  <StripImage
-                    item={SHOTS.bruecke}
-                    sizes={page}
-                    caption={t("Day 4 · Across the ridge", "Tag 4 · Über den Grat")}
-                  />
-                </div>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
+    <div
+      ref={outer}
+      className="ht-preview"
+      role="group"
+      aria-label={t(`${journey.title}: the journey, set in First light`, `${journey.title}: die Reise, gesetzt in Erstes Licht`)}
+    >
+      {near && size.w > 0 && (
+        <iframe
+          className="ht-preview-frame"
+          title={t("Preview of the journey", "Vorschau der Reise")}
+          tabIndex={0}
+          srcDoc={"<!doctype html><html><head></head><body></body></html>"}
+          style={{ width, height: size.h / scale, transform: `scale(${scale})` }}
+          onLoad={(event) => {
+            const doc = event.currentTarget.contentDocument;
+            if (!doc) return;
+            document.querySelectorAll('style,link[rel="stylesheet"]').forEach((node) => doc.head.appendChild(node.cloneNode(true)));
+            doc.documentElement.className = document.documentElement.className;
+            doc.documentElement.classList.add("is-home-frame");
+            doc.body.className = "preview-document home-preview-document";
+            setBody(doc.body);
+          }}
+        >
+          {body &&
+            createPortal(
+              <main className={`story-experience template-${edition} is-story-preview is-home-preview`}>
+                <JournalCanvas journey={journey} />
+              </main>,
+              body,
+            )}
+        </iframe>
+      )}
+      <span className="ht-preview-hint" data-on={active && !touched && Boolean(body)} aria-hidden="true">
+        {t("Scroll to explore", "Scrollen zum Erkunden")}
+      </span>
     </div>
   );
 }
 
-/* FLIP (geometry in homeLightTable.ts): every print flies from the light table to its frame in the story overview
-   (all four views side by side); after a short rest the overview opens into the strip.
-   A clone sits at the frame's final place and starts transformed back onto the print (translate,
-   tilt, uniform scale); clip-path carries the crop from the print to the frame. Both boxes
-   show the same photo with object-fit: cover, so working with the whole photo keeps the scale uniform. */
+// Eight prints fly towards the journey: each one on its own way (a loose fan), smaller and fainter, while the journey
+// fades in underneath; then the table rests.
 const EASE = "cubic-bezier(0.2, 0.7, 0.2, 1)";
-const FLIGHT = 900;
-const STAGGER = 40;
-// After the last print lands, the overview rests a moment before it opens into the strip.
-const HOLD = 420;
+const FLIGHT = 1000;
+const STAGGER = 55;
+const PREVIEW_AT = 560;
 
 // Layout box without rotation: the centre survives a rotation, the size comes from offsetWidth/Height.
 function boxOf(el: HTMLElement): Box {
@@ -276,50 +348,35 @@ function boxOf(el: HTMLElement): Box {
   const h = el.offsetHeight;
   return { x: r.left + r.width / 2 - w / 2, y: r.top + r.height / 2 - h / 2, w, h };
 }
-function focusOf(el: HTMLImageElement): [number, number] {
-  const [x, y] = getComputedStyle(el).objectPosition.split(" ");
-  const part = (v?: string) => (v && v.endsWith("%") ? parseFloat(v) / 100 : 0.5);
-  return [part(x), part(y)];
-}
-function launch(print: HTMLImageElement, target: HTMLImageElement, layer: HTMLElement, tilt: number, delay: number) {
-  const origin = layer.getBoundingClientRect();
-  const ratio =
-    target.naturalWidth && target.naturalHeight
-      ? target.naturalWidth / target.naturalHeight
-      : print.naturalWidth && print.naturalHeight
-        ? print.naturalWidth / print.naturalHeight
-        : 1.5;
-  const flight = planFlight(boxOf(print), boxOf(target), ratio, tilt, focusOf(print), focusOf(target));
-  const clone = document.createElement("img");
-  clone.src = target.complete && target.currentSrc ? target.currentSrc : print.currentSrc || print.src;
-  clone.alt = "";
-  clone.className = "ht-flier";
-  clone.style.left = `${flight.photo.x - origin.left}px`;
-  clone.style.top = `${flight.photo.y - origin.top}px`;
-  clone.style.width = `${flight.photo.w}px`;
-  clone.style.height = `${flight.photo.h}px`;
-  layer.appendChild(clone);
-  const animation = clone.animate(
-    [
-      {
-        transform: `translate(${flight.tx}px, ${flight.ty}px) rotate(${tilt}deg) scale(${flight.scale})`,
-        clipPath: insetCss(flight.startInset),
-        filter: "saturate(0.5) brightness(0.8)",
-      },
-      { transform: "none", clipPath: insetCss(flight.endInset), filter: "none" },
-    ],
-    { duration: FLIGHT, delay, easing: EASE, fill: "both" },
-  );
-  return { clone, animation };
-}
 
 type Phase = "before" | "flying" | "after";
 
 export function HomeTransformation() {
   const [phase, setPhase] = useState<Phase>("before");
   const phaseRef = useRef<Phase>("before");
+  const { locale } = useLocale();
+  // The real example journey; until it has arrived (or if it cannot be reached) the built-in copy stands in.
+  // A journey that arrives mid-flight waits until the table is reset, so nothing changes under the prints.
+  const [loaded, setLoaded] = useState<Journey | null>(null);
+  const pending = useRef<Journey | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<Journey>(STORY_PATH(locale), { signal: controller.signal })
+      .then((journey) => {
+        if (controller.signal.aborted || !journey?.photos?.length || !journey.chapters?.length) return;
+        if (phaseRef.current === "before") setLoaded(journey);
+        else pending.current = journey;
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [locale]);
+  const journey = useMemo(() => loaded ?? fallbackJourney(), [loaded, locale]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { sheet, grid, count } = useMemo(() => {
+    const roll = pickShots(journey);
+    const prints: Print[] = contactSheet(roll.length).map((spec) => ({ ...spec, photo: roll[spec.shot] }));
+    return { sheet: prints, grid: sheetGrid(prints.length), count: countWord(prints.length) };
+  }, [journey]);
   const stageRef = useRef<HTMLDivElement>(null);
-  const flightRef = useRef<HTMLDivElement>(null);
   const linkRef = useRef<HTMLAnchorElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const focusLink = useRef(false);
@@ -332,27 +389,6 @@ export function HomeTransformation() {
     setPhase(next);
   };
   const settle = () => cleanups.current.splice(0).forEach((done) => done());
-  const expandFrom = useRef<DOMRect[] | null>(null);
-  const views = () => Array.from(stageRef.current?.querySelectorAll<HTMLElement>(".hs-view") ?? []);
-  // Overview → strip (FLIP): every page grows from its small place in the overview to its place in the strip.
-  useLayoutEffect(() => {
-    const from = expandFrom.current;
-    expandFrom.current = null;
-    if (phase !== "after" || !from || motionOff || isMotionOff()) return;
-    const animations = views().map((view, i) => {
-      const a = from[i];
-      const b = view.getBoundingClientRect();
-      if (!a || !b.width || !b.height) return null;
-      return view.animate(
-        [
-          { transformOrigin: "0 0", transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})` },
-          { transformOrigin: "0 0", transform: "none" },
-        ],
-        { duration: FLIGHT, easing: EASE },
-      );
-    });
-    return () => animations.forEach((animation) => animation?.cancel());
-  }, [phase, motionOff]);
   useEffect(() => settle, []);
   useEffect(() => {
     if (phase !== "before" && focusLink.current) {
@@ -370,70 +406,61 @@ export function HomeTransformation() {
     if (phaseRef.current !== "before") return;
     focusLink.current = true;
     const stage = stageRef.current;
-    const layer = flightRef.current;
-    if (!stage || !layer || motionOff || isMotionOff()) {
+    if (!stage || motionOff || isMotionOff()) {
       move("after");
       return;
     }
-    const viewport = stage.querySelector<HTMLElement>(".hs-viewport");
-    if (viewport) viewport.scrollLeft = 0;
-    // The overview (all views side by side) has to stand before the targets are measured.
-    stage.dataset.phase = "flying";
-    const visible = (el: HTMLElement) => {
-      const r = el.getBoundingClientRect();
-      return el.offsetWidth > 0 && r.right > 0 && r.left < window.innerWidth;
-    };
-    const prints = Array.from(stage.querySelectorAll<HTMLImageElement>(".ht-sheet img[data-shot]")).filter(visible);
-    const targets = Array.from(stage.querySelectorAll<HTMLImageElement>(".ht-after img[data-shot]")).filter(visible);
-    const spot = (el: HTMLImageElement) => {
-      const box = boxOf(el);
-      return { shot: el.dataset.shot ?? "", at: { x: box.x, y: box.y } };
-    };
-    const pairs = pairPrints(prints.map(spot), targets.map(spot)).map(({ print, target }) => ({
-      print: prints[print],
-      target: targets[target],
-    }));
-    const flights = pairs.map(({ print, target }, i) => {
-      const flight = launch(print, target, layer, Number(print.dataset.tilt) || 0, i * STAGGER);
-      print.parentElement?.classList.add("is-lifted");
-      target.classList.add("is-landing");
-      return { ...flight, print, target };
+    const prints = Array.from(stage.querySelectorAll<HTMLElement>(".ht-sheet .ht-print"));
+    const area = stage.querySelector<HTMLElement>(".ht-preview")?.getBoundingClientRect();
+    if (!prints.length || !area) {
+      move("after");
+      return;
+    }
+    const to = { x: area.left + area.width / 2, y: area.top + area.height / 2 };
+    const animations = prints.map((print, i) => {
+      const flight = flightOf(boxOf(print), to, i, prints.length);
+      const dx = parseFloat(print.style.getPropertyValue("--dx")) || 0;
+      const dy = parseFloat(print.style.getPropertyValue("--dy")) || 0;
+      const tilt = parseFloat(print.style.getPropertyValue("--tilt")) || 0;
+      return print.animate(
+        [
+          { translate: `${dx}px ${dy}px`, rotate: `${tilt}deg`, scale: 1, opacity: 1 },
+          { opacity: 1, offset: 0.62 },
+          { translate: `${dx + flight.tx}px ${dy + flight.ty}px`, rotate: "0deg", scale: flight.scale, opacity: 0 },
+        ],
+        { duration: FLIGHT, delay: i * STAGGER, easing: EASE, fill: "both" },
+      );
     });
+    move("flying");
+    const showPreview = window.setTimeout(() => {
+      stage.dataset.preview = "on";
+    }, PREVIEW_AT);
     const land = () => {
-      flights.forEach(({ clone, animation, print, target }) => {
-        animation.cancel();
-        clone.remove();
-        print.parentElement?.classList.remove("is-lifted");
-        target.classList.remove("is-landing");
-      });
+      window.clearTimeout(showPreview);
+      animations.forEach((animation) => animation.cancel());
     };
     cleanups.current.push(land);
-    move("flying");
-    const done = () => {
-      if (phaseRef.current !== "flying") return;
-      land();
-      cleanups.current = cleanups.current.filter((item) => item !== land);
-      const id = window.setTimeout(() => {
+    Promise.all(animations.map((animation) => animation.finished)).then(
+      () => {
         if (phaseRef.current !== "flying") return;
-        expandFrom.current = views().map((view) => view.getBoundingClientRect());
+        stage.dataset.preview = "on";
         move("after");
-      }, HOLD);
-      cleanups.current.push(() => window.clearTimeout(id));
-    };
-    if (flights.length) {
-      Promise.all(flights.map(({ animation }) => animation.finished)).then(done, () => undefined);
-    } else {
-      const id = window.setTimeout(done, FLIGHT);
-      cleanups.current.push(() => window.clearTimeout(id));
-    }
+        // The prints are invisible by now; releasing them lets the table rest under the finished page.
+        window.setTimeout(land, 60);
+      },
+      () => undefined,
+    );
   };
 
   // Back to the light table – the prints wait for the next click, nothing plays by itself.
   const reset = () => {
     settle();
-    const viewport = stageRef.current?.querySelector<HTMLElement>(".hs-viewport");
-    if (viewport) viewport.scrollLeft = 0;
+    delete stageRef.current?.dataset.preview;
     focusButton.current = true;
+    if (pending.current) {
+      setLoaded(pending.current);
+      pending.current = null;
+    }
     move("before");
   };
 
@@ -443,7 +470,7 @@ export function HomeTransformation() {
         <h2 id="home-transform-title" className="ht-title">
           <span className="ht-swap">
             <span className="ht-line-set" data-on={!isAfter} aria-hidden={isAfter}>
-              <span className="ht-line">{t(`${COUNT.en} photos.`, `${COUNT.de} Fotos.`)}</span>
+              <span className="ht-line">{t(`${count.en} photos.`, `${count.de} Fotos.`)}</span>
               <em className="ht-line">{t("Somewhere among four thousand others.", "Irgendwo zwischen viertausend anderen.")}</em>
             </span>
             <span className="ht-line-set" data-on={isAfter} aria-hidden={!isAfter}>
@@ -475,7 +502,7 @@ export function HomeTransformation() {
           <div className="hs-bar ht-bar">
             <span className="home-transform-label">
               {t("Before", "Vorher")}
-              <span className="hs-bar-note">{t(`${SHEET.length} photos, unsorted`, `${SHEET.length} Fotos, unsortiert`)}</span>
+              <span className="hs-bar-note">{t(`${sheet.length} photos, unsorted`, `${sheet.length} Fotos, unsortiert`)}</span>
             </span>
           </div>
           <div className="ht-table">
@@ -483,34 +510,46 @@ export function HomeTransformation() {
               className="ht-sheet"
               role="img"
               aria-label={t(
-                `Contact sheet: ${COUNT.en.toLowerCase()} photos from a winter week in Switzerland, unsorted.`,
-                `Kontaktbogen: ${COUNT.de.toLowerCase()} Fotos einer Winterwoche in der Schweiz, unsortiert.`,
+                `Contact sheet: ${count.en.toLowerCase()} photos, unsorted.`,
+                `Kontaktbogen: ${count.de.toLowerCase()} Fotos, unsortiert.`,
               )}
-              style={{ "--cols": GRID.cols, "--rows": GRID.rows } as CSSProperties}
+              style={{ "--cols": grid.cols, "--rows": grid.rows } as CSSProperties}
             >
-              {SHEET.map((print, i) => (
+              {sheet.map((print, i) => (
                 <li
                   key={i}
                   className="ht-print"
                   style={{ "--tilt": `${print.tilt}deg`, "--dx": `${print.dx}px`, "--dy": `${print.dy}px` } as CSSProperties}
                 >
                   <img
-                    src={img(print.shot.src)}
+                    src={print.photo.src}
+                    srcSet={print.photo.srcSet || undefined}
+                    sizes="(max-width: 639px) 26vw, 16vw"
                     alt=""
                     width={640}
                     height={427}
                     loading="lazy"
                     decoding="async"
-                    data-shot={print.shot.src}
-                    data-tilt={print.tilt}
                   />
                 </li>
               ))}
             </ul>
           </div>
         </div>
-        <StoryStrip active={phase === "after"} />
-        <div ref={flightRef} className="ht-flight" aria-hidden="true" />
+        <div className="ht-layer ht-after" inert={phase !== "after"}>
+          <div className="hs-bar ht-bar">
+            <span className="home-transform-label">
+              {t("After", "Nachher")}
+              <span className="hs-bar-note">
+                {t("The same photos, as a story in First light.", "Dieselben Fotos, als Geschichte in Erstes Licht.")}
+              </span>
+            </span>
+            <Link to="/inspiration/quiet-atlas" className="ht-more">
+              {t("See the whole journey", "Die ganze Reise ansehen")} <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
+          <JourneyPreview journey={journey} active={phase === "after"} />
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Picture } from "./components";
 import type { Layout, Photo } from "./types";
 import { offsetsFor } from "./journalModel";
 import { fixedParallax } from "./fixedMotion";
+import { edgeColumns } from "./edgeMedia";
 import { automaticWallSpans, balancedWallRows, effectivePhotoRatio } from "./storyLayout";
 
 /** Phone width: balanced rows hold at most two photos. */
@@ -25,6 +26,7 @@ export function PhotoWall({
   selectedId,
   mini = false,
   autoComposition = false,
+  edge = false,
 }: {
   photos: Photo[];
   layout: Layout;
@@ -32,6 +34,8 @@ export function PhotoWall({
   selectedId?: string;
   mini?: boolean;
   autoComposition?: boolean;
+  /** „Bis zum Rand“: one format, full viewport width (see edgeMedia.ts, edge-media.css). */
+  edge?: boolean;
 }) {
   const compact = useCompactWall();
   const columns = autoComposition ? 12 : layout.columns || 4,
@@ -72,6 +76,32 @@ export function PhotoWall({
     "--wall-top": `${Math.max(0, -Math.min(...offsets))}px`,
     "--wall-bottom": `${Math.max(0, ...offsets)}px`,
   } as CSSProperties;
+  if (edge && !mini && photos.length > 1) {
+    const cols = edgeColumns(photos.length, effectivePhotoRatio(framed(photos[0])));
+    return (
+      <div
+        className="photo-wall wall-edge"
+        data-wall-mode="edge"
+        style={{ "--edge-cols": cols.desktop, "--edge-mobile-cols": cols.mobile } as CSSProperties}
+      >
+        {photos.map((p, i) => (
+          <figure
+            key={p.placement_id || `${p.id}:${i}`}
+            className={p.placement_id === selectedId ? "photo-selected" : ""}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Picture
+              parallax={false}
+              photo={framed(p)}
+              sizes="(max-width:760px) 100vw, 50vw"
+              onClick={onPhoto ? () => onPhoto(p) : undefined}
+            />
+            {p.edits?.show_title && p.title?.trim() && <figcaption>{p.title}</figcaption>}
+          </figure>
+        ))}
+      </div>
+    );
+  }
   if (layout.wall_mode === "balanced") {
     const sizes = photos.map((p) => layout.placements?.find((f) => f.id === p.placement_id)?.size);
     const rows = balancedWallRows({

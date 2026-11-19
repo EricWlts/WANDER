@@ -102,8 +102,8 @@ export function Inspiration({ embedded = false, intro }: { embedded?: boolean; i
       <header className="inspiration-head">
         <span className="eyebrow">{t("Two editions", "Zwei Editionen")}</span>
         <Heading id="editions-heading">
-          {t("Light or dark.", "Hell oder dunkel.")}{" "}
-          <em>{t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}</em>
+          {t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}{" "}
+          <em>{t("Light or dark.", "Hell oder dunkel.")}</em>
         </Heading>
         <p className="page-lead">
           {t(
@@ -118,8 +118,8 @@ export function Inspiration({ embedded = false, intro }: { embedded?: boolean; i
         <div className="ed-seam-title" aria-hidden="true">
           {(["is-ink", "is-linen"] as const).map((tone) => (
             <span key={tone} className={`ed-seam-copy ${tone}`} aria-hidden="true">
-              <span className="ed-seam-line">{t("Light or dark.", "Hell oder dunkel.")}</span>
-              <span className="ed-seam-line is-italic">{t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}</span>
+              <span className="ed-seam-line">{t("Two lights, two moods.", "Zwei Lichter, zwei Stimmungen.")}</span>
+              <span className="ed-seam-line is-italic">{t("Light or dark.", "Hell oder dunkel.")}</span>
             </span>
           ))}
         </div>
@@ -216,16 +216,6 @@ export function ExampleStory() {
 export function JourneyStory() {
   const { slug } = useParams();
   return <StoryLoader path={`/journeys/${slug}?public=1`} slug={slug} />;
-}
-export function ShowcaseStory() {
-  const { edition } = useParams();
-  const { locale } = useLocale();
-  return (
-    <StoryLoader
-      path={`/showcase/${encodeURIComponent(edition ?? "")}?lang=${locale}`}
-      showcase
-    />
-  );
 }
 type StoryCover = Pick<
   Photo,
@@ -463,6 +453,8 @@ export function DayTeaser({
     </section>
   );
 }
+/** Drift of the running filmstrip in px per second. */
+const FILM_PX_PER_S = 22;
 export function Filmstrip({
   photos,
   onExplore,
@@ -492,7 +484,9 @@ export function Filmstrip({
     const measure = () =>
       element.style.setProperty(
         "--film-duration",
-        `${speed || Math.max(38, (group.current?.getBoundingClientRect().width || 1200) / 32)}s`,
+        // Fixed, calm drift (motion is not configurable): the same speed in px/s however many photos run,
+        // so a long strip does not race. A stored `speed` of older modules is ignored.
+        `${Math.max(60, (group.current?.getBoundingClientRect().width || 1200) / FILM_PX_PER_S)}s`,
       );
     const resize = new ResizeObserver(measure);
     if (group.current) resize.observe(group.current);
@@ -502,7 +496,8 @@ export function Filmstrip({
       resize.disconnect();
       document.removeEventListener("visibilitychange", update);
     };
-  }, [speed]);
+  }, []);
+  void speed;
   if (photos.length < 1) return null;
   const frames = (duplicate = false) =>
     photos.map((photo, index) => (
@@ -801,13 +796,11 @@ function NextJourney({ journey }: { journey: Journey }) {
   );
 }
 /** Closing page of the two edition examples: an invitation to the other edition, in its own mood. */
-function OtherEdition({ journey, showcase }: { journey: Journey; showcase?: boolean }) {
+function OtherEdition({ journey }: { journey: Journey }) {
   const { locale } = useLocale();
   const otherId = journey.story_template === "after-hours" ? "quiet-atlas" : "after-hours";
   const name = tr(otherId === "after-hours" ? "Last Light" : "First Light");
-  const path = showcase
-    ? `/showcase/${otherId}?lang=${locale}`
-    : `/templates/${otherId}/example?lang=${locale}`;
+  const path = `/templates/${otherId}/example?lang=${locale}`;
   const [other, setOther] = useState<{ path: string; journey: Journey } | null>(null);
   useEffect(() => {
     let alive = true;
@@ -829,7 +822,7 @@ function OtherEdition({ journey, showcase }: { journey: Journey; showcase?: bool
       className={`other-edition template-${otherId}`}
       aria-labelledby="other-edition-title"
     >
-      <Link className="other-edition-link" to={`/${showcase ? "showcase" : "inspiration"}/${otherId}`}>
+      <Link className="other-edition-link" to={`/inspiration/${otherId}`}>
         <span className="eyebrow other-edition-kicker">
           {t("THE OTHER EDITION", "DIE ANDERE EDITION")}
         </span>
@@ -1077,11 +1070,11 @@ export function StoryExperience({ journey, showcase, preview = false }: { journe
   }
   const afterHours = journey.story_template === "after-hours";
   const otherEdition = afterHours ? "quiet-atlas" : "after-hours";
-  const editionLink = `/${showcase ? "showcase" : "inspiration"}/${otherEdition}`;
+  const editionLink = `/inspiration/${otherEdition}`;
   const editionName = tr(afterHours ? "First Light" : "Last Light");
-  const editionLabel = afterHours
-    ? t("Last Light · Tenerife", "Letztes Licht · Teneriffa")
-    : t("First Light · Switzerland", "Erstes Licht · Schweiz");
+  const editionLabel = `${afterHours ? t("Last Light", "Letztes Licht") : t("First Light", "Erstes Licht")}${
+    journey.country ? ` · ${journey.country}` : ""
+  }`;
   return (
     <main
       id="main"
@@ -1185,7 +1178,7 @@ export function StoryExperience({ journey, showcase, preview = false }: { journe
           </button>
         </div>
       </div>
-      {(journey.is_example || showcase) && <OtherEdition journey={journey} showcase={showcase} />}
+      {(journey.is_example || showcase) && <OtherEdition journey={journey} />}
       {!showcase && !journey.is_example && journey.published && (
         <NextJourney journey={journey} />
       )}

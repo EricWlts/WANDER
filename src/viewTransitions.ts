@@ -179,11 +179,41 @@ function finishRestore(key: string) {
   const entry = pendingRestore;
   if (!entry || entry.key !== key) return;
   window.scrollTo({ top: entry.y, behavior: "instant" });
-  // Keep the target a moment longer: the app's scroll effect may still run for this entry.
-  setTimeout(() => {
+  // The page may still be growing (images, lazy sections) and clip the target: follow its height for a
+  // moment until the place is reached. Any own scroll gesture of the visitor ends this at once.
+  const until = performance.now() + RESTORE_FOLLOW_MS;
+  let stopped = false;
+  // The tail of a horizontal swipe-back still sends wheel events: only a vertical scroll counts as the visitor's own.
+  const onWheel = (event: WheelEvent) => {
+    if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && Math.abs(event.deltaY) > 4) stop();
+  };
+  const stop = () => {
+    stopped = true;
+    window.removeEventListener("wheel", onWheel);
+    observer?.disconnect();
+    ["touchstart", "keydown", "pointerdown"].forEach((type) => window.removeEventListener(type, stop));
     if (pendingRestore === entry) pendingRestore = null;
-  }, 160);
+  };
+  const follow = () => {
+    if (stopped) return;
+    if (performance.now() > until) return stop();
+    if (Math.abs(window.scrollY - entry.y) > 2) window.scrollTo({ top: entry.y, behavior: "instant" });
+    if (Math.abs(window.scrollY - entry.y) <= 2 && document.documentElement.scrollHeight - window.innerHeight >= entry.y) {
+      // Reached and stable: keep the target a moment longer, the app's scroll effect may still run for this entry.
+      window.setTimeout(stop, 160);
+      stopped = true;
+      observer?.disconnect();
+    }
+  };
+  const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(follow);
+  observer?.observe(document.body);
+  ["touchstart", "keydown", "pointerdown"].forEach((type) => window.addEventListener(type, stop, { passive: true, once: true }));
+  window.addEventListener("wheel", onWheel, { passive: true });
+  follow();
+  window.setTimeout(() => !stopped && stop(), RESTORE_FOLLOW_MS + 50);
 }
+/** How long a Back/Forward restore follows a page that is still growing. */
+const RESTORE_FOLLOW_MS = 2500;
 
 // ---------- Active navigation item: changes on click, not after loading ----------
 
@@ -343,7 +373,10 @@ function onPop(event: PopStateEvent) {
     fromLightbox: !!document.querySelector("dialog.focus-view[open]"),
     toLightbox: !!(event.state as { wanderLightbox?: unknown } | null)?.wanderLightbox,
   });
-  if (!supported() || !wanted) {
+  // A trackpad swipe or the browser's own back animation already shows the page change (Chrome:
+  // hasUAVisualTransition). A second, own transition on top would capture the page before it is restored.
+  const uaAnimated = (event as PopStateEvent & { hasUAVisualTransition?: boolean }).hasUAVisualTransition === true;
+  if (!supported() || !wanted || uaAnimated) {
     // Same page (e.g. the photo viewer closing): let the event through untouched.
     if (to === renderedPath) { pendingRestore = null; return; }
     void waitForPageReady(to).then(() => finishRestore(key));

@@ -923,3 +923,146 @@ html .public-header-slot.is-story {
   pointer-events: none;
   clip-path: inset(-24px -24px -24px -24px);
 }
+
+/* 19.11.2026 – Mobiles Menü: bildschirmfüllendes dunkles Milchglas mit großen Serif-Punkten.
+   Der Rahmen liegt als festes Overlay unter Marke, Sprachwahl und Schließen-Knopf; die Punkte
+   blenden gestaffelt ein. Abschalten: diesen Block entfernen. */
+@keyframes nav-sheet-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nav-item-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 699px) {
+  html.nav-locked { overflow: hidden; overscroll-behavior: none; }
+  /* Ein Backdrop-Filter am Header würde das feste Overlay auf die Leistenhöhe einsperren. */
+  html body .site-header.site-header.has-open-menu {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    overflow: visible;
+    z-index: 60;
+  }
+  html body .site-header.site-header.has-open-menu :is(.editorial-brand, .language-switch, .menu-toggle) {
+    z-index: 30;
+  }
+  html body .site-header.site-header:is(.public-header, .studio-header) nav.nav-open {
+    position: fixed;
+    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 100dvh;
+    max-height: none;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: calc(var(--menu-top, 148px) + 20px) max(28px, env(safe-area-inset-right, 0px)) max(28px, env(safe-area-inset-bottom, 0px)) max(28px, env(safe-area-inset-left, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: none;
+    border: 0;
+    box-shadow: none;
+    background: color-mix(in srgb, var(--brand-frame) 90%, transparent);
+    -webkit-backdrop-filter: blur(26px) saturate(1.15);
+    backdrop-filter: blur(26px) saturate(1.15);
+    animation: nav-sheet-in 320ms var(--ease-out-soft, ease-out) both;
+  }
+  html body .site-header.site-header.is-compact { --menu-top: 84px; }
+  html body .site-header.site-header.public-header:not(.is-compact) { --menu-top: 140px; }
+  html body .site-header.site-header.studio-header:not(.is-compact) { --menu-top: 140px; }
+  html body .site-header.site-header nav.nav-open > a:not(.studio-link) {
+    display: flex;
+    align-items: center;
+    min-height: 56px;
+    padding: 6px 0;
+    font-family: var(--serif);
+    font-size: clamp(34px, 10.5vw, 44px);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.005em;
+    color: color-mix(in srgb, var(--c-linen) 58%, transparent);
+    animation: nav-item-in 560ms var(--ease-out-soft, ease-out) both;
+  }
+  html body .site-header.site-header nav.nav-open > a:not(.studio-link):is(.active, [aria-current="page"], :focus-visible) {
+    color: var(--c-linen);
+  }
+  html body .site-header.site-header nav.nav-open > a:nth-of-type(1) { animation-delay: 90ms; }
+  html body .site-header.site-header nav.nav-open > a:nth-of-type(2) { animation-delay: 150ms; }
+  html body .site-header.site-header nav.nav-open > a:nth-of-type(3) { animation-delay: 210ms; }
+  html body .site-header.site-header nav.nav-open > a:nth-of-type(4) { animation-delay: 270ms; }
+  html body .site-header.site-header nav.nav-open > a:nth-of-type(5) { animation-delay: 360ms; }
+  html body .site-header.site-header nav.nav-open > a::after,
+  html body .site-header.site-header nav.nav-open .nav-label::after { content: none; display: none; }
+  html body .site-header.site-header nav.nav-open .nav-label { display: inline; }
+  html body .site-header.site-header nav.nav-open .nav-action {
+    min-height: 52px;
+    padding: 6px 0;
+    font-family: var(--serif);
+    font-size: clamp(30px, 9vw, 38px);
+    line-height: 1.1;
+    color: color-mix(in srgb, var(--c-linen) 58%, transparent);
+  }
+  /* Mein Studio: dezent am unteren Rand. */
+  html body .site-header.site-header nav.nav-open .studio-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: auto 0 0;
+    padding: 16px 0 6px;
+    min-height: 48px;
+    border-top: 1px solid color-mix(in srgb, var(--c-linen) 14%, transparent);
+    font-family: var(--sans, Manrope, Arial, sans-serif);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    color: color-mix(in srgb, var(--c-linen) 62%, transparent);
+    animation: nav-item-in 560ms var(--ease-out-soft, ease-out) 440ms both;
+  }
+  html body .site-header.site-header nav.nav-open .studio-link:is(:focus-visible, :active) { color: var(--c-linen); }
+  /* Schließen-Knopf: 48 px Fläche, gut mit dem Daumen erreichbar. */
+  html body .site-header.site-header.has-open-menu .menu-toggle {
+    min-width: 48px;
+    min-height: 48px;
+    top: 8px;
+  }
+  html body .site-header.site-header nav.nav-open > a:focus-visible { outline-offset: 4px; border-radius: 2px; }
+  html[data-motion="off"] body .site-header.site-header nav.nav-open,
+  html[data-motion="off"] body .site-header.site-header nav.nav-open > a,
+  html[data-motion="off"] body .site-header.site-header nav.nav-open .studio-link { animation: none; }
+}
+@media (max-width: 699px) and (prefers-reduced-motion: reduce) {
+  html body .site-header.site-header nav.nav-open,
+  html body .site-header.site-header nav.nav-open > a,
+  html body .site-header.site-header nav.nav-open .studio-link { animation: none; }
+}
+@media (max-width: 699px) and (max-height: 640px) {
+  html body .site-header.site-header nav.nav-open > a:not(.studio-link) { min-height: 48px; font-size: 30px; }
+}
+
+/* Studio: Anmelden / Abmelden direkt links neben der Sprache (19.11.2026). */
+.site-header.studio-header .header-auth {
+  position: absolute;
+  top: 10px;
+  right: calc(var(--gutter) + 56px);
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 6px;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: 500 12px / 1 Manrope, Arial, sans-serif;
+  letter-spacing: 0.02em;
+  color: rgb(216, 214, 210);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+.site-header.studio-header .header-auth:hover,
+.site-header.studio-header .header-auth:focus-visible { color: #fff; }
+.site-header.studio-header .header-auth:focus-visible { outline: 2px solid var(--c-linen); outline-offset: 2px; }
+@media (max-width: 699px) {
+  .site-header.studio-header .header-auth { right: calc(16px + 52px); }
+}
+@media (max-width: 380px) {
+  .site-header.studio-header .header-auth { font-size: 0; gap: 0; width: 44px; justify-content: center; }
+}

@@ -197,8 +197,8 @@ export function prefetchPathsFor(path: string, locale: string): string[] {
   const lang = locale === "en" ? "en" : "de";
   if (path === "/" || path === "") return [
     "/journeys?public=1",
-    `/showcase/after-hours?lang=${lang}`,
-    `/showcase/quiet-atlas?lang=${lang}`,
+    `/templates/after-hours/example?lang=${lang}`,
+    `/templates/quiet-atlas/example?lang=${lang}`,
     "/site/hero",
   ];
   if (/^\/archive\/?$/.test(path)) return ["/journeys?public=1"];
@@ -206,7 +206,7 @@ export function prefetchPathsFor(path: string, locale: string): string[] {
   let match = /^\/journeys\/([^/]+)\/?$/.exec(path);
   if (match) return [`/journeys/${segment(match[1])}?public=1`];
   match = /^\/showcase\/([^/]+)\/?$/.exec(path);
-  if (match) return [`/showcase/${encodeURIComponent(segment(match[1]))}?lang=${lang}`];
+  if (match) return [`/templates/${encodeURIComponent(segment(match[1]))}/example?lang=${lang}`];
   match = /^\/inspiration\/([^/]+)\/?$/.exec(path);
   if (match) return [`/templates/${segment(match[1])}/example?lang=${lang}`];
   return [];

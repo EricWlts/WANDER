@@ -1,10 +1,13 @@
 /* Focus view: the photograph grows out of the story and the page stays visible
    behind a veil in the tone of the current edition. No black box. */
 dialog.focus-view {
-  --fv-w: min(72vw, 1180px);
-  --fv-step: calc(var(--fv-w) + 3.2vw);
-  --fv-top: 64px;
-  --fv-h: calc(100svh - 190px);
+  /* The photograph takes nearly the whole screen: a slim masthead above, the counter right below. */
+  --fv-w: min(94vw, 2600px);
+  --fv-step: calc(var(--fv-w) + 1.6vw);
+  /* Slim masthead (64px) + a small gap: the photograph starts below it. */
+  --fv-top: 72px;
+  --fv-cap: 48px;
+  --fv-h: calc(100svh - var(--fv-top) - var(--fv-cap));
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -135,6 +138,10 @@ dialog.focus-view::backdrop {
 .focus-stage[data-zoomed][data-gesture] .focus-slide[data-center] .focus-media {
   cursor: grabbing;
 }
+.focus-flight-frame {
+  position: absolute;
+  pointer-events: none;
+}
 .focus-media img {
   position: absolute;
   inset: 0;
@@ -151,14 +158,14 @@ dialog.focus-view::backdrop {
   to { opacity: 1; }
 }
 
-/* Same place as the page masthead wordmark: top centre, clear of the close control. */
+/* Same rectangle as the slim masthead wordmark (measured on open; fallbacks are the slim-bar values). */
 .focus-wordmark {
   position: absolute;
   z-index: 2;
-  top: 16px;
-  left: 50%;
+  top: var(--fv-mark-top, 20.4px);
+  left: var(--fv-mark-x, 50%);
   transform: translateX(-50%);
-  width: 180px;
+  width: var(--fv-mark-w, 190.8px);
   height: auto;
   aspect-ratio: 736 / 84;
   pointer-events: none;
@@ -200,23 +207,23 @@ dialog.focus-view::backdrop {
   outline-offset: 3px;
 }
 .focus-close {
-  top: 16px;
-  right: 16px;
+  top: 8px;
+  right: 12px;
 }
 .focus-zoom-reset {
-  top: 16px;
-  left: 16px;
+  top: 8px;
+  left: 12px;
 }
 .focus-arrow {
-  top: calc(var(--fv-top) + var(--fv-h) / 2 - 22px);
+  top: calc(var(--fv-top) + var(--fv-h) / 2 - 20px);
 }
-.focus-arrow-prev { left: 16px; }
-.focus-arrow-next { right: 16px; }
+.focus-arrow-prev { left: 12px; }
+.focus-arrow-next { right: 12px; }
 
 .focus-caption {
   position: absolute;
   left: 50%;
-  bottom: 22px;
+  bottom: 12px;
   width: min(640px, calc(100vw - 48px));
   transform: translateX(-50%);
   text-align: center;
@@ -301,16 +308,16 @@ dialog.focus-view[data-leaving] .focus-slide {
 
 @media (max-width: 760px) {
   dialog.focus-view {
-    --fv-w: 86vw;
-    --fv-step: calc(var(--fv-w) + 4vw);
-    --fv-top: 60px;
-    --fv-h: calc(100svh - 210px);
+    --fv-w: 100vw;
+    --fv-step: calc(var(--fv-w) + 8px);
+    --fv-top: 70px;
+    --fv-cap: 52px;
   }
-  .focus-close { top: 10px; right: 10px; }
-  .focus-zoom-reset { top: 10px; left: 10px; }
+  .focus-close { top: 6px; right: 8px; }
+  .focus-zoom-reset { top: 6px; left: 8px; }
   .focus-title { font-size: 21px; }
-  .focus-caption { bottom: 16px; }
-  .focus-wordmark { top: 14px; width: 146px; }
+  .focus-caption { bottom: 14px; }
+  .focus-wordmark { top: var(--fv-mark-top, 26.5px); width: var(--fv-mark-w, 137.2px); }
 }
 @media (hover: none), (pointer: coarse) {
   .focus-arrow { display: none; }

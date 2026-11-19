@@ -7,7 +7,7 @@ html .story-running-line::before,
 html body:has(.chapter-bar.is-docked) .story-running-line::before {
   height: 26px !important;
   transform: none !important;
-  background: color-mix(in srgb, var(--c-ink-black, #10130f) 80%, transparent);
+  background: color-mix(in srgb, var(--c-ink-black, #121110) 80%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
   backdrop-filter: blur(18px) saturate(1.2);
   box-shadow: none;
@@ -1186,7 +1186,7 @@ html body .story-experience[data-scrolled="true"] {
   align-items: flex-end;
   aspect-ratio: 16 / 10;
   color: var(--c-linen);
-  background: #101311;
+  background: #131210;
   text-decoration: none;
 }
 .more-journeys-image { position: absolute; inset: 0; z-index: -2; display: block; }
@@ -1209,7 +1209,7 @@ html body .story-experience[data-scrolled="true"] {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(to top, rgba(10, 12, 11, 0.86) 0%, rgba(10, 12, 11, 0.55) 32%, rgba(10, 12, 11, 0) 62%);
+  background: linear-gradient(to top, rgba(12, 11, 10, 0.86) 0%, rgba(12, 11, 10, 0.55) 32%, rgba(12, 11, 10, 0) 62%);
 }
 .more-journeys-copy {
   display: grid;

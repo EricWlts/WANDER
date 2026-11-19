@@ -39,7 +39,6 @@ import { dayOf } from "./storyDraft";
 import { readLights, type PhotoLight } from "./photoMood";
 import { editionTraits } from "./editionCopy";
 import { StoryCreating } from "./StoryCreating";
-import { prefersReducedMotion, storyCreatingPlan } from "./storyCreatingPlan";
 import type { Journey } from "./types";
 import "./edition-editor.css";
 import "./new-story.css";
@@ -58,13 +57,14 @@ export function NewJournal() {
     [structure, setStructure] = useState<StructureOption | null>(null),
     [words, setWords] = useState<StoryWords>(EMPTY_WORDS),
     [working, setWorking] = useState(false),
-    [creating, setCreating] = useState<{ title: string; photos: string[] } | null>(null),
+    [creating, setCreating] = useState<{ title: string; ready: boolean; photoUrl: string | null } | null>(null),
     [error, setError] = useState(""),
     // Set when composing failed: "Try again" repeats it with the same title and words (they stay in this state).
     [failedCompose, setFailedCompose] = useState<boolean | null>(null),
     [resuming, setResuming] = useState(params.get("journey") !== null);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
+  const creatingDone = useRef<(() => void) | null>(null);
   /** Latest journey and the running date update, readable from the upload callbacks. */
   const latest = useRef<Journey | null>(null),
     datesSaved = useRef<Promise<void>>(Promise.resolve());
@@ -233,11 +233,12 @@ export function NewJournal() {
     setFailedCompose(null);
     setCreating({
       title: isPlaceholderTitleOfAnyForm(current.title) ? "" : current.title,
-      photos: current.photos.map((p) => p.url).filter(Boolean),
+      ready: false,
+      photoUrl: (current.cover ?? current.photos[0])?.large_url || (current.cover ?? current.photos[0])?.url || null,
     });
-    const minimum = new Promise<void>((resolve) =>
-      window.setTimeout(resolve, storyCreatingPlan(prefersReducedMotion(), edition).totalMs),
-    );
+    const minimum = new Promise<void>((resolve) => {
+      creatingDone.current = resolve;
+    });
     try {
       await datesSaved.current;
       const { form, mode } = structureFor(chosenStructure);
@@ -260,6 +261,7 @@ export function NewJournal() {
       } catch {
         /* storage unavailable: the story starts without words */
       }
+      setCreating((c) => (c ? { ...c, ready: true } : c));
       await minimum;
       navigate(`/studio/${current.slug}/edit?${editorStartQuery(mode)}`);
     } catch (e) {
@@ -668,7 +670,7 @@ export function NewJournal() {
         </section>
       )}
 
-      {creating && <StoryCreating title={creating.title} edition={edition} photos={creating.photos} />}
+      {creating && <StoryCreating title={creating.title} edition={edition} ready={creating.ready} photoUrl={creating.photoUrl} onComplete={() => creatingDone.current?.()} />}
 
       {error && (
         <p className="inspector-note new-story-error" role="alert">

@@ -17,9 +17,10 @@ import { RangeField, SegmentedControl, VariantPicker } from "../EditorControls";
 import { CoverFocusEditor } from "../CoverFocusEditor";
 import { ArchiveFocusEditor } from "../ArchiveFocusEditor";
 import { ImageControls } from "../ImageControls";
+import { edgeToEdgeAvailable, edgeToEdgeActive } from "../edgeMedia";
 import { STAGGER_MAX_PX, defaultSideMargin, pairOffsets } from "../imageFrame";
 import { getLocale, t } from "../I18n";
-import { moduleNames, modulePhotos } from "../JournalCanvas";
+import { SIDE_MARGIN_MAX, moduleNames, modulePhotos } from "../JournalCanvas";
 import { photoDateRange } from "../journeyDates";
 import { JOURNEY_FORMS, formName, formOf, isPlaceholderTitleOfAnyForm, placeholderTitle, withForm, type JourneyForm } from "../journeyForm";
 import { placementsFor, rootPhotos, typePresets } from "../journalModel";
@@ -234,6 +235,18 @@ export function Inspector() {
     (legacyStagger ? Math.round((legacyStagger[1] / STAGGER_MAX_PX) * 100) : 0);
   const showStagger = layout.stagger !== undefined || !!legacyStagger;
   const photoRange = journey ? photoDateRange(journey.photos) : null;
+  const edgePhotos = module && journey ? modulePhotos(module, journey) : [];
+  const edgeAvailable = !!module && edgeToEdgeAvailable(module.kind, edgePhotos, layout);
+  const railAsPair = !!module && module.kind === "rail" && edgePhotos.length === 2;
+  /** Two photographs in a running row look better side by side: same photographs, position and chapter. */
+  const convertRailToPair = () => {
+    if (!module) return;
+    const { rail_mode, rail_size, rail_loop, speed, ...rest } = layout;
+    void rail_mode; void rail_size; void rail_loop; void speed;
+    const next: Layout = { ...rest, columns: 2 };
+    if (edgeToEdgeAvailable("pair", edgePhotos, next)) next.edge_to_edge = true;
+    moduleChange(module.id, { kind: "pair", layout: next });
+  };
   const form = formOf(journey);
   const formHints: Record<JourneyForm, string> = {
     journey: t("Several days, told day by day.", "Mehrere Tage, nach Tagen erzählt."),
@@ -1042,6 +1055,19 @@ export function Inspector() {
                       onChange={(rail_mode) => layoutChange(module.id, { rail_mode })}
                     />
                   )}
+                  {module.kind === "rail" && (
+                    <SegmentedControl
+                      label={t("Size", "Größe")}
+                      value={layout.rail_size === "large" ? "large" : "normal"}
+                      options={[
+                        { value: "normal", label: t("Normal", "Normal") },
+                        { value: "large", label: t("Large", "Groß") },
+                      ]}
+                      onChange={(rail_size) =>
+                        layoutChange(module.id, { rail_size: rail_size === "large" ? "large" : undefined })
+                      }
+                    />
+                  )}
                     </section>
                   )}
                   {(TEXT_KINDS.includes(module.kind) || module.kind === "text" || module.kind === "quote" || module.kind === "hero") && (
@@ -1116,6 +1142,41 @@ export function Inspector() {
                     )}
                     </section>
                   )}
+                  {railAsPair && (
+                    <section className="inspector-design-block edge-media-hint" role="note">
+                      <p className="inspector-note">
+                        <strong>
+                          {t(
+                            "Two images often look better side by side. Show as an image pair?",
+                            "Zwei Bilder wirken nebeneinander oft schöner. Als Bildpaar zeigen?",
+                          )}
+                        </strong>
+                      </p>
+                      <button type="button" className="button button-outline" onClick={convertRailToPair}>
+                        {t("Show as image pair", "Als Bildpaar zeigen")}
+                      </button>
+                    </section>
+                  )}
+                  {edgeAvailable && (
+                    <section className="inspector-design-block">
+                      <label className="check-field">
+                        <input
+                          type="checkbox"
+                          checked={edgeToEdgeActive(module.kind, edgePhotos, layout)}
+                          onChange={(e) =>
+                            layoutChange(module.id, { edge_to_edge: e.target.checked ? true : undefined })
+                          }
+                        />
+                        {t("Edge to edge", "Bis zum Rand")}
+                      </label>
+                      <p className="inspector-note">
+                        {t(
+                          "The images run side by side across the full width, separated by a narrow gap.",
+                          "Die Bilder stehen in voller Breite nebeneinander, nur durch eine schmale Fuge getrennt.",
+                        )}
+                      </p>
+                    </section>
+                  )}
                   {module.kind === "wall" && (
                     <section className="inspector-design-block">
                       <h3 className="inspector-group-title">{t("Photo wall", "Fotowand")}</h3>
@@ -1164,7 +1225,34 @@ export function Inspector() {
                   {module.kind !== "hero" && (
                     <section className="inspector-design-block">
                       <h3 className="inspector-group-title">{t("Spacing", "Abstand")}</h3>
-                      {module.kind !== "text" && module.kind !== "quote" && (
+                      {module.kind === "filmstrip" && (
+                        <MarginField
+                          label={t("Width", "Breite")}
+                          value={
+                            (layout.margin_x ?? SIDE_MARGIN_MAX) === 0
+                              ? t("To the edge", "Bis zum Rand")
+                              : `${Math.round(100 - ((layout.margin_x ?? SIDE_MARGIN_MAX) / SIDE_MARGIN_MAX) * 100)} %`
+                          }
+                          resetLabel={t("Reset width", "Breite zurücksetzen")}
+                          changed={layout.margin_x !== undefined}
+                          onReset={() => layoutChange(module.id, { margin_x: undefined })}
+                        >
+                          <input
+                            type="range"
+                            min={0}
+                            max={SIDE_MARGIN_MAX}
+                            step={4}
+                            aria-label={t("Width of the filmstrip", "Breite des Fotostreifens")}
+                            value={SIDE_MARGIN_MAX - (layout.margin_x ?? SIDE_MARGIN_MAX)}
+                            onChange={(e) =>
+                              layoutChange(module.id, {
+                                margin_x: SIDE_MARGIN_MAX - Number(e.target.value),
+                              })
+                            }
+                          />
+                        </MarginField>
+                      )}
+                      {module.kind !== "text" && module.kind !== "quote" && module.kind !== "filmstrip" && (
                         <MarginField
                           label={t("Side margin", "Rand seitlich")}
                           value={`${

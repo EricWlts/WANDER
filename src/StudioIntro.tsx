@@ -1,41 +1,78 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t } from "./I18n";
 import { isMotionOff } from "./motionState";
 import { markStudioIntroPlayed, studioIntroPlayed } from "./studioIntroState";
+import { W_PATH, W_RIDGE, WINDOW } from "./wMark";
+import { pageColor, preloadPhoto, startWindowZoom } from "./wWindow";
 import "./studio-intro.css";
 
 /* Entering the studio: the mountain W draws itself on a dark screen, "Studio" appears beneath it,
-   then the view travels through the W into the studio. Plays once after each successful sign-in
+   then the W becomes a window onto the newest cover and the view flies into it; the studio only appears once the photo fills the screen (wWindow.ts, holdPhoto). Plays once after each successful sign-in
    (see studioIntroState.ts), not on every visit to the studio, and never with motion switched off. */
-
-const W_PATH =
-  "M 995.10,4.90 L 818.63,4.90 L 882.35,39.22 L 887.25,78.43 L 754.90,372.55 L 534.31,0.00 L 348.04,357.84 L 205.88,68.63 L 210.78,29.41 L 259.80,4.90 L 0.00,4.90 L 68.63,49.02 L 289.22,514.71 L 421.57,269.61 L 441.18,279.41 L 490.20,176.47 L 553.92,303.92 L 578.43,269.61 L 720.59,514.71 L 916.67,73.53 L 955.88,24.51 Z";
-const W_RIDGE =
-  "M 289.22,514.71 L 421.57,269.61 L 441.18,279.41 L 490.20,176.47 L 553.92,303.92 L 578.43,269.61 L 720.59,514.71";
 
 function shouldPlay(): boolean {
   return typeof window !== "undefined" && !isMotionOff() && !studioIntroPlayed();
 }
 
-export function StudioIntro() {
+/** Moment (ms) at which the drawn W is complete and becomes a window: the ridge stroke ends at 600 + 3300 ms
+ *  (studio-intro.css); a short rest after it, so the finished letter stands still before anything moves. */
+const WINDOW_AT_MS = 4050;
+
+/** `photoUrl`: cover of the newest story; undefined while the library is still loading, null if there is none. */
+export function StudioIntro({ photoUrl }: { photoUrl?: string | null }) {
   const [show, setShow] = useState(shouldPlay);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const photoRef = useRef(photoUrl);
+  photoRef.current = photoUrl;
+  const preloaded = useRef<{ url: string; promise: Promise<string | null> } | null>(null);
+  if (show && photoUrl && preloaded.current?.url !== photoUrl) preloaded.current = { url: photoUrl, promise: preloadPhoto(photoUrl) };
   useEffect(() => {
     if (!show) return;
     markStudioIntroPlayed();
-    // Safety net: never leave the curtain up if an animation event is missed.
-    const timer = window.setTimeout(() => setShow(false), 5600);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    const launch = async () => {
+      // Wait for the cover (the library may still be loading), at most 1.5 s, otherwise the window opens without a photo.
+      const t0 = performance.now();
+      while (photoRef.current === undefined && performance.now() - t0 < WINDOW.maxPhotoWaitMs) await new Promise((r) => window.setTimeout(r, 50));
+      if (photoRef.current) await (preloaded.current?.promise ?? preloadPhoto(photoRef.current));
+      // The W opens onto the real studio below: wait until its title image is decoded (at most 1.5 s more).
+      const t1 = performance.now();
+      const titleImageReady = () => {
+        const img = document.querySelector<HTMLImageElement>(".studio-am-lead .am-cover img");
+        return !img || (img.complete && img.naturalWidth > 0);
+      };
+      while (!titleImageReady() && performance.now() - t1 < WINDOW.maxPhotoWaitMs) await new Promise((r) => window.setTimeout(r, 50));
+      const root = rootRef.current;
+      const mark = root?.querySelector(".studio-intro-mark");
+      if (cancelled || !root || !mark) return;
+      const bg = getComputedStyle(root).backgroundColor;
+      startWindowZoom({
+        mark,
+        texts: Array.from(root.querySelectorAll<HTMLElement>(".studio-intro-word")),
+        bg,
+        fg: "#fff",
+        // No photo copy inside the letter: through the W you already see the studio's own title image,
+        // and the flight only reveals more of it (no grey-to-clear change, no second picture).
+        photoUrl: null,
+        page: pageColor(bg),
+        gentle: true,
+        // The drawn letter carries its ridge as an 11-unit stroke; without it the hand-over visibly jumps.
+        strokes: [{ d: W_RIDGE, width: 11 }],
+      });
+      setShow(false);
+    };
+    const timer = window.setTimeout(() => void launch(), WINDOW_AT_MS);
+    // Safety net: never leave the curtain up.
+    const safety = window.setTimeout(() => setShow(false), 7500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.clearTimeout(safety);
+    };
   }, [show]);
   if (!show) return null;
   return (
-    <div
-      className="studio-intro"
-      aria-hidden="true"
-      onClick={() => setShow(false)}
-      onAnimationEnd={(event) => {
-        if (event.animationName === "studio-intro-curtain") setShow(false);
-      }}
-    >
+    <div ref={rootRef} className="studio-intro" aria-hidden="true" onClick={() => setShow(false)}>
       <div className="studio-intro-stage">
         {/* Same construction and timing as the masthead W on the home page (App.tsx, header.css):
             the ridge is drawn in one stroke, then the letter grows upward behind a soft-edged mask. */}

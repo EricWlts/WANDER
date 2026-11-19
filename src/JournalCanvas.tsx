@@ -13,6 +13,7 @@ import { QuietAtlasChapterCompass } from "./QuietAtlasChapterCompass";
 import { Filmstrip } from "./StoryExperience";
 import { PhotoRail } from "./PhotoRail";
 import { t } from "./I18n";
+import { InlineText, type TextTarget } from "./InlineText";
 import {
   modulePhotos,
   rootPhotos,
@@ -29,6 +30,7 @@ import {
 export { modulePhotos } from "./journalModel";
 import type { Chapter, Journey, Layout, Photo } from "./types";
 import { coverFocusVars } from "./editionOverrides";
+import { edgeToEdgeActive } from "./edgeMedia";
 import { coverTransitionAttr, coverTransitionStyle } from "./viewTransitions";
 export type Selection =
   | { type: "hero" }
@@ -41,6 +43,8 @@ export type Selection =
       context?: "cover" | "loose" | "filmstrip";
     }
   | { type: "intro" };
+/** Upper end of the side-margin slider (backend range 0–120). */
+export const SIDE_MARGIN_MAX = 120;
 export const moduleNames: Record<Chapter["kind"], [string, string]> = {
   chapter: ["Day / chapter", "Tag / Kapitel"],
   hero: ["Cover", "Titelbild"],
@@ -153,6 +157,7 @@ export function JournalCanvas({
   onPhoto = () => {},
   onEmptyModule,
   onWriteText,
+  onEditText,
   replay = 0,
   dayId,
   emptyState,
@@ -166,6 +171,8 @@ export function JournalCanvas({
   onEmptyModule?: (id: number) => void;
   /** Editor only: the placeholder of an empty text asks to write in the settings panel. */
   onWriteText?: (moduleId: number) => void;
+  /** Editor only: texts are written right in the canvas; called with the finished text on blur. */
+  onEditText?: (target: TextTarget, value: string) => void;
   replay?: number;
   dayId?: number;
   /** Editor only: shown instead of the loose-photo fallback while the story has no modules. */
@@ -185,6 +192,10 @@ export function JournalCanvas({
     formOf(journey) === "journey"
       ? t("What happened on this day?", "Was ist an diesem Tag passiert?")
       : t("One sentence about these pictures.", "Ein Satz zu diesen Bildern.");
+  // Inline writing: a commit handler for one text, or undefined outside the editor.
+  const edit = (target: TextTarget) =>
+    editing && onEditText ? (value: string) => onEditText(target, value) : undefined;
+  const inline = !!(editing && onEditText);
   const placeholder = (moduleId: number) =>
     editing && onWriteText ? (
       <button
@@ -246,7 +257,8 @@ export function JournalCanvas({
       isHero = kind === "hero",
       // Text and quote sit centred in a block of their own width: the text width (not a side margin) decides there.
       hasSideMargin = layout.margin_x !== undefined && !isHero && kind !== "text" && kind !== "quote",
-      single = kind === "image" || isHero;
+      single = kind === "image" || isHero,
+      edge = !single && edgeToEdgeActive(kind, photos, layout);
     const isText = kind === "text" || kind === "quote";
     // Bewegung ist fest (fixedMotion.ts): gespeicherte reveal-Werte werden ignoriert.
     const motion = fixedReveal(kind);
@@ -309,6 +321,11 @@ export function JournalCanvas({
             "--image-hover-scale": hoverScale(kind),
             "--module-margin-x":
               hasSideMargin ? `${layout.margin_x}px` : undefined,
+            // Filmstrip: the side margin reads as width – 0 px = edge to edge, 120 px = the text column.
+            "--strip-bleed":
+              kind === "filmstrip" && hasSideMargin
+                ? String(1 - Math.min(Math.max(layout.margin_x ?? 0, 0), SIDE_MARGIN_MAX) / SIDE_MARGIN_MAX)
+                : undefined,
           } as CSSProperties
         }
         editing={editing}
@@ -323,7 +340,7 @@ export function JournalCanvas({
             onEmptyModule(module.id);
           else onSelect({ type: "module", id: module.id });
         }}
-        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} module-title-overlay ${layout.frame ? "module-framed" : ""} ${filled ? "module-fill" : ""} ${hasSideMargin ? "has-margin-x" : ""} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""} ${kind === "text" && layout.font === undefined ? "text-prose-default-font" : ""} ${kind === "text" && layout.text_size === undefined && layout.text_preset === undefined ? "text-prose-default-size" : ""} ${kind === "text" && layout.text_width === undefined ? "text-prose-default-width" : ""}`}
+        className={`journal-module module-${kind} module-theme-${theme} module-align-${layout.align || "flush"} ${edge ? "module-edge-media" : ""} module-title-overlay ${layout.frame ? "module-framed" : ""} ${filled ? "module-fill" : ""} ${hasSideMargin ? "has-margin-x" : ""} text-position-${layout.text_position || (kind === "chapter" ? "left" : "center")} ${kind === "chapter" && layout.font === undefined ? "chapter-prose-default-font" : ""} ${kind === "chapter" && layout.text_size === undefined && layout.text_preset === undefined ? "chapter-prose-default-size" : ""} ${kind === "chapter" && layout.text_width === undefined ? "chapter-prose-default-width" : ""} ${kind === "text" && layout.font === undefined ? "text-prose-default-font" : ""} ${kind === "text" && layout.text_size === undefined && layout.text_preset === undefined ? "text-prose-default-size" : ""} ${kind === "text" && layout.text_width === undefined ? "text-prose-default-width" : ""}`}
       >
         <Reveal
           key={`${replay}-${module.id}-${motion.effect}`}
@@ -342,25 +359,69 @@ export function JournalCanvas({
                   })}
                 </span>
               )}
-              <h2>{module.title}</h2>
-              {module.story ? (
-                <p className="module-prose">{module.story}</p>
+              <InlineText
+                as="h2"
+                value={module.title}
+                multiline={false}
+                onCommit={edit({ module: module.id, field: "title" })}
+                label={t("Chapter title", "Titel des Kapitels")}
+                placeholder={t("Title", "Titel")}
+              />
+              {module.story || inline ? (
+                <InlineText
+                  className="module-prose"
+                  value={module.story || ""}
+                  onCommit={edit({ module: module.id, field: "story" })}
+                  label={t("Text", "Text")}
+                  placeholder={writeHint}
+                />
               ) : (
                 placeholder(module.id)
               )}
-              {module.quote && <blockquote>{module.quote}</blockquote>}
+              {module.quote && (
+                <InlineText
+                  as="blockquote"
+                  value={module.quote}
+                  onCommit={edit({ module: module.id, field: "quote" })}
+                  label={t("Quote", "Zitat")}
+                />
+              )}
             </div>
           )}
           {kind === "text" &&
             (showTitle || module.story || (editing && onWriteText)) && (
               <div className="module-prose">
-                {showTitle && <h2>{module.title}</h2>}
-                {module.story ? <p>{module.story}</p> : placeholder(module.id)}
+                {showTitle && (
+                  <InlineText
+                    as="h2"
+                    value={module.title}
+                    multiline={false}
+                    onCommit={edit({ module: module.id, field: "title" })}
+                    label={t("Title", "Titel")}
+                    placeholder={t("Title", "Titel")}
+                  />
+                )}
+                {module.story || inline ? (
+                  <InlineText
+                    value={module.story || ""}
+                    onCommit={edit({ module: module.id, field: "story" })}
+                    label={t("Text", "Text")}
+                    placeholder={writeHint}
+                  />
+                ) : (
+                  placeholder(module.id)
+                )}
               </div>
             )}
           {kind === "quote" && (
             <blockquote>
-              {module.quote || module.story}
+              <InlineText
+                as="span"
+                value={module.quote || module.story || ""}
+                onCommit={edit({ module: module.id, field: module.quote ? "quote" : "story" })}
+                label={t("Quote", "Zitat")}
+                placeholder={t("A sentence worth keeping.", "Ein Satz, der bleibt.")}
+              />
               {showTitle && <cite>{module.title}</cite>}
             </blockquote>
           )}
@@ -368,7 +429,7 @@ export function JournalCanvas({
             layout.show_title && <h2>{module.title}</h2>}
           <MediaLayout
             layout={layout}
-            enabled={!isText && kind !== "filmstrip"}
+            enabled={!isText && kind !== "filmstrip" && !edge}
           >
             {isHero ? (
               <div className="module-cover">
@@ -397,8 +458,21 @@ export function JournalCanvas({
                 </Parallax>
                 {showTitle && (
                   <div className="module-cover-copy">
-                    <h2>{module.title}</h2>
-                    {module.story && <p>{module.story}</p>}
+                    <InlineText
+                      as="h2"
+                      value={module.title}
+                      multiline={false}
+                      onCommit={edit({ module: module.id, field: "title" })}
+                      label={t("Title", "Titel")}
+                    />
+                    {(module.story || inline) && (
+                      <InlineText
+                        value={module.story || ""}
+                        onCommit={edit({ module: module.id, field: "story" })}
+                        label={t("Text", "Text")}
+                        placeholder={t("A line about this picture", "Eine Zeile zu diesem Bild")}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -441,6 +515,7 @@ kind === "image" ? (
                       ? 1
                       : desktopWallColumns(layout, kind, photos.length),
                   }}
+                  edge={edge}
                   autoComposition={
                     !single &&
                     ["chapter", "pair", "wall", "gallery"].includes(kind) &&
@@ -468,6 +543,7 @@ kind === "image" ? (
                       ? 1
                       : desktopWallColumns(layout, kind, photos.length),
                   }}
+                  edge={edge}
                   autoComposition={
                     !single &&
                     ["chapter", "pair", "wall", "gallery"].includes(kind) &&
@@ -578,8 +654,25 @@ kind === "image" ? (
               {coverDate}
             </span>
           )}
-          <h1 tabIndex={-1}>{journey.title}</h1>
-          {journey.subtitle && <p>{journey.subtitle}</p>}
+          {inline ? (
+            <InlineText
+              as="h1"
+              value={journey.title}
+              multiline={false}
+              onCommit={edit({ journey: "title" })}
+              label={t("Title of the story", "Titel der Geschichte")}
+            />
+          ) : (
+            <h1 tabIndex={-1}>{journey.title}</h1>
+          )}
+          {(journey.subtitle || inline) && (
+            <InlineText
+              value={journey.subtitle || ""}
+              onCommit={edit({ journey: "subtitle" })}
+              label={t("Subtitle", "Untertitel")}
+              placeholder={t("Subtitle", "Untertitel")}
+            />
+          )}
         </div>
       </Selectable>
       {journey.introduction && (
@@ -590,7 +683,11 @@ kind === "image" ? (
           onSelect={() => onSelect({ type: "intro" })}
           className="journal-intro"
         >
-          <p>{journey.introduction}</p>
+          <InlineText
+            value={journey.introduction}
+            onCommit={edit({ journey: "introduction" })}
+            label={t("Introduction", "Einleitung")}
+          />
         </Selectable>
       )}
       {!editing && rootChapters.length > 1 && (
@@ -614,8 +711,20 @@ kind === "image" ? (
       )}
       {(journey.reflection || journey.closing) && (
         <div className="journal-postscript">
-          {journey.reflection && <p>{journey.reflection}</p>}
-          {journey.closing && <p>{journey.closing}</p>}
+          {journey.reflection && (
+            <InlineText
+              value={journey.reflection}
+              onCommit={edit({ journey: "reflection" })}
+              label={t("Closing thoughts", "Gedanken zum Schluss")}
+            />
+          )}
+          {journey.closing && (
+            <InlineText
+              value={journey.closing}
+              onCommit={edit({ journey: "closing" })}
+              label={t("Last words", "Schlusswort")}
+            />
+          )}
         </div>
       )}
     </div>

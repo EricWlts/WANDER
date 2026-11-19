@@ -118,8 +118,67 @@ function overlapsForegroundPlate(picture: HTMLElement, rest: Rect) {
     rest.top + rest.height > front.top;
 }
 
-const enterEase = "cubic-bezier(0.2, 0.8, 0.2, 1)";
-const exitEase = "cubic-bezier(0.4, 0, 0.2, 1)";
+const enterEase = "cubic-bezier(0.2, 0.7, 0.2, 1)";
+const exitEase = "cubic-bezier(0.2, 0.7, 0.2, 1)";
+const flightMs = 620;
+const openShadow = "0 0 0 0 rgba(0, 0, 0, 0)";
+/** Extends the clip past the box at rest so the shadow is not cut off. */
+const clipRest = "inset(-140px -140px)";
+
+type MountShadow = { color: string; lens: number[] };
+
+/** Splits a computed box-shadow into colour + lengths (x, y, blur, spread). Inset shadows are ignored. */
+function parseShadows(value: string): MountShadow[] {
+  if (!value || value === "none") return [];
+  const parts: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    else if (char === "," && depth === 0) {
+      parts.push(value.slice(from, i));
+      from = i + 1;
+    }
+  }
+  parts.push(value.slice(from));
+  const shadows: MountShadow[] = [];
+  for (const part of parts) {
+    if (/\binset\b/.test(part)) continue;
+    const lens = [...part.matchAll(/(-?[\d.]+(?:e-?\d+)?)px/g)].map((m) => Number(m[1]));
+    const color = part.replace(/(-?[\d.]+(?:e-?\d+)?)px/g, "").trim();
+    if (lens.length < 2 || !color) continue;
+    while (lens.length < 4) lens.push(0);
+    shadows.push({ color, lens: lens.slice(0, 4) });
+  }
+  return shadows;
+}
+
+/** The shadow list scaled to `k` (0 = nothing yet); lengths are divided by `unit` because the flight scales the box. */
+function mountShadow(shadows: MountShadow[], k: number, unit: number) {
+  return shadows
+    .map(
+      ({ color, lens }) =>
+        `${color} ${lens.map((n) => `${(n * k) / unit}px`).join(" ")}`,
+    )
+    .join(", ");
+}
+
+/** The page picture that shows this photograph (same file), preferring one that is on screen. */
+function findOriginal(photo: Photo | undefined): HTMLElement | null {
+  if (!photo) return null;
+  let found: HTMLElement | null = null;
+  for (const image of document.querySelectorAll<HTMLImageElement>(".picture img")) {
+    if (image.closest("dialog.focus-view")) continue;
+    if (image.getAttribute("src") !== photo.url) continue;
+    const picture = image.closest<HTMLElement>(".picture");
+    if (!picture) continue;
+    if (inViewport(picture.getBoundingClientRect())) return picture;
+    found ??= picture;
+  }
+  return found;
+}
 
 export function FocusView({
   photos,
@@ -239,18 +298,88 @@ export function FocusView({
   const centerMedia = () =>
     dialog.current?.querySelector<HTMLElement>("[data-center] .focus-media") ??
     null;
+  /**
+   * The paper mount of a framed original (Erstes Licht) travels with the flight: a separate
+   * frame box sits on the visible part of the photograph and its box-shadow grows from nothing
+   * to exactly the original's computed value (or melts away when opening). Clip and frame are
+   * different boxes, so the clipped overhang never shows and the frame is never cut.
+   */
+  const flightFrame = (
+    media: HTMLElement,
+    source: HTMLElement | null,
+    flip: ReturnType<typeof focusFlip>,
+    closingFlight: boolean,
+  ) => {
+    if (!source) return null;
+    const style = getComputedStyle(source);
+    const shadows = parseShadows(style.boxShadow);
+    if (!shadows.length) return null;
+    const unit = flip.scale > 0 ? flip.scale : 1;
+    const frame = document.createElement("div");
+    frame.setAttribute("aria-hidden", "true");
+    frame.className = "focus-flight-frame";
+    const radius = parseFloat(style.borderTopLeftRadius) || 0;
+    const full = {
+      top: `${flip.clip}px`,
+      bottom: `${flip.clip}px`,
+      left: `${flip.clipX}px`,
+      right: `${flip.clipX}px`,
+      borderRadius: `${radius / unit}px`,
+      boxShadow: mountShadow(shadows, 1, unit),
+    };
+    const none = {
+      top: "0px",
+      bottom: "0px",
+      left: "0px",
+      right: "0px",
+      borderRadius: "0px",
+      boxShadow: mountShadow(shadows, 0, unit),
+    };
+    for (const stale of media.querySelectorAll(".focus-flight-frame")) stale.remove();
+    media.appendChild(frame);
+    const animation = run(
+      frame,
+      closingFlight ? [none, full] : [full, none],
+      {
+        duration: flightMs,
+        easing: closingFlight ? exitEase : enterEase,
+        fill: "both",
+      },
+    );
+    if (!closingFlight && animation) {
+      const drop = () => frame.remove();
+      animation.finished.then(drop, drop);
+    }
+    return animation;
+  };
 
   // Open: the photograph grows out of its place; the page behind stays visible under a veil.
   useLayoutEffect(() => {
     const element = dialog.current!;
     const scroll = { x: window.scrollX, y: window.scrollY };
+    // The wordmark stays exactly where the slim masthead shows it: measure the page's own glyphs.
+    const header = document.querySelector<HTMLElement>("header.site-header.is-compact");
+    const mono = header?.querySelector<SVGElement>(".editorial-brand .header-monogram");
+    const rest = header?.querySelector<SVGElement>(".editorial-brand .header-remainder");
+    if (mono && rest) {
+      const a = mono.getBoundingClientRect();
+      const b = rest.getBoundingClientRect();
+      const width = b.right - a.left;
+      const height = (width * 84) / 736;
+      const centre = (Math.min(a.top, b.top) + Math.max(a.bottom, b.bottom)) / 2;
+      if (width > 80 && width < 400 && centre > 0 && centre < 120) {
+        element.style.setProperty("--fv-mark-w", `${width.toFixed(2)}px`);
+        element.style.setProperty("--fv-mark-x", `${((a.left + b.right) / 2).toFixed(2)}px`);
+        element.style.setProperty("--fv-mark-top", `${(centre - height / 2).toFixed(2)}px`);
+      }
+    }
     if (!element.open) element.showModal();
     finished.current = false;
     closing.current = false;
     waitingPop.current = false;
     if (!motionRef.current) {
       run(scrim.current, [{ opacity: 0 }, { opacity: 1 }], {
-        duration: 540,
+        duration: flightMs,
         easing: enterEase,
       });
       const media = centerMedia();
@@ -260,17 +389,26 @@ export function FocusView({
         : null;
       if (media && to && from && inViewport(from)) {
         const flip = focusFlip(from, to);
+        const shadow = getComputedStyle(media).boxShadow;
+        const tint = getComputedStyle(media).backgroundColor;
         run(
           media,
           [
             {
               transform: `translate(${flip.x}px, ${flip.y}px) scale(${flip.scale})`,
-              clipPath: `inset(${flip.clip}px 0px)`,
+              boxShadow: openShadow,
+              backgroundColor: "transparent",
             },
-            { transform: "none", clipPath: "inset(0px 0px)" },
+            { transform: "none", boxShadow: shadow, backgroundColor: tint },
           ],
-          { duration: 580, easing: enterEase },
+          { duration: flightMs, easing: enterEase },
         );
+        run(
+          media.querySelector(".focus-zoom"),
+          [{ clipPath: `inset(${flip.clip}px ${flip.clipX}px)` }, { clipPath: clipRest }],
+          { duration: flightMs, easing: enterEase },
+        );
+        flightFrame(media, origin.picture, flip, false);
         if (origin.picture) hide(origin.picture);
       } else
         run(
@@ -279,7 +417,7 @@ export function FocusView({
             { opacity: 0, transform: "scale(0.96)" },
             { opacity: 1, transform: "none" },
           ],
-          { duration: 420, easing: enterEase },
+          { duration: 460, easing: enterEase },
         );
     } else if (origin.picture?.isConnected) hide(origin.picture);
     return () => {
@@ -349,10 +487,19 @@ export function FocusView({
           height: picture.offsetHeight,
         });
       }
-    } else if (origin.picture?.isConnected && indexRef.current === startIndex) {
-      landing = origin.picture;
-      rest = origin.picture.getBoundingClientRect();
     }
+    if (!landing || !rest) {
+      // The photograph on screen now (maybe not the one that was clicked): its own original.
+      const own =
+        indexRef.current === startIndex && origin.picture?.isConnected
+          ? origin.picture
+          : findOriginal(photos[indexRef.current]);
+      landing = own;
+      rest = own ? own.getBoundingClientRect() : null;
+    }
+    // Another original than the clicked one: the clicked one is already back.
+    if (landing !== origin.picture && origin.picture?.isConnected)
+      origin.picture.style.visibility = "";
     const media = centerMedia();
     const here = media?.getBoundingClientRect();
     const behindPlate = landing && rest && here && media && inViewport(rest) &&
@@ -363,7 +510,7 @@ export function FocusView({
     };
     add(
       run(scrim.current, [{ opacity: 1 }, { opacity: 0 }], {
-        duration: behindPlate ? 480 : 520,
+        duration: flightMs,
         easing: exitEase,
         fill: "forwards",
       }),
@@ -375,26 +522,37 @@ export function FocusView({
       if (behindPlate) {
         landing.style.visibility = "";
         add(run(media, [{ opacity: 1 }, { opacity: 0 }], {
-          delay: 300,
-          duration: 180,
+          delay: flightMs - 200,
+          duration: 200,
           easing: exitEase,
           fill: "both",
         }));
       } else hide(landing);
       focusTarget.current = landing;
+      const shadow = getComputedStyle(media).boxShadow;
+      const tint = getComputedStyle(media).backgroundColor;
       add(
         run(
           media,
           [
-            { transform: "none", clipPath: "inset(0px 0px)" },
+            { transform: "none", boxShadow: shadow, backgroundColor: tint },
             {
               transform: `translate(${flip.x}px, ${flip.y}px) scale(${flip.scale})`,
-              clipPath: `inset(${flip.clip}px 0px)`,
+              boxShadow: openShadow,
+              backgroundColor: "transparent",
             },
           ],
-          { duration: 480, easing: exitEase, fill: "forwards" },
+          { duration: flightMs, easing: exitEase, fill: "forwards" },
         ),
       );
+      add(
+        run(
+          media.querySelector(".focus-zoom"),
+          [{ clipPath: clipRest }, { clipPath: `inset(${flip.clip}px ${flip.clipX}px)` }],
+          { duration: flightMs, easing: exitEase, fill: "forwards" },
+        ),
+      );
+      add(flightFrame(media, landing, flip, true));
     } else
       add(
         run(
@@ -403,7 +561,7 @@ export function FocusView({
             { opacity: 1, transform: "none" },
             { opacity: 0, transform: "scale(0.97)" },
           ],
-          { duration: 300, easing: exitEase, fill: "forwards" },
+          { duration: 360, easing: exitEase, fill: "forwards" },
         ),
       );
     if (!pending.length) {
@@ -414,7 +572,7 @@ export function FocusView({
       settle,
       settle,
     );
-    window.setTimeout(settle, 900);
+    window.setTimeout(settle, flightMs + 400);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count, origin, startIndex, resetZoom]);
 
@@ -426,6 +584,29 @@ export function FocusView({
     },
     [count, resetZoom],
   );
+
+  // The caption sits right under the photograph: the photograph gets what is left (never shrinks back).
+  const captionRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const caption = captionRef.current;
+    const host = dialog.current;
+    if (!caption || !host || typeof ResizeObserver === "undefined") return;
+    let tallest = 0;
+    const measure = () => {
+      // Only the text block: the transient loading line must not shrink the photograph.
+      const body = caption.querySelector<HTMLElement>(".focus-caption-body");
+      const next = Math.ceil(body?.offsetHeight ?? caption.offsetHeight);
+      if (next <= tallest) return;
+      tallest = next;
+      host.style.setProperty("--fv-cap", `${next + 22}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(caption);
+    const body = caption.querySelector(".focus-caption-body");
+    if (body) observer.observe(body);
+    return () => observer.disconnect();
+  }, []);
 
   // Decoded full-size loading for the current photograph and its neighbours.
   useEffect(() => {
@@ -788,7 +969,7 @@ export function FocusView({
                 <img
                   src={slide.url}
                   srcSet={slide.srcset || undefined}
-                  sizes="(max-width: 760px) 86vw, 72vw"
+                  sizes="(max-width: 760px) 100vw, 94vw"
                   alt={center ? slide.alt || slide.description || slide.title || "" : ""}
                   width={slide.width}
                   height={slide.height}
@@ -844,7 +1025,7 @@ export function FocusView({
           </button>
         </>
       )}
-      <div className="focus-caption" aria-busy={view.status === "loading"}>
+      <div ref={captionRef} className="focus-caption" aria-busy={view.status === "loading"}>
         <div key={view.visible ?? index} className="focus-caption-body">
         {detail?.edits?.show_title && detail.title?.trim() && (
           <p className="focus-title">{detail.title}</p>
